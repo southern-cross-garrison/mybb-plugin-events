@@ -1,0 +1,47 @@
+<html>
+<head>
+    <title>Events - {$mybb->settings['bbname']}</title>
+    {$headerinclude}
+</head>
+<body>
+    {$header}
+    
+    <div class="events_container">
+        <h1>Events</h1>
+        
+        <div class="events_controls">
+            <a href="events.php?view=list" class="button">List View</a>
+            <a href="events.php?view=calendar" class="button">Calendar View</a>
+            
+            <form method="get" action="events.php" style="display: inline-block; margin-left: 20px;">
+                <select name="region">
+                    <option value="">All Regions</option>
+                    <option value="Sydney" {$region_sydney_selected}>Sydney</option>
+                    <option value="Hunter" {$region_hunter_selected}>Hunter</option>
+                    <option value="Canberra" {$region_canberra_selected}>Canberra</option>
+                    <option value="Other" {$region_other_selected}>Other</option>
+                </select>
+                <input type="submit" value="Filter" class="button">
+            </form>
+        </div>
+        
+        <table class="events_table">
+            <thead>
+                <tr>
+                    <th>Event</th>
+                    <th>Region</th>
+                    <th>Date</th>
+                    <th>RSVPs</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {$events_list}
+            </tbody>
+        </table>
+    </div>
+    
+    {$footer}
+</body>
+</html>

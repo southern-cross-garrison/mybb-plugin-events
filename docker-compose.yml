@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: mybb-events-test
+    ports:
+      - "8080:80"
+    volumes:
+      - ./test-forum:/var/www/html
+      - ./plugin/inc/plugins:/var/www/html/inc/plugins
+    depends_on:
+      - db
+    environment:
+      - APACHE_DOCUMENT_ROOT=/var/www/html
+    networks:
+      - mybb-network
+
+  db:
+    image: mysql:5.7
+    container_name: mybb-events-db
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: mybb
+      MYSQL_USER: mybb
+      MYSQL_PASSWORD: mybbpassword
+    volumes:
+      - mybb-db-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    networks:
+      - mybb-network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: mybb-events-phpmyadmin
+    environment:
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: rootpassword
+    ports:
+      - "8081:80"
+    depends_on:
+      - db
+    networks:
+      - mybb-network
+
+volumes:
+  mybb-db-data:
+
+networks:
+  mybb-network:
+    driver: bridge

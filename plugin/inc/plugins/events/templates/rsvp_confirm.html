@@ -1,0 +1,23 @@
+<html>
+<head>
+    <title>RSVP Confirmed - {$mybb->settings['bbname']}</title>
+    {$headerinclude}
+</head>
+<body>
+    {$header}
+    
+    <div class="rsvp_confirmed">
+        <h1>RSVP Confirmed!</h1>
+        
+        <p>You have successfully RSVPed to <strong>{$event_title}</strong>.</p>
+        
+        <div class="rsvp_actions">
+            <a href="ical.php?id={$event_id}" class="button">Download iCal File</a>
+            <a href="event.php?id={$event_id}" class="button">View Event</a>
+            <a href="events.php" class="button">Back to Events</a>
+        </div>
+    </div>
+    
+    {$footer}
+</body>
+</html>

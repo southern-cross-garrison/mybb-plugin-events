@@ -1,0 +1,89 @@
+<html>
+<head>
+    <title>RSVP - {$mybb->settings['bbname']}</title>
+    {$headerinclude}
+</head>
+<body>
+    {$header}
+    
+    <div class="rsvp_form">
+        <h1>RSVP to Event</h1>
+        
+        {if $step == 'costumes'}
+        <form method="post" action="rsvp.php?id={$event_id}&step=costumes">
+            <input type="hidden" name="my_post_key" value="{$mybb->post_code}">
+            
+            <div class="form_section">
+                <h2>Select Costumes</h2>
+                <p>Select the costume(s) you intend to wear at this event:</p>
+                
+                {if $user_costumes}
+                {foreach $user_costumes as $costume}
+                <label>
+                    <input type="checkbox" name="costumes[]" value="{$costume}">
+                    {$costume}
+                </label><br>
+                {/foreach}
+                {else}
+                <p>No costumes found in your profile. <a href="usercp.php?action=profile">Edit your profile</a> to add costumes.</p>
+                {/if}
+            </div>
+            
+            <div class="form_actions">
+                <input type="submit" value="Continue" class="button">
+                <a href="event.php?id={$event_id}" class="button">Cancel</a>
+            </div>
+        </form>
+        {/if}
+        
+        {if $step == 'days'}
+        <form method="post" action="rsvp.php?id={$event_id}&step=days">
+            <input type="hidden" name="my_post_key" value="{$mybb->post_code}">
+            <input type="hidden" name="costumes" value="{$selected_costumes}">
+            
+            <div class="form_section">
+                <h2>Select Days</h2>
+                <p>Select which days you will attend (default: all days):</p>
+                
+                {foreach $event_days as $day}
+                <label>
+                    <input type="checkbox" name="days[]" value="{$day.id}" checked>
+                    {$day.date} {if $day.start_time}{$day.start_time}{/if} - {if $day.end_time}{$day.end_time}{/if}
+                </label><br>
+                {/foreach}
+            </div>
+            
+            <div class="form_actions">
+                <input type="submit" value="Continue" class="button">
+                <a href="event.php?id={$event_id}" class="button">Cancel</a>
+            </div>
+        </form>
+        {/if}
+        
+        {if $step == 'confirm'}
+        <form method="post" action="rsvp.php?id={$event_id}&step=confirm">
+            <input type="hidden" name="my_post_key" value="{$mybb->post_code}">
+            <input type="hidden" name="costumes" value="{$selected_costumes}">
+            <input type="hidden" name="days" value="{$selected_days}">
+            
+            <div class="form_section">
+                <h2>Confirm RSVP</h2>
+                
+                <p><strong>Event:</strong> {$event_title}</p>
+                <p><strong>Costumes:</strong> {$selected_costumes_display}</p>
+                {if $selected_days_display}
+                <p><strong>Days:</strong> {$selected_days_display}</p>
+                {/if}
+            </div>
+            
+            <div class="form_actions">
+                <input type="submit" value="Confirm RSVP" class="button">
+                <a href="event.php?id={$event_id}" class="button">Cancel</a>
+            </div>
+        </form>
+        {/if}
+    </div>
+    
+    {$footer}
+</body>
+</html>
