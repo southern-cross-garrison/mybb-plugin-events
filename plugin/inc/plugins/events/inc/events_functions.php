@@ -26,20 +26,20 @@ function events_is_gec($user_id = null)
         return true;
     }
     
-    // Check if user is in GEC group
-    $gec_groups = events_get_setting('gec_groups');
-    if(empty($gec_groups))
+    // Check if user is in Event Coordinator group
+    $event_coordinator_groups = events_get_setting('event_coordinator_groups');
+    if(empty($event_coordinator_groups))
     {
         return false;
     }
     
-    $gec_groups = explode(',', $gec_groups);
+    $event_coordinator_groups = explode(',', $event_coordinator_groups);
     $user_groups = explode(',', $mybb->user['additionalgroups']);
     $user_groups[] = $mybb->user['usergroup'];
     
-    foreach($gec_groups as $gec_group)
+    foreach($event_coordinator_groups as $event_coordinator_group)
     {
-        if(in_array($gec_group, $user_groups))
+        if(in_array($event_coordinator_group, $user_groups))
         {
             return true;
         }
@@ -209,19 +209,11 @@ function events_check_prerequisites($event_id, $user_id = null)
         return array('error' => 'Event not found');
     }
     
-    // Check TK ID requirement
-    $scg_group = events_get_setting('scg_members_group');
-    $legion_group = events_get_setting('501st_members_group');
-    $user_groups = explode(',', $mybb->user['additionalgroups']);
-    $user_groups[] = $mybb->user['usergroup'];
-    
-    if(in_array($scg_group, $user_groups) || in_array($legion_group, $user_groups))
+    // Check TK ID requirement - check if field is populated
+    $tk_id = events_get_user_field($user_id, 'tk_id');
+    if(empty($tk_id))
     {
-        $tk_id = events_get_user_field($user_id, 'tk_id');
-        if(empty($tk_id))
-        {
-            $missing['tk_id'] = true;
-        }
+        $missing['tk_id'] = true;
     }
     
     // Check WWCC requirement

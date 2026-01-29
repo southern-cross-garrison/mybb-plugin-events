@@ -23,7 +23,7 @@ function events_admin_settings()
             'events_wwcc_field' => $mybb->input['wwcc_field'],
             'events_mobile_field' => $mybb->input['mobile_field'],
             'events_emergency_contact_field' => $mybb->input['emergency_contact_field'],
-            'events_gec_groups' => $mybb->input['gec_groups'],
+            'events_event_coordinator_groups' => $mybb->input['event_coordinator_groups'],
             'events_scg_members_group' => $mybb->input['scg_members_group'],
             'events_501st_members_group' => $mybb->input['501st_members_group'],
             'events_troop_report_forum' => $mybb->input['troop_report_forum']
@@ -93,10 +93,10 @@ function events_admin_settings()
         "Select the custom profile field that contains emergency contact information",
         $form->generate_select_box("emergency_contact_field", $profile_fields, $mybb->settings['events_emergency_contact_field']));
     
-    // GEC groups
-    $form_container->output_row("GEC User Groups",
-        "Comma-separated list of user group IDs that have GEC permissions",
-        $form->generate_text_box("gec_groups", $mybb->settings['events_gec_groups']));
+    // Event Coordinator groups
+    $form_container->output_row("Event Coordinator User Groups",
+        "Select user groups that have Event Coordinator permissions",
+        $form->generate_text_box("event_coordinator_groups", $mybb->settings['events_event_coordinator_groups']));
     
     // SCG Members group
     $form_container->output_row("SCG Members Group",

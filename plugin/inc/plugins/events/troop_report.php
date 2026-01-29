@@ -165,18 +165,18 @@ while($rsvp = $db->fetch_array($query))
     // Get TK ID
     $tk_id = events_get_user_field($rsvp['uid'], 'tk_id');
     
-    // Determine club
+    // Determine club categorization
     $user_groups = explode(',', $rsvp['additionalgroups'] ?? '');
     $user_groups[] = $rsvp['usergroup'];
     
-    $club = 'Other';
-    if(in_array($legion_group, $user_groups))
+    $club = 'Others';
+    if(in_array($scg_group, $user_groups))
     {
-        $club = '501st';
+        $club = 'Southern Cross Garrison Members';
     }
-    elseif(in_array($scg_group, $user_groups))
+    elseif(in_array($legion_group, $user_groups))
     {
-        $club = 'SCG';
+        $club = 'Other 501st Members';
     }
     
     $attendees_by_club[$club][] = array(

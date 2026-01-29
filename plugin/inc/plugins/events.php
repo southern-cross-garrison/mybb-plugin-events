@@ -133,10 +133,10 @@ function events_install()
             "gid" => $gid
         ),
         array(
-            "name" => "events_gec_groups",
-            "title" => "GEC User Groups",
-            "description" => "Comma-separated list of user group IDs that have GEC permissions",
-            "optionscode" => "text",
+            "name" => "events_event_coordinator_groups",
+            "title" => "Event Coordinator User Groups",
+            "description" => "Select user groups that have Event Coordinator permissions",
+            "optionscode" => "groupselect",
             "value" => "",
             "disporder" => 6,
             "gid" => $gid
@@ -144,8 +144,8 @@ function events_install()
         array(
             "name" => "events_scg_members_group",
             "title" => "SCG Members Group ID",
-            "description" => "User group ID for SCG Members (required for TK ID validation)",
-            "optionscode" => "text",
+            "description" => "Select the user group for SCG Members (used to segment users on the troop report)",
+            "optionscode" => "groupselectsingle",
             "value" => "",
             "disporder" => 7,
             "gid" => $gid
@@ -153,8 +153,8 @@ function events_install()
         array(
             "name" => "events_501st_members_group",
             "title" => "501st Members Group ID",
-            "description" => "User group ID for 501st Members (required for TK ID validation)",
-            "optionscode" => "text",
+            "description" => "Select the user group for 501st Members (used to segment users on the troop report)",
+            "optionscode" => "groupselectsingle",
             "value" => "",
             "disporder" => 8,
             "gid" => $gid
@@ -162,8 +162,8 @@ function events_install()
         array(
             "name" => "events_troop_report_forum",
             "title" => "Troop Report Forum ID",
-            "description" => "Forum ID where troop reports should be posted",
-            "optionscode" => "text",
+            "description" => "Select the forum where troop reports should be posted",
+            "optionscode" => "forumselectsingle",
             "value" => "",
             "disporder" => 9,
             "gid" => $gid
@@ -254,6 +254,25 @@ function events_activate()
             array("optionscode" => $db->escape_string($optionscode)),
             "name = '" . $db->escape_string($setting_name) . "'");
     }
+    
+    // Update group settings to use built-in group selectors
+    $group_settings = array(
+        'events_event_coordinator_groups' => 'groupselect',
+        'events_scg_members_group' => 'groupselectsingle',
+        'events_501st_members_group' => 'groupselectsingle'
+    );
+    
+    foreach($group_settings as $setting_name => $optionscode)
+    {
+        $db->update_query("settings", 
+            array("optionscode" => $db->escape_string($optionscode)),
+            "name = '" . $db->escape_string($setting_name) . "'");
+    }
+    
+    // Update forum setting to use built-in forum selector
+    $db->update_query("settings", 
+        array("optionscode" => $db->escape_string("forumselectsingle")),
+        "name = 'events_troop_report_forum'");
     
     // Rebuild settings cache so changes take effect
     rebuild_settings();
