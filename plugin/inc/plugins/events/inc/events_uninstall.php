@@ -10,7 +10,7 @@ if(!defined("IN_MYBB"))
     die("Direct initialization of this file is not allowed.");
 }
 
-function events_uninstall()
+function events_uninstall_database()
 {
     global $db;
     

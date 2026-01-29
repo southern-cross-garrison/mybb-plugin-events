@@ -47,7 +47,7 @@ function events_install()
     
     // Install database tables
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_install.php";
-    events_install();
+    events_install_database();
     
     // Create settings group (check first to avoid duplicates)
     $query = $db->simple_select("settinggroups", "gid", "name = 'events'");
@@ -172,10 +172,45 @@ function events_install()
 }
 
 /**
+ * Build optionscode for profile field dropdown
+ */
+function events_build_profile_field_optionscode()
+{
+    global $db;
+    
+    // Get all custom profile fields
+    $profile_fields = array();
+    $query = $db->simple_select("profilefields", "fid, name", "", array("order_by" => "name", "order_dir" => "ASC"));
+    while($field = $db->fetch_array($query))
+    {
+        $profile_fields[$field['fid']] = $field['name'];
+    }
+    
+    // Build optionscode string for select dropdown
+    // Format: select\nkey1=Value1\nkey2=Value2
+    $optionscode = "select\n";
+    $optionscode .= "=None\n"; // Add "None" option (empty value)
+    
+    foreach($profile_fields as $fid => $name)
+    {
+        // Escape special characters in the name
+        $name = str_replace(array('=', "\n", "\r"), array('', '', ''), $name);
+        $optionscode .= $fid . "=" . $name . "\n";
+    }
+    
+    // Remove trailing newline
+    $optionscode = rtrim($optionscode);
+    
+    return $optionscode;
+}
+
+/**
  * Plugin activation
  */
 function events_activate()
 {
+    global $db;
+    
     // Register hooks
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_hooks.php";
     events_register_hooks();
@@ -183,6 +218,29 @@ function events_activate()
     // Register scheduled task
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_tasks.php";
     events_register_task();
+    
+    // Update profile field settings to use dropdown instead of text
+    // This needs to happen on activation so we can query existing profile fields
+    $profile_field_settings = array(
+        'events_costume_field',
+        'events_tk_id_field',
+        'events_wwcc_field',
+        'events_mobile_field',
+        'events_emergency_contact_field'
+    );
+    
+    $optionscode = events_build_profile_field_optionscode();
+    
+    // Update each profile field setting
+    foreach($profile_field_settings as $setting_name)
+    {
+        $db->update_query("settings", 
+            array("optionscode" => $db->escape_string($optionscode)),
+            "name = '" . $db->escape_string($setting_name) . "'");
+    }
+    
+    // Rebuild settings cache so changes take effect
+    rebuild_settings();
 }
 
 /**
@@ -211,7 +269,7 @@ function events_uninstall()
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_uninstall.php";
     
     // Uninstall database
-    events_uninstall();
+    events_uninstall_database();
     
     // Remove scheduled task
     $db->delete_query("tasks", "file = 'events_reminders'");

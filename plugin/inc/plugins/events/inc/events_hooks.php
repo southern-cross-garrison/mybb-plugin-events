@@ -26,6 +26,11 @@ function events_register_hooks()
     
     // Scheduled task
     $plugins->add_hook("task_events_reminders", "events_send_reminders");
+    
+    // Rebuild profile field dropdowns when profile fields are added, edited, or deleted
+    $plugins->add_hook("admin_config_profile_fields_add_commit", "events_rebuild_profile_field_dropdowns");
+    $plugins->add_hook("admin_config_profile_fields_edit_commit", "events_rebuild_profile_field_dropdowns");
+    $plugins->add_hook("admin_config_profile_fields_delete_commit", "events_rebuild_profile_field_dropdowns");
 }
 
 /**
@@ -143,3 +148,61 @@ function events_send_reminders()
         }
     }
 }
+
+/**
+ * Rebuild profile field dropdowns when profile fields are added, edited, or deleted
+ * This ensures the dropdown menus stay up-to-date with available profile fields
+ * 
+ * Hook names (verified from MyBB source):
+ * - admin_config_profile_fields_add_commit (fires after profile field is added)
+ * - admin_config_profile_fields_edit_commit (fires after profile field is edited)
+ * - admin_config_profile_fields_delete_commit (fires after profile field is deleted)
+ */
+function events_rebuild_profile_field_dropdowns()
+{
+    global $db;
+    
+    // List of settings that should be profile field dropdowns
+    $profile_field_settings = array(
+        'events_costume_field',
+        'events_tk_id_field',
+        'events_wwcc_field',
+        'events_mobile_field',
+        'events_emergency_contact_field'
+    );
+    
+    // Get all custom profile fields
+    $profile_fields = array();
+    $query = $db->simple_select("profilefields", "fid, name", "", array("order_by" => "name", "order_dir" => "ASC"));
+    while($field = $db->fetch_array($query))
+    {
+        $profile_fields[$field['fid']] = $field['name'];
+    }
+    
+    // Build optionscode string for select dropdown
+    // Format: select\nkey1=Value1\nkey2=Value2
+    $optionscode = "select\n";
+    $optionscode .= "=None\n"; // Add "None" option (empty value)
+    
+    foreach($profile_fields as $fid => $name)
+    {
+        // Escape special characters in the name
+        $name = str_replace(array('=', "\n", "\r"), array('', '', ''), $name);
+        $optionscode .= $fid . "=" . $name . "\n";
+    }
+    
+    // Remove trailing newline
+    $optionscode = rtrim($optionscode);
+    
+    // Update each profile field setting
+    foreach($profile_field_settings as $setting_name)
+    {
+        $db->update_query("settings", 
+            array("optionscode" => $db->escape_string($optionscode)),
+            "name = '" . $db->escape_string($setting_name) . "'");
+    }
+    
+    // Rebuild settings cache so changes take effect immediately
+    rebuild_settings();
+}
+

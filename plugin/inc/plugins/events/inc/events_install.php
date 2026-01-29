@@ -10,7 +10,7 @@ if(!defined("IN_MYBB"))
     die("Direct initialization of this file is not allowed.");
 }
 
-function events_install()
+function events_install_database()
 {
     global $db;
     
