@@ -26,11 +26,6 @@ function events_register_hooks()
     
     // Scheduled task
     $plugins->add_hook("task_events_reminders", "events_send_reminders");
-    
-    // Rebuild profile field dropdowns when profile fields are added, edited, or deleted
-    $plugins->add_hook("admin_config_profile_fields_add_commit", "events_rebuild_profile_field_dropdowns");
-    $plugins->add_hook("admin_config_profile_fields_edit_commit", "events_rebuild_profile_field_dropdowns");
-    $plugins->add_hook("admin_config_profile_fields_delete_commit", "events_rebuild_profile_field_dropdowns");
 }
 
 /**

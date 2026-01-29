@@ -11,6 +11,22 @@ if(!defined("IN_MYBB"))
     die("Direct initialization of this file is not allowed.");
 }
 
+// Register admin hooks directly in plugin file (needed for admin context)
+// This ensures hooks are registered every time the admin panel loads
+if(defined('IN_ADMINCP'))
+{
+    global $plugins;
+    
+    // Load hooks file to get the functions
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_hooks.php";
+    
+    // Rebuild profile field dropdowns when profile fields are added, edited, or deleted
+    // These hooks must be registered in admin context to work properly
+    $plugins->add_hook("admin_config_profile_fields_add_commit", "events_rebuild_profile_field_dropdowns");
+    $plugins->add_hook("admin_config_profile_fields_edit_commit", "events_rebuild_profile_field_dropdowns");
+    $plugins->add_hook("admin_config_profile_fields_delete_commit", "events_rebuild_profile_field_dropdowns");
+}
+
 // Plugin information
 function events_info()
 {
