@@ -1,0 +1,30 @@
+<html>
+<head>
+<title>{$event_title} - {$mybb->settings['bbname']}</title>
+{$headerinclude}
+</head>
+<body>
+{$header}
+<div id="event_page" data-event-id="{$event_id}" data-event-status="{$event_status}">
+<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
+<tr><td class="thead"><strong id="event_title">{$event_title}</strong></td></tr>
+<tr><td class="trow1">
+<div id="event_meta">
+<p><strong>Status:</strong> <span id="event_status">{$event_status}</span></p>
+<p><strong>Region:</strong> <span id="event_region">{$event_region}</span></p>
+<p><strong>Starts:</strong> <span id="event_start">{$event_start_date}</span></p>
+<p><strong>Ends:</strong> <span id="event_end">{$event_end_date}</span></p>
+{$event_cutoff_row}
+{$event_wwcc_row}
+<p><strong>RSVPs:</strong> <span id="event_rsvp_count">{$rsvp_count}</span></p>
+</div>
+<div id="event_description">{$event_description}</div>
+{$event_days_block}
+</td></tr>
+<tr><td class="trow2"><div id="event_actions">{$event_actions}</div></td></tr>
+</table>
+{$gec_block}
+</div>
+{$footer}
+</body>
+</html>

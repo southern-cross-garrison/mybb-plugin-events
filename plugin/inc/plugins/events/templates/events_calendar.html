@@ -1,63 +1,42 @@
 <html>
 <head>
-    <title>Events Calendar - {$mybb->settings['bbname']}</title>
-    {$headerinclude}
-    <style>
-        .events_calendar {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 1px;
-            background: #ccc;
-        }
-        .calendar_day {
-            background: white;
-            padding: 10px;
-            min-height: 100px;
-        }
-        .calendar_day.other_month {
-            background: #f5f5f5;
-        }
-        .calendar_event {
-            background: #4CAF50;
-            color: white;
-            padding: 2px 5px;
-            margin: 2px 0;
-            font-size: 12px;
-            cursor: pointer;
-        }
-        .calendar_event.rsvped {
-            background: #2196F3;
-        }
-    </style>
+<title>Events Calendar - {$mybb->settings['bbname']}</title>
+{$headerinclude}
+<style type="text/css">
+#events_calendar { width: 100%; border-collapse: collapse; }
+#events_calendar td { border: 1px solid #ccc; vertical-align: top; height: 80px; width: 14%; padding: 4px; }
+#events_calendar td.other_month { background: #f5f5f5; }
+#events_calendar .calendar_event { display: block; font-size: 11px; margin: 2px 0; padding: 2px; background: #4CAF50; color: #fff; }
+#events_calendar .calendar_event.rsvped { background: #2196F3; }
+</style>
 </head>
 <body>
-    {$header}
-    
-    <div class="events_container">
-        <h1>Events Calendar</h1>
-        
-        <div class="events_controls">
-            <a href="events.php?view=list" class="button">List View</a>
-            <a href="events.php?view=calendar" class="button">Calendar View</a>
-            
-            <form method="get" action="events.php" style="display: inline-block; margin-left: 20px;">
-                <input type="hidden" name="view" value="calendar">
-                <select name="region">
-                    <option value="">All Regions</option>
-                    <option value="Sydney" {$region_sydney_selected}>Sydney</option>
-                    <option value="Hunter" {$region_hunter_selected}>Hunter</option>
-                    <option value="Canberra" {$region_canberra_selected}>Canberra</option>
-                    <option value="Other" {$region_other_selected}>Other</option>
-                </select>
-                <input type="submit" value="Filter" class="button">
-            </form>
-        </div>
-        
-        <div class="events_calendar">
-            {$calendar_content}
-        </div>
-    </div>
-    
-    {$footer}
+{$header}
+<div id="events_page">
+<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
+<tr><td class="thead"><strong>Events Calendar - {$calendar_month_name}</strong></td></tr>
+<tr><td class="trow1">
+<a href="events.php?view=list" id="events_view_list">List View</a> |
+<a href="events.php?view=calendar" id="events_view_calendar">Calendar View</a>
+<span style="margin-left:20px;">
+<a href="events.php?view=calendar&amp;month={$calendar_prev}" id="events_calendar_prev">&laquo; Previous</a> |
+<a href="events.php?view=calendar&amp;month={$calendar_next}" id="events_calendar_next">Next &raquo;</a>
+</span>
+<form method="get" action="events.php" style="display:inline-block; margin-left:20px;">
+<input type="hidden" name="view" value="calendar" />
+<input type="hidden" name="month" value="{$calendar_month}" />
+<select name="region" id="events_region_filter">{$region_options}</select>
+<input type="submit" class="button" value="Filter" />
+</form>
+</td></tr>
+<tr><td class="trow1">
+<table id="events_calendar">
+<tr><th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th></tr>
+{$calendar_content}
+</table>
+</td></tr>
+</table>
+</div>
+{$footer}
 </body>
 </html>

@@ -1,8 +1,10 @@
 .git
-.gitignore
-README.md
+.github
+.devenv
+node_modules
+test-forum
+tests
 *.md
 .DS_Store
-node_modules
 .vscode
 .idea

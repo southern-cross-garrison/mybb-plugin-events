@@ -1,33 +1,37 @@
 <?php
 /**
  * MyBB Event Management Plugin
- * 
- * Plugin Information
  */
 
-// Disallow direct access to this file for security reasons
 if(!defined("IN_MYBB"))
 {
     die("Direct initialization of this file is not allowed.");
 }
 
-// Register admin hooks directly in plugin file (needed for admin context)
-// This ensures hooks are registered every time the admin panel loads
+require_once MYBB_ROOT . "inc/plugins/events/inc/events_hooks.php";
+
 if(defined('IN_ADMINCP'))
 {
     global $plugins;
-    
-    // Load hooks file to get the functions
-    require_once MYBB_ROOT . "inc/plugins/events/inc/events_hooks.php";
-    
-    // Rebuild profile field dropdowns when profile fields are added, edited, or deleted
-    // These hooks must be registered in admin context to work properly
+
+    // Keep the profile-field dropdowns on the settings page in step with the board's
+    // custom profile fields. These have to be registered in admin context.
     $plugins->add_hook("admin_config_profile_fields_add_commit", "events_rebuild_profile_field_dropdowns");
     $plugins->add_hook("admin_config_profile_fields_edit_commit", "events_rebuild_profile_field_dropdowns");
     $plugins->add_hook("admin_config_profile_fields_delete_commit", "events_rebuild_profile_field_dropdowns");
 }
+else
+{
+    // MyBB includes active plugin files on every request, so this is where front-end
+    // hooks belong - registering them in events_activate() would only run once.
+    events_register_hooks();
+}
 
-// Plugin information
+/**
+ * Plugin information.
+ *
+ * @return array
+ */
 function events_info()
 {
     return array(
@@ -36,7 +40,7 @@ function events_info()
         "website"       => "https://github.com/southern-cross-garrison/mybb-plugin-events",
         "author"        => "Kevin Brown (TK-33151)",
         "authorsite"    => "https://www.501scg.org/",
-        "version"       => "1.0",
+        "version"       => "1.1",
         "guid"          => "aa8e5870-f198-467f-a67a-0726e9690efc",
         "codename"      => "events",
         "compatibility" => "18*"
@@ -44,39 +48,54 @@ function events_info()
 }
 
 /**
- * Check if plugin is installed
+ * The settings that are rendered as a custom-profile-field picker.
+ *
+ * @return array
+ */
+function events_profile_field_settings()
+{
+    return array(
+        'events_costume_field',
+        'events_tk_id_field',
+        'events_wwcc_field',
+        'events_mobile_field',
+        'events_emergency_contact_field',
+    );
+}
+
+/**
+ * @return bool
  */
 function events_is_installed()
 {
     global $db;
-    
-    // Check if main table exists (reliable indicator of installation)
+
     return $db->table_exists('event_plugin_events');
 }
 
 /**
- * Plugin installation
+ * Create the plugin's tables, settings and templates.
  */
 function events_install()
 {
     global $db;
-    
-    // Install database tables
+
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_install.php";
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_templates.php";
+
     events_install_database();
-    
-    // Create settings group (check first to avoid duplicates)
+    events_install_templates();
+
     $query = $db->simple_select("settinggroups", "gid", "name = 'events'");
     if($db->num_rows($query) == 0)
     {
-        $setting_group = array(
-            "name" => "events",
-            "title" => "Event Management Settings",
-            "description" => "Configure the event management plugin",
-            "disporder" => 5,
-            "isdefault" => 0
-        );
-        $db->insert_query("settinggroups", $setting_group);
+        $db->insert_query("settinggroups", array(
+            "name"        => "events",
+            "title"       => $db->escape_string("Event Management Settings"),
+            "description" => $db->escape_string("Configure the event management plugin"),
+            "disporder"   => 5,
+            "isdefault"   => 0
+        ));
         $gid = $db->insert_id();
     }
     else
@@ -84,230 +103,129 @@ function events_install()
         $group = $db->fetch_array($query);
         $gid = $group['gid'];
     }
-    
-    // Add settings (check each one before inserting)
+
     $settings = array(
-        array(
-            "name" => "events_costume_field",
-            "title" => "Costume Profile Field",
-            "description" => "Select the custom profile field that contains user costumes",
-            "optionscode" => "text",
-            "value" => "",
-            "disporder" => 1,
-            "gid" => $gid
-        ),
-        array(
-            "name" => "events_tk_id_field",
-            "title" => "TK ID Profile Field",
-            "description" => "Select the custom profile field that contains TK IDs",
-            "optionscode" => "text",
-            "value" => "",
-            "disporder" => 2,
-            "gid" => $gid
-        ),
-        array(
-            "name" => "events_wwcc_field",
-            "title" => "WWCC Profile Field",
-            "description" => "Select the custom profile field that contains WWCC numbers",
-            "optionscode" => "text",
-            "value" => "",
-            "disporder" => 3,
-            "gid" => $gid
-        ),
-        array(
-            "name" => "events_mobile_field",
-            "title" => "Mobile Number Profile Field",
-            "description" => "Select the custom profile field that contains mobile numbers",
-            "optionscode" => "text",
-            "value" => "",
-            "disporder" => 4,
-            "gid" => $gid
-        ),
-        array(
-            "name" => "events_emergency_contact_field",
-            "title" => "Emergency Contact Profile Field",
-            "description" => "Select the custom profile field that contains emergency contact information",
-            "optionscode" => "text",
-            "value" => "",
-            "disporder" => 5,
-            "gid" => $gid
-        ),
-        array(
-            "name" => "events_event_coordinator_groups",
-            "title" => "Event Coordinator User Groups",
-            "description" => "Select user groups that have Event Coordinator permissions",
-            "optionscode" => "groupselect",
-            "value" => "",
-            "disporder" => 6,
-            "gid" => $gid
-        ),
-        array(
-            "name" => "events_scg_members_group",
-            "title" => "SCG Members Group ID",
-            "description" => "Select the user group for SCG Members (used to segment users on the troop report)",
-            "optionscode" => "groupselectsingle",
-            "value" => "",
-            "disporder" => 7,
-            "gid" => $gid
-        ),
-        array(
-            "name" => "events_501st_members_group",
-            "title" => "501st Members Group ID",
-            "description" => "Select the user group for 501st Members (used to segment users on the troop report)",
-            "optionscode" => "groupselectsingle",
-            "value" => "",
-            "disporder" => 8,
-            "gid" => $gid
-        ),
-        array(
-            "name" => "events_troop_report_forum",
-            "title" => "Troop Report Forum ID",
-            "description" => "Select the forum where troop reports should be posted",
-            "optionscode" => "forumselectsingle",
-            "value" => "",
-            "disporder" => 9,
-            "gid" => $gid
-        )
+        array("name" => "events_costume_field", "title" => "Costume Profile Field", "description" => "The custom profile field that holds a member's costumes", "optionscode" => "text", "disporder" => 1),
+        array("name" => "events_tk_id_field", "title" => "TK ID Profile Field", "description" => "The custom profile field that holds a member's TK ID", "optionscode" => "text", "disporder" => 2),
+        array("name" => "events_wwcc_field", "title" => "WWCC Profile Field", "description" => "The custom profile field that holds a member's WWCC number", "optionscode" => "text", "disporder" => 3),
+        array("name" => "events_mobile_field", "title" => "Mobile Number Profile Field", "description" => "The custom profile field that holds a member's mobile number", "optionscode" => "text", "disporder" => 4),
+        array("name" => "events_emergency_contact_field", "title" => "Emergency Contact Profile Field", "description" => "The custom profile field that holds a member's emergency contact", "optionscode" => "text", "disporder" => 5),
+        array("name" => "events_event_coordinator_groups", "title" => "Event Coordinator User Groups", "description" => "User groups that may coordinate events", "optionscode" => "groupselect", "disporder" => 6),
+        array("name" => "events_scg_members_group", "title" => "SCG Members Group", "description" => "Used to segment attendees on the troop report", "optionscode" => "groupselectsingle", "disporder" => 7),
+        array("name" => "events_501st_members_group", "title" => "501st Members Group", "description" => "Used to segment attendees on the troop report", "optionscode" => "groupselectsingle", "disporder" => 8),
+        array("name" => "events_troop_report_forum", "title" => "Troop Report Forum", "description" => "The forum troop reports are posted to", "optionscode" => "forumselectsingle", "disporder" => 9),
     );
-    
+
     foreach($settings as $setting)
     {
-        // Check if setting already exists
-        $check_query = $db->simple_select("settings", "sid", "name = '" . $db->escape_string($setting['name']) . "'");
-        if($db->num_rows($check_query) == 0)
+        if($db->num_rows($db->simple_select("settings", "sid", "name = '" . $db->escape_string($setting['name']) . "'")) > 0)
         {
-            $db->insert_query("settings", $setting);
+            continue;
         }
+
+        // insert_query() quotes values but does not escape them.
+        $row = array(
+            'name'        => $db->escape_string($setting['name']),
+            'title'       => $db->escape_string($setting['title']),
+            'description' => $db->escape_string($setting['description']),
+            'optionscode' => $db->escape_string($setting['optionscode']),
+            'disporder'   => (int)$setting['disporder'],
+            'gid'         => (int)$gid,
+            'value'       => '',
+        );
+
+        $db->insert_query("settings", $row);
     }
-    
-    // Rebuild settings cache
+
     rebuild_settings();
-    
-    // Note: Admin menu items are added via admin module files (module_meta.php), not database inserts
-    // The admin menu for this plugin should be added in plugin/inc/plugins/events/admin/module_meta.php
 }
 
 /**
- * Build optionscode for profile field dropdown
+ * Build the optionscode for a profile-field picker setting.
+ *
+ * @return string
  */
 function events_build_profile_field_optionscode()
 {
     global $db;
-    
-    // Get all custom profile fields
-    $profile_fields = array();
+
+    $optionscode = "select\n=None\n";
+
     $query = $db->simple_select("profilefields", "fid, name", "", array("order_by" => "name", "order_dir" => "ASC"));
     while($field = $db->fetch_array($query))
     {
-        $profile_fields[$field['fid']] = $field['name'];
+        $name = str_replace(array('=', "\n", "\r"), '', $field['name']);
+        $optionscode .= $field['fid'] . "=" . $name . "\n";
     }
-    
-    // Build optionscode string for select dropdown
-    // Format: select\nkey1=Value1\nkey2=Value2
-    $optionscode = "select\n";
-    $optionscode .= "=None\n"; // Add "None" option (empty value)
-    
-    foreach($profile_fields as $fid => $name)
-    {
-        // Escape special characters in the name
-        $name = str_replace(array('=', "\n", "\r"), array('', '', ''), $name);
-        $optionscode .= $fid . "=" . $name . "\n";
-    }
-    
-    // Remove trailing newline
-    $optionscode = rtrim($optionscode);
-    
-    return $optionscode;
+
+    return rtrim($optionscode);
 }
 
 /**
- * Plugin activation
+ * Activate: refresh templates and settings that depend on board data, and register
+ * the scheduled task.
  */
 function events_activate()
 {
     global $db;
-    
-    // Register hooks
-    require_once MYBB_ROOT . "inc/plugins/events/inc/events_hooks.php";
-    events_register_hooks();
-    
-    // Register scheduled task
+
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_templates.php";
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_tasks.php";
+
+    // Re-sync templates so editing a .html file and re-activating picks up the change.
+    events_install_templates();
     events_register_task();
-    
-    // Update profile field settings to use dropdown instead of text
-    // This needs to happen on activation so we can query existing profile fields
-    $profile_field_settings = array(
-        'events_costume_field',
-        'events_tk_id_field',
-        'events_wwcc_field',
-        'events_mobile_field',
-        'events_emergency_contact_field'
-    );
-    
+
     $optionscode = events_build_profile_field_optionscode();
-    
-    // Update each profile field setting
-    foreach($profile_field_settings as $setting_name)
+    foreach(events_profile_field_settings() as $setting_name)
     {
-        $db->update_query("settings", 
+        $db->update_query("settings",
             array("optionscode" => $db->escape_string($optionscode)),
             "name = '" . $db->escape_string($setting_name) . "'");
     }
-    
-    // Update group settings to use built-in group selectors
+
     $group_settings = array(
         'events_event_coordinator_groups' => 'groupselect',
-        'events_scg_members_group' => 'groupselectsingle',
-        'events_501st_members_group' => 'groupselectsingle'
+        'events_scg_members_group'        => 'groupselectsingle',
+        'events_501st_members_group'      => 'groupselectsingle',
+        'events_troop_report_forum'       => 'forumselectsingle',
     );
-    
+
     foreach($group_settings as $setting_name => $optionscode)
     {
-        $db->update_query("settings", 
+        $db->update_query("settings",
             array("optionscode" => $db->escape_string($optionscode)),
             "name = '" . $db->escape_string($setting_name) . "'");
     }
-    
-    // Update forum setting to use built-in forum selector
-    $db->update_query("settings", 
-        array("optionscode" => $db->escape_string("forumselectsingle")),
-        "name = 'events_troop_report_forum'");
-    
-    // Rebuild settings cache so changes take effect
+
     rebuild_settings();
 }
 
 /**
- * Plugin deactivation
+ * Deactivate: hooks are registered per-request so there is nothing to unregister,
+ * but the scheduled task should stop running.
  */
 function events_deactivate()
 {
-    global $plugins;
-    
-    // Remove hooks
-    $plugins->remove_hook("global_start", "events_nav_menu");
-    $plugins->remove_hook("member_profile_end", "events_profile_display");
-    $plugins->remove_hook("showthread_start", "events_thread_display");
-    $plugins->remove_hook("task_events_reminders", "events_send_reminders");
-    
-    // Note: Admin menu items are managed via module_meta.php files, not database
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_tasks.php";
+
+    events_unregister_task();
 }
 
 /**
- * Plugin uninstallation
+ * Remove every trace of the plugin.
  */
 function events_uninstall()
 {
     global $db;
-    
+
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_uninstall.php";
-    
-    // Uninstall database
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_templates.php";
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_tasks.php";
+
     events_uninstall_database();
-    
-    // Remove scheduled task
-    $db->delete_query("tasks", "file = 'events_reminders'");
-    
-    // Note: Admin menu items are managed via module_meta.php files, not database
+    events_uninstall_templates();
+    events_unregister_task();
+
+    rebuild_settings();
 }

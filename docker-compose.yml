@@ -1,53 +1,59 @@
-version: '3.8'
-
 services:
   web:
-    build: .
-    container_name: mybb-events-test
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    container_name: mybb-events-web
     ports:
-      - "8080:80"
+      - "${WEB_PORT:-8080}:80"
     volumes:
+      # MyBB source + the deployed plugin (see scripts/deploy.sh).
       - ./test-forum:/var/www/html
-      - ./plugin/inc/plugins:/var/www/html/inc/plugins
+      # Shared clock control file, written by the e2e suite (see tests/helpers/clock.ts).
+      - ./.devenv/faketime:/faketime
     depends_on:
-      - db
-    environment:
-      - APACHE_DOCUMENT_ROOT=/var/www/html
-    networks:
-      - mybb-network
+      db:
+        condition: service_healthy
+    networks: [mybb]
 
   db:
-    image: mysql:5.7
+    image: mariadb:10.11
     container_name: mybb-events-db
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: mybb
-      MYSQL_USER: mybb
-      MYSQL_PASSWORD: mybbpassword
+      MARIADB_ROOT_PASSWORD: rootpassword
+      MARIADB_DATABASE: mybb
+      MARIADB_USER: mybb
+      MARIADB_PASSWORD: mybbpassword
+      TZ: UTC
+    ports:
+      - "${DB_PORT:-3307}:3306"
     volumes:
       - mybb-db-data:/var/lib/mysql
-    ports:
-      - "3306:3306"
-    networks:
-      - mybb-network
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+    networks: [mybb]
 
+  # Optional: `docker compose --profile tools up -d phpmyadmin`
   phpmyadmin:
-    image: phpmyadmin/phpmyadmin
+    image: phpmyadmin
     container_name: mybb-events-phpmyadmin
+    profiles: [tools]
     environment:
       PMA_HOST: db
       PMA_USER: root
       PMA_PASSWORD: rootpassword
     ports:
-      - "8081:80"
-    depends_on:
-      - db
-    networks:
-      - mybb-network
+      - "${PMA_PORT:-8081}:80"
+    depends_on: [db]
+    networks: [mybb]
 
 volumes:
   mybb-db-data:
 
 networks:
-  mybb-network:
+  mybb:
     driver: bridge

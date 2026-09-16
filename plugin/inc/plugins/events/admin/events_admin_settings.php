@@ -12,7 +12,12 @@ function events_admin_settings()
 {
     global $mybb, $db, $page, $lang;
     
-    $page->output_nav_tabs($sub_tabs, 'settings');
+    // Prevent browser from serving cached form so dropdowns show latest profile fields after add/edit/delete
+    if($mybb->request_method != "post")
+    {
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+        header('Pragma: no-cache');
+    }
     
     if($mybb->request_method == "post")
     {
@@ -23,7 +28,7 @@ function events_admin_settings()
             'events_wwcc_field' => $mybb->input['wwcc_field'],
             'events_mobile_field' => $mybb->input['mobile_field'],
             'events_emergency_contact_field' => $mybb->input['emergency_contact_field'],
-            'events_event_coordinator_groups' => $mybb->input['event_coordinator_groups'],
+            'events_event_coordinator_groups' => implode(',', array_filter(array_map('intval', (array)$mybb->get_input('event_coordinator_groups', MyBB::INPUT_ARRAY)))),
             'events_scg_members_group' => $mybb->input['scg_members_group'],
             'events_501st_members_group' => $mybb->input['501st_members_group'],
             'events_troop_report_forum' => $mybb->input['troop_report_forum']
@@ -40,7 +45,7 @@ function events_admin_settings()
         admin_redirect("index.php?module=events&action=settings");
     }
     
-    // Get all custom profile fields
+    // Get all custom profile fields (fresh from DB each load)
     $profile_fields = array();
     $query = $db->simple_select("profilefields", "*", "", array("order_by" => "name", "order_dir" => "ASC"));
     while($field = $db->fetch_array($query))
@@ -94,9 +99,10 @@ function events_admin_settings()
         $form->generate_select_box("emergency_contact_field", $profile_fields, $mybb->settings['events_emergency_contact_field']));
     
     // Event Coordinator groups
+    $selected_coordinator_groups = array_filter(array_map('intval', explode(',', (string)$mybb->settings['events_event_coordinator_groups'])));
     $form_container->output_row("Event Coordinator User Groups",
-        "Select user groups that have Event Coordinator permissions",
-        $form->generate_text_box("event_coordinator_groups", $mybb->settings['events_event_coordinator_groups']));
+        "Members of these groups may coordinate events (hold ctrl to select more than one)",
+        $form->generate_select_box("event_coordinator_groups[]", $user_groups, $selected_coordinator_groups, array("id" => "event_coordinator_groups", "multiple" => true, "size" => 6)));
     
     // SCG Members group
     $form_container->output_row("SCG Members Group",
@@ -114,10 +120,8 @@ function events_admin_settings()
         $form->generate_select_box("troop_report_forum", $forums, $mybb->settings['events_troop_report_forum']));
     
     $form_container->end();
-    
-    $buttons[] = $form->generate_submit_button("Save Settings");
+
+    $buttons = array($form->generate_submit_button("Save Settings"));
     $form->output_submit_wrapper($buttons);
     $form->end();
-    
-    $page->output_footer();
 }

@@ -1,47 +1,33 @@
 <html>
 <head>
-    <title>Events - {$mybb->settings['bbname']}</title>
-    {$headerinclude}
+<title>Events - {$mybb->settings['bbname']}</title>
+{$headerinclude}
 </head>
 <body>
-    {$header}
-    
-    <div class="events_container">
-        <h1>Events</h1>
-        
-        <div class="events_controls">
-            <a href="events.php?view=list" class="button">List View</a>
-            <a href="events.php?view=calendar" class="button">Calendar View</a>
-            
-            <form method="get" action="events.php" style="display: inline-block; margin-left: 20px;">
-                <select name="region">
-                    <option value="">All Regions</option>
-                    <option value="Sydney" {$region_sydney_selected}>Sydney</option>
-                    <option value="Hunter" {$region_hunter_selected}>Hunter</option>
-                    <option value="Canberra" {$region_canberra_selected}>Canberra</option>
-                    <option value="Other" {$region_other_selected}>Other</option>
-                </select>
-                <input type="submit" value="Filter" class="button">
-            </form>
-        </div>
-        
-        <table class="events_table">
-            <thead>
-                <tr>
-                    <th>Event</th>
-                    <th>Region</th>
-                    <th>Date</th>
-                    <th>RSVPs</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {$events_list}
-            </tbody>
-        </table>
-    </div>
-    
-    {$footer}
+{$header}
+<div id="events_page">
+<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
+<tr><td class="thead" colspan="6"><strong>Events</strong></td></tr>
+<tr><td class="trow1" colspan="6">
+<a href="events.php?view=list" id="events_view_list">List View</a> |
+<a href="events.php?view=calendar" id="events_view_calendar">Calendar View</a>
+<form method="get" action="events.php" style="display:inline-block; margin-left:20px;">
+<input type="hidden" name="view" value="list" />
+<select name="region" id="events_region_filter">{$region_options}</select>
+<input type="submit" class="button" value="Filter" />
+</form>
+</td></tr>
+<tr>
+<td class="tcat"><strong>Event</strong></td>
+<td class="tcat"><strong>Region</strong></td>
+<td class="tcat"><strong>Starts</strong></td>
+<td class="tcat"><strong>RSVPs</strong></td>
+<td class="tcat"><strong>Status</strong></td>
+<td class="tcat"><strong>You</strong></td>
+</tr>
+{$events_rows}
+</table>
+</div>
+{$footer}
 </body>
 </html>

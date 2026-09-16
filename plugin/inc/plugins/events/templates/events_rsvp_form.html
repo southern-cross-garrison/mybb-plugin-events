@@ -1,0 +1,27 @@
+<html>
+<head>
+<title>{$rsvp_page_title} - {$mybb->settings['bbname']}</title>
+{$headerinclude}
+</head>
+<body>
+{$header}
+<div id="rsvp_page" data-event-id="{$event_id}" data-rsvp-step="{$rsvp_step}">
+<form method="post" action="rsvp.php" id="rsvp_form">
+<input type="hidden" name="my_post_key" value="{$mybb->post_code}" />
+<input type="hidden" name="id" value="{$event_id}" />
+<input type="hidden" name="step" value="{$rsvp_step}" />
+{$rsvp_carried_state}
+<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
+<tr><td class="thead"><strong>{$rsvp_page_title}</strong></td></tr>
+<tr><td class="trow1">{$rsvp_intro}</td></tr>
+<tr><td class="trow2">{$rsvp_body}</td></tr>
+<tr><td class="trow1">
+<input type="submit" class="button" id="rsvp_submit" value="{$rsvp_submit_label}" />
+<a href="event.php?id={$event_id}" id="rsvp_cancel">Cancel</a>
+</td></tr>
+</table>
+</form>
+</div>
+{$footer}
+</body>
+</html>

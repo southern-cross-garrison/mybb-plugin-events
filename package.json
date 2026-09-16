@@ -1,0 +1,21 @@
+{
+  "name": "mybb-plugin-events-e2e",
+  "private": true,
+  "description": "End-to-end test suite for the MyBB Event Management plugin",
+  "scripts": {
+    "bootstrap": "./scripts/bootstrap.sh",
+    "bootstrap:fresh": "./scripts/bootstrap.sh --fresh",
+    "deploy": "./scripts/deploy.sh",
+    "db:snapshot": "./scripts/db-snapshot.sh",
+    "db:restore": "./scripts/db-restore.sh",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:headed": "playwright test --headed",
+    "test:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.10.0",
+    "mysql2": "^3.11.5"
+  }
+}

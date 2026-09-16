@@ -1,6 +1,6 @@
 <?php
 /**
- * MyBB Event Plugin - Hooks Registration
+ * MyBB Event Plugin - Hooks
  */
 
 if(!defined("IN_MYBB"))
@@ -9,195 +9,163 @@ if(!defined("IN_MYBB"))
 }
 
 /**
- * Register all plugin hooks
+ * Register the plugin's front-end hooks.
+ *
+ * Called from inc/plugins/events.php on every request (MyBB includes active plugin
+ * files on each page load); registering inside _activate() would only ever run once.
  */
 function events_register_hooks()
 {
     global $plugins;
-    
-    // Navigation menu
-    $plugins->add_hook("global_start", "events_nav_menu");
-    
-    // User profile display
-    $plugins->add_hook("member_profile_end", "events_profile_display");
-    
-    // Thread integration
+
+    $plugins->add_hook("pre_output_page", "events_nav_menu");
     $plugins->add_hook("showthread_start", "events_thread_display");
-    
-    // Scheduled task
-    $plugins->add_hook("task_events_reminders", "events_send_reminders");
 }
 
 /**
- * Add Events link to navigation menu
+ * Add an "Events" item to the board's top navigation.
+ *
+ * MyBB's header template has no plugin-facing placeholder, so the link is injected
+ * into the rendered top_links list.
+ *
+ * @param string $page
+ * @return string
  */
-function events_nav_menu()
+function events_nav_menu(&$page)
 {
-    global $templates, $mybb, $nav_events;
-    
-    if(!isset($nav_events))
+    global $mybb;
+
+    $marker = '<ul class="menu top_links">';
+    if(strpos($page, $marker) === false || strpos($page, 'id="nav_events"') !== false)
     {
-        $nav_events = '';
+        return $page;
     }
-    
-    $nav_events .= '<li><a href="' . $mybb->settings['bburl'] . '/events.php">Events</a></li>';
+
+    $link = $marker . '<li><a href="' . $mybb->settings['bburl'] . '/events.php" id="nav_events" class="events">Events</a></li>';
+    $page = preg_replace('/' . preg_quote($marker, '/') . '/', $link, $page, 1);
+
+    return $page;
 }
 
 /**
- * Display event info on user profile
- */
-function events_profile_display()
-{
-    global $memprofile, $db;
-    
-    // Get user's RSVP history (could add this later)
-}
-
-/**
- * Display event info in thread if linked
+ * Expose the linked event (if any) to threads, so other code/templates can use it.
  */
 function events_thread_display()
 {
     global $tid, $db, $event_info;
-    
-    $query = $db->simple_select("event_plugin_events", "*", "thread_id = " . (int)$tid);
-    $event = $db->fetch_array($query);
-    
-    if($event)
-    {
-        $event_info = $event;
-    }
+
+    $event_info = $db->fetch_array($db->simple_select("event_plugin_events", "*", "thread_id = " . (int)$tid));
 }
 
 /**
- * Send reminder PMs for incomplete troop reports
+ * PM every attendee of a finished event that still has no posted troop report.
+ *
+ * Reminders are re-sent at most once a week per event. All time comparisons are done
+ * in PHP rather than with SQL NOW() so the behaviour follows the application clock.
+ *
+ * @return int number of events reminded about
  */
 function events_send_reminders()
 {
     global $db, $mybb;
-    
+
     require_once MYBB_ROOT . "inc/datahandlers/pm.php";
-    
-    // Find events that need reminders
-    $cutoff_date = date('Y-m-d H:i:s', strtotime('-7 days'));
-    
+
+    $reminder_interval = 7 * 24 * 60 * 60;
+    $now = date('Y-m-d H:i:s', TIME_NOW);
+    $resend_before = date('Y-m-d H:i:s', TIME_NOW - $reminder_interval);
+
     $query = $db->query("
-        SELECT e.*, tr.last_reminder_sent
+        SELECT e.id, e.title, tr.id AS report_id, tr.last_reminder_sent
         FROM " . TABLE_PREFIX . "event_plugin_events e
         LEFT JOIN " . TABLE_PREFIX . "event_plugin_troop_reports tr ON e.id = tr.event_id
         WHERE e.status = 'live'
-        AND e.end_date < NOW()
-        AND (tr.id IS NULL OR tr.posted_at IS NULL)
-        AND (tr.last_reminder_sent IS NULL OR tr.last_reminder_sent < '{$cutoff_date}')
+          AND e.end_date < '" . $db->escape_string($now) . "'
+          AND (tr.id IS NULL OR tr.posted_at IS NULL)
+          AND (tr.last_reminder_sent IS NULL OR tr.last_reminder_sent < '" . $db->escape_string($resend_before) . "')
     ");
-    
-    while($event = $db->fetch_array($query))
+
+    $events = array();
+    while($row = $db->fetch_array($query))
     {
-        // Get all RSVPs for this event
-        $rsvp_query = $db->simple_select("event_plugin_rsvps", "user_id", 
-            "event_id = " . (int)$event['id'] . " AND status = 'attending'");
-        
+        $events[] = $row;
+    }
+
+    $reminded = 0;
+    foreach($events as $event)
+    {
         $user_ids = array();
+        $rsvp_query = $db->simple_select("event_plugin_rsvps", "user_id",
+            "event_id = " . (int)$event['id'] . " AND status = 'attending'");
         while($rsvp = $db->fetch_array($rsvp_query))
         {
-            $user_ids[] = $rsvp['user_id'];
+            $user_ids[] = (int)$rsvp['user_id'];
         }
-        
+
         if(empty($user_ids))
         {
             continue;
         }
-        
-        // Send PM to all attendees
+
         $pmhandler = new PMDataHandler();
-        $pm = array(
+        $pmhandler->admin_override = true;
+        $pmhandler->set_data(array(
             'subject' => "Troop Report Needed: " . $event['title'],
-            'message' => "The event '" . $event['title'] . "' has finished, but no troop report has been created yet.\n\n" .
-                        "Please create a troop report: " . $mybb->settings['bburl'] . "/troop_report.php?id=" . $event['id'],
-            'fromid' => 0, // System message
-            'toid' => $user_ids
-        );
-        
-        $pmhandler->set_data($pm);
-        
-        if($pmhandler->validate_pm())
+            'message' => "The event '" . $event['title'] . "' has finished, but no troop report has been posted yet.\n\n" .
+                         "Please create one here: " . $mybb->settings['bburl'] . "/troop_report.php?id=" . $event['id'],
+            'fromid'  => 0,
+            'toid'    => $user_ids,
+            'ipaddress' => '127.0.0.1',
+        ));
+
+        if(!$pmhandler->validate_pm())
         {
-            $pmhandler->insert_pm();
+            continue;
         }
-        
-        // Update last reminder sent
-        if(isset($event['last_reminder_sent']) && $event['last_reminder_sent'])
+
+        $pmhandler->insert_pm();
+        $reminded++;
+
+        if($event['report_id'])
         {
-            $db->update_query("event_plugin_troop_reports", 
-                array('last_reminder_sent' => date('Y-m-d H:i:s')),
-                "event_id = " . (int)$event['id']);
+            $db->update_query("event_plugin_troop_reports",
+                array('last_reminder_sent' => $db->escape_string($now)),
+                "id = " . (int)$event['report_id']);
         }
         else
         {
             $db->insert_query("event_plugin_troop_reports", array(
-                'event_id' => $event['id'],
-                'created_by' => 0,
-                'created_at' => date('Y-m-d H:i:s'),
-                'last_reminder_sent' => date('Y-m-d H:i:s')
+                'event_id'           => (int)$event['id'],
+                'created_by'         => 0,
+                'created_at'         => $db->escape_string($now),
+                'last_reminder_sent' => $db->escape_string($now),
             ));
         }
     }
+
+    return $reminded;
 }
 
 /**
- * Rebuild profile field dropdowns when profile fields are added, edited, or deleted
- * This ensures the dropdown menus stay up-to-date with available profile fields
- * 
- * Hook names (verified from MyBB source):
- * - admin_config_profile_fields_add_commit (fires after profile field is added)
- * - admin_config_profile_fields_edit_commit (fires after profile field is edited)
- * - admin_config_profile_fields_delete_commit (fires after profile field is deleted)
+ * Keep the profile-field dropdowns on the plugin's settings page in step with the
+ * board's custom profile fields.
+ *
+ * Hooks: admin_config_profile_fields_{add,edit,delete}_commit
  */
 function events_rebuild_profile_field_dropdowns()
 {
     global $db;
-    
-    // List of settings that should be profile field dropdowns
-    $profile_field_settings = array(
-        'events_costume_field',
-        'events_tk_id_field',
-        'events_wwcc_field',
-        'events_mobile_field',
-        'events_emergency_contact_field'
-    );
-    
-    // Get all custom profile fields
-    $profile_fields = array();
-    $query = $db->simple_select("profilefields", "fid, name", "", array("order_by" => "name", "order_dir" => "ASC"));
-    while($field = $db->fetch_array($query))
+
+    require_once MYBB_ROOT . "inc/plugins/events.php";
+
+    $optionscode = events_build_profile_field_optionscode();
+
+    foreach(events_profile_field_settings() as $setting_name)
     {
-        $profile_fields[$field['fid']] = $field['name'];
-    }
-    
-    // Build optionscode string for select dropdown
-    // Format: select\nkey1=Value1\nkey2=Value2
-    $optionscode = "select\n";
-    $optionscode .= "=None\n"; // Add "None" option (empty value)
-    
-    foreach($profile_fields as $fid => $name)
-    {
-        // Escape special characters in the name
-        $name = str_replace(array('=', "\n", "\r"), array('', '', ''), $name);
-        $optionscode .= $fid . "=" . $name . "\n";
-    }
-    
-    // Remove trailing newline
-    $optionscode = rtrim($optionscode);
-    
-    // Update each profile field setting
-    foreach($profile_field_settings as $setting_name)
-    {
-        $db->update_query("settings", 
+        $db->update_query("settings",
             array("optionscode" => $db->escape_string($optionscode)),
             "name = '" . $db->escape_string($setting_name) . "'");
     }
-    
-    // Rebuild settings cache so changes take effect immediately
+
     rebuild_settings();
 }
-

@@ -1,6 +1,6 @@
 <?php
 /**
- * MyBB Event Plugin - Scheduled Tasks
+ * MyBB Event Plugin - Scheduled task registration
  */
 
 if(!defined("IN_MYBB"))
@@ -9,47 +9,44 @@ if(!defined("IN_MYBB"))
 }
 
 /**
- * Register scheduled task for reminder PMs
+ * Register the daily troop-report reminder task.
  */
 function events_register_task()
 {
-    global $db;
-    
-    // Check if task already exists
-    $query = $db->simple_select("tasks", "tid", "file = 'events_reminders'");
-    if($db->num_rows($query) > 0)
+    global $db, $cache, $lang;
+
+    if($db->num_rows($db->simple_select("tasks", "tid", "file = 'events_reminders'")) > 0)
     {
         return;
     }
-    
-    // Add task
+
+    require_once MYBB_ROOT . "inc/functions_task.php";
+
     $task = array(
-        'title' => 'Event Reminder PMs',
-        'description' => 'Sends reminder PMs for events missing troop reports',
-        'file' => 'events_reminders',
-        'minute' => '0',
-        'hour' => '0',
-        'day' => '*',
-        'month' => '*',
-        'weekday' => '*',
-        'enabled' => 1,
-        'logging' => 1
+        'title'       => $db->escape_string('Event Reminder PMs'),
+        'description' => $db->escape_string('Sends reminder PMs for finished events that are missing a troop report'),
+        'file'        => 'events_reminders',
+        'minute'      => '0',
+        'hour'        => '0',
+        'day'         => '*',
+        'month'       => '*',
+        'weekday'     => '*',
+        'enabled'     => 1,
+        'logging'     => 1,
     );
-    
+    $task['nextrun'] = fetch_next_run($task);
+
     $db->insert_query("tasks", $task);
+    $cache->update_tasks();
 }
 
 /**
- * Task file for reminder PMs
+ * Remove the scheduled task.
  */
-function task_events_reminders($task)
+function events_unregister_task()
 {
-    global $db;
-    
-    require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
-    require_once MYBB_ROOT . "inc/plugins/events/inc/events_hooks.php";
-    
-    events_send_reminders();
-    
-    add_task_log($task, "Event reminder PMs sent successfully.");
+    global $db, $cache;
+
+    $db->delete_query("tasks", "file = 'events_reminders'");
+    $cache->update_tasks();
 }

@@ -1,1 +1,11 @@
+# The MyBB tree is a build artifact: scripts/bootstrap.sh downloads the pinned release
+# and scripts/deploy.sh copies the plugin into it.
 test-forum/
+
+# Local environment state: the MyBB download cache, database snapshot, clock control
+# file, cached logins and Playwright output.
+.devenv/
+
+node_modules/
+.env
+.DS_Store

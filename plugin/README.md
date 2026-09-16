@@ -19,7 +19,8 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 
 ## Installation
 
-1. Upload all files to your MyBB installation maintaining the directory structure
+1. Upload all files to your MyBB installation maintaining the directory structure shown
+   under *File Structure* below (the front-end pages go at the web root)
 2. Go to Admin CP → Plugins
 3. Find "Event Management" and click "Activate"
 4. Go to Admin CP → Event Management → Settings
@@ -40,7 +41,7 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 
 Before using the plugin, create the following custom profile fields in MyBB:
 
-1. **Costume Field** (multi-select): User's available costumes
+1. **Costume Field** (multi-select, or a comma separated text field): User's available costumes
 2. **TK ID Field** (text): User's TK ID
 3. **WWCC Field** (text): Working With Children Check number
 4. **Mobile Number Field** (text, hidden): Mobile phone number
@@ -69,22 +70,25 @@ The mobile and emergency contact fields should be configured as hidden fields (v
 1. Users browse events on the Events page
 2. Click on an event to view details
 3. Click "RSVP to Event"
-4. Complete prerequisites if needed
+4. Complete any missing prerequisites (saved back to the user's profile)
 5. Select costumes
-6. Select days (for multi-day events)
-7. Confirm RSVP
+6. Select days (multi-day events only; all days are selected by default)
+7. Confirm the RSVP
+
+RSVPs close at the event's signup cutoff. Events with no cutoff stay open until the event
+ends, so a late signup can still be recorded.
 
 ### GEC Event Management
 
 GECs can manage events and RSVPs directly from the event page (no Admin CP access required):
 
-1. **Viewing RSVPs**: 
+1. **Viewing RSVPs**:
    - Navigate to an event you're managing
-   - Click "View RSVPs" in the GEC Controls section
+   - Click "View RSVPs" in the Coordinator Controls section
    - Filter by costume or day as needed
 
 2. **Attendance Sheets**:
-   - Click "View Attendance Sheet" in the GEC Controls section
+   - Click "View Attendance Sheet" in the Coordinator Controls section
    - A print-friendly page will display with all attendee information
    - Use browser print function (Ctrl+P / Cmd+P) to print or save as PDF
 
@@ -103,36 +107,48 @@ GECs can manage events and RSVPs directly from the event page (no Admin CP acces
 ## File Structure
 
 ```
+/events.php                       # Events index (list and calendar views)
+/event.php                        # Single event, coordinator RSVP list, attendance sheet
+/rsvp.php                         # RSVP wizard
+/troop_report.php                 # Troop report drafting and posting
+/ical.php                         # iCal export
+
+/inc/tasks/
+  events_reminders.php            # Scheduled task entry point
+
 /inc/plugins/
-  events.php                    # Main plugin file
+  events.php                      # Plugin metadata, install / activate / uninstall
   /events/
     /inc/
-      events_install.php        # Database installation
-      events_uninstall.php      # Database cleanup
-      events_functions.php      # Core helper functions
-      events_hooks.php          # MyBB hooks registration
-      events_tasks.php          # Automated tasks
+      events_functions.php        # Core helper functions
+      events_render.php           # Shared HTML building helpers
+      events_hooks.php            # Hook callbacks and the reminder job
+      events_install.php          # Database installation
+      events_templates.php        # Template installation
+      events_tasks.php            # Scheduled task registration
+      events_uninstall.php        # Database cleanup
     /admin/
-      events_admin.php          # Admin CP module
-      events_admin_settings.php # Plugin settings
-      events_admin_events.php   # Event CRUD management
-      events_admin_rsvps.php    # RSVP management
-    /events.php                 # Main events page
-    /event.php                  # Single event view
-    /rsvp.php                   # RSVP flow handler
-    /attendance.php             # Attendance sheet generation
-    /troop_report.php           # Troop report creation
-    /ical.php                   # iCal export
-    /templates/
-      events_calendar.html      # Calendar view template
-      events_list.html          # List view template
-      event_view.html           # Event detail template
-      rsvp_form.html            # RSVP form template
-      rsvp_prerequisites.html   # Prerequisites form
-      rsvp_confirm.html         # RSVP confirmation
-      attendance_sheet.html     # Attendance sheet template
-      troop_report_draft.html   # Troop report draft template
+      events_admin.php            # Admin CP dispatcher
+      events_admin_events.php     # Event CRUD
+      events_admin_rsvps.php      # RSVP review
+      events_admin_settings.php   # Plugin settings
+    /templates/                   # Synced into MyBB's templates table on activate
+      events_list.html
+      events_calendar.html
+      events_event.html
+      events_rsvp_form.html
+      events_rsvp_success.html
+      events_rsvp_list.html
+      events_attendance.html
+      events_troop_report.html
+
+/admin/modules/events/
+  module_meta.php                 # Admin CP menu registration
+  index.php                       # Admin CP entry point
 ```
+
+The front-end pages live at the web root because MyBB pages `require ./global.php`. In this
+repository they are kept under `plugin/root/` and copied into place by `scripts/deploy.sh`.
 
 ## Database Tables
 
@@ -151,6 +167,11 @@ All tables use the `mybb_event_plugin_` prefix:
 - **GEC (Garrison Event Coordinator)**: Can view and manage RSVPs for assigned events from the event page, generate attendance sheets (no Admin CP access required)
 - **Admin**: Full access to all features including Admin CP event management
 - **Users**: Can view live events, RSVP, create troop reports
+
+## Development
+
+See the [repository README](../README.md) for the Docker development environment and the
+end-to-end test suite.
 
 ## Support
 

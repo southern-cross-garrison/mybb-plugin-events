@@ -1,0 +1,28 @@
+<html>
+<head>
+<title>Create Troop Report - {$mybb->settings['bbname']}</title>
+{$headerinclude}
+</head>
+<body>
+{$header}
+<div id="troop_report_page" data-event-id="{$event_id}">
+<form method="post" action="troop_report.php" id="troop_report_form">
+<input type="hidden" name="my_post_key" value="{$mybb->post_code}" />
+<input type="hidden" name="id" value="{$event_id}" />
+<input type="hidden" name="action" value="post" />
+<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
+<tr><td class="thead"><strong>Create Troop Report: {$event_title}</strong></td></tr>
+<tr><td class="trow1">Edit the draft below and post it to the troop report forum. Posting the report archives the event.</td></tr>
+<tr><td class="trow2">
+<textarea name="report_content" id="troop_report_content" rows="20" style="width:98%;">{$draft_content}</textarea>
+</td></tr>
+<tr><td class="trow1">
+<input type="submit" class="button" id="troop_report_submit" value="Post Troop Report" />
+<a href="event.php?id={$event_id}" id="troop_report_cancel">Cancel</a>
+</td></tr>
+</table>
+</form>
+</div>
+{$footer}
+</body>
+</html>
