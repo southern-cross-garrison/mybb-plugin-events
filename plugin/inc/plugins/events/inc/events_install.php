@@ -59,14 +59,20 @@ function events_install_database()
     ) ENGINE=MyISAM DEFAULT CHARSET=utf8;");
     
     // RSVPs table
+    //
+    // One row per member per role, so somebody can troop an event and also wrangle it.
+    // The unique key deliberately excludes status: if cancelling is ever implemented as
+    // a status flip, a cancelled row would keep occupying the slot and the member could
+    // never sign up again. Delete the row instead, or widen the key.
     $db->write_query("CREATE TABLE IF NOT EXISTS `" . TABLE_PREFIX . "event_plugin_rsvps` (
         `id` int(11) NOT NULL AUTO_INCREMENT,
         `event_id` int(11) NOT NULL,
         `user_id` int(11) NOT NULL,
+        `role` enum('trooper','wrangler') NOT NULL DEFAULT 'trooper',
         `rsvp_date` datetime NOT NULL,
         `status` enum('attending','cancelled') NOT NULL DEFAULT 'attending',
         PRIMARY KEY (`id`),
-        UNIQUE KEY `event_user` (`event_id`, `user_id`),
+        UNIQUE KEY `event_user_role` (`event_id`, `user_id`, `role`),
         KEY `user_id` (`user_id`),
         KEY `status` (`status`)
     ) ENGINE=MyISAM DEFAULT CHARSET=utf8;");
@@ -99,4 +105,50 @@ function events_install_database()
         UNIQUE KEY `event_id` (`event_id`),
         KEY `thread_id` (`thread_id`)
     ) ENGINE=MyISAM DEFAULT CHARSET=utf8;");
+}
+
+/**
+ * Bring an already-installed board's schema up to date.
+ *
+ * MyBB gives plugins no upgrade hook and CREATE TABLE IF NOT EXISTS will not add a
+ * column, so this runs from events_activate() on every activation. Each step is guarded
+ * independently: MyISAM has no transactions, so a run interrupted between two ALTERs has
+ * to be resumable.
+ *
+ * Note that ADD COLUMN on MyISAM copies the whole table under a lock. At garrison scale
+ * that is instant.
+ */
+function events_upgrade_database()
+{
+    global $db;
+
+    if(!$db->table_exists('event_plugin_rsvps'))
+    {
+        return;
+    }
+
+    // 1.2 - signups carry a role so a member can wrangle as well as troop.
+    if(!$db->field_exists('role', 'event_plugin_rsvps'))
+    {
+        $db->write_query("ALTER TABLE `" . TABLE_PREFIX . "event_plugin_rsvps`
+            ADD `role` enum('trooper','wrangler') NOT NULL DEFAULT 'trooper' AFTER `user_id`");
+    }
+
+    // The old key allowed one signup per member per event. It is replaced under a new
+    // name rather than widened in place, because index_exists() only reports that a
+    // *name* is present - reusing `event_user` would look done on the first run and the
+    // index would never actually widen.
+    //
+    // This cannot fail on duplicate data: every existing row takes 'trooper' from the
+    // column default, and the old two-column key already guaranteed those pairs unique.
+    if($db->index_exists('event_plugin_rsvps', 'event_user'))
+    {
+        $db->drop_index('event_plugin_rsvps', 'event_user');
+    }
+
+    if(!$db->index_exists('event_plugin_rsvps', 'event_user_role'))
+    {
+        $db->write_query("ALTER TABLE `" . TABLE_PREFIX . "event_plugin_rsvps`
+            ADD UNIQUE KEY `event_user_role` (`event_id`, `user_id`, `role`)");
+    }
 }

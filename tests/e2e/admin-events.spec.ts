@@ -196,6 +196,23 @@ test.describe('admin event management', () => {
     expect(orphanCostumes, 'RSVP costumes should not be orphaned').toHaveLength(0);
   });
 
+  test('the event list breaks signups down into troopers and wranglers', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Admin Breakdown Troop' });
+    await createRsvp(eventId, 'trooper1', {});
+    await createRsvp(eventId, 'wrangler', { role: 'wrangler' });
+
+    await loginToAdminCp(page);
+    await gotoEventsAdmin(page);
+
+    await expect(page.locator('table')).toContainText('Troopers');
+    await expect(page.locator('table')).toContainText('Wranglers');
+
+    const row = page.locator('tr', { hasText: 'Admin Breakdown Troop' }).first();
+    const cells = await row.locator('td').allInnerTexts();
+    // Troopers then wranglers, immediately after the start date.
+    expect(cells).toContain('1');
+  });
+
   test('a coordinator without admin rights cannot reach the Admin CP', async ({ page }) => {
     // Coordinators are deliberately kept out of the Admin CP: they manage their events
     // from the front-end event page instead (see coordinator.spec.ts).

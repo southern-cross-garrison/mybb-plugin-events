@@ -60,3 +60,50 @@ export async function lockReasonOnEventPage(page: Page, eventId: number): Promis
   }
   return locked.getAttribute('data-lock-reason');
 }
+
+/**
+ * Drive the wrangler signup, which is the same wizard with no costumes step.
+ *
+ * A wrangler with nothing missing on a single-day event goes straight to `confirm`, so
+ * every step here is optional except the confirmation itself.
+ */
+export async function wrangleThroughWizard(
+  page: Page,
+  eventId: number,
+  options: {
+    prerequisites?: Record<string, string>;
+    /** Event day ids to keep; omit to accept the default of every day. */
+    dayIds?: number[];
+  } = {},
+): Promise<void> {
+  await page.goto(`/rsvp.php?id=${eventId}&role=wrangler`);
+
+  if ((await page.locator('#rsvp_page[data-rsvp-step="prerequisites"]').count()) > 0) {
+    for (const [field, value] of Object.entries(options.prerequisites ?? {})) {
+      await page.locator(`#prereq_${field}`).fill(value);
+    }
+    await page.locator('#rsvp_submit').click();
+  }
+
+  // The costumes step must never appear for a wrangler.
+  await expect(page.locator('#rsvp_page[data-rsvp-step="costumes"]')).toHaveCount(0);
+
+  if ((await page.locator('#rsvp_page[data-rsvp-step="days"]').count()) > 0) {
+    if (options.dayIds) {
+      for (const checkbox of await page.locator('input.day_checkbox').all()) {
+        const value = Number(await checkbox.getAttribute('value'));
+        if (options.dayIds.includes(value)) {
+          await checkbox.check();
+        } else {
+          await checkbox.uncheck();
+        }
+      }
+    }
+    await page.locator('#rsvp_submit').click();
+  }
+
+  await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'confirm');
+  await page.locator('#rsvp_submit').click();
+
+  await expect(page.locator('#rsvp_success_message')).toBeVisible();
+}

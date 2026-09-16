@@ -33,17 +33,31 @@ if($region_filter !== '')
     $where .= " AND region = '" . $db->escape_string($region_filter) . "'";
 }
 
-$user_rsvps = array();
-$rsvp_query = $db->simple_select("event_plugin_rsvps", "event_id",
+// Tracked per role: somebody who has only signed up to wrangle must still be offered
+// the RSVP link, or they could never troop the event.
+$user_trooper_rsvps = array();
+$user_wrangler_rsvps = array();
+$rsvp_query = $db->simple_select("event_plugin_rsvps", "event_id, role",
     "user_id = " . (int)$mybb->user['uid'] . " AND status = 'attending'");
 while($row = $db->fetch_array($rsvp_query))
 {
-    $user_rsvps[] = (int)$row['event_id'];
+    if($row['role'] === 'wrangler')
+    {
+        $user_wrangler_rsvps[] = (int)$row['event_id'];
+    }
+    else
+    {
+        $user_trooper_rsvps[] = (int)$row['event_id'];
+    }
 }
+
+// The calendar only highlights "you are involved in this", so either role counts.
+$user_rsvps = array_values(array_unique(array_merge($user_trooper_rsvps, $user_wrangler_rsvps)));
 
 $query = $db->query("
     SELECT e.*,
-           (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.status = 'attending') AS rsvp_count
+           (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.role = 'trooper' AND r.status = 'attending') AS rsvp_count,
+           (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.role = 'wrangler' AND r.status = 'attending') AS wrangler_count
     FROM " . TABLE_PREFIX . "event_plugin_events e
     WHERE {$where}
     ORDER BY e.start_date ASC
@@ -80,8 +94,9 @@ if($view === 'calendar')
 $events_rows = '';
 foreach($events as $event)
 {
-    $rsvped = in_array((int)$event['id'], $user_rsvps);
-    $lock_reason = events_rsvp_lock_reason($event);
+    $rsvped = in_array((int)$event['id'], $user_trooper_rsvps, true);
+    $wrangling = in_array((int)$event['id'], $user_wrangler_rsvps, true);
+    $lock_reason = events_rsvp_lock_reason($event, null, 'trooper');
 
     if($rsvped)
     {
@@ -97,11 +112,26 @@ foreach($events as $event)
              . htmlspecialchars_uni(events_rsvp_lock_message($lock_reason)) . '</span>';
     }
 
+    if($wrangling)
+    {
+        $you .= ' <span class="event_wrangling">Wrangling</span>';
+    }
+
     $events_rows .= '<tr class="event_row" data-event-id="' . (int)$event['id'] . '" data-event-status="' . htmlspecialchars_uni($event['status']) . '">';
     $events_rows .= '<td class="trow1"><a class="event_link" href="event.php?id=' . (int)$event['id'] . '">' . htmlspecialchars_uni($event['title']) . '</a></td>';
     $events_rows .= '<td class="trow1 event_region">' . htmlspecialchars_uni($event['region']) . '</td>';
     $events_rows .= '<td class="trow1 event_start">' . events_format_date($event['start_date']) . '</td>';
-    $events_rows .= '<td class="trow1 event_rsvp_count">' . (int)$event['rsvp_count'] . '</td>';
+    // Two lozenges rather than one number, so an event with only wranglers still reads as
+    // "0 troopers, 1 wrangler" instead of an unexplained 0. The dot is backed up by a
+    // title and a letter, so the breakdown does not depend on colour alone.
+    $events_rows .= '<td class="trow1 event_counts">'
+        . '<span class="event_count event_count_trooper" title="Troopers">'
+        . '<span class="event_count_dot"></span><span class="event_rsvp_count">' . (int)$event['rsvp_count'] . '</span>'
+        . '<span class="event_count_key">T</span></span>'
+        . '<span class="event_count event_count_wrangler" title="Wranglers">'
+        . '<span class="event_count_dot"></span><span class="event_wrangler_count">' . (int)$event['wrangler_count'] . '</span>'
+        . '<span class="event_count_key">W</span></span>'
+        . '</td>';
     $events_rows .= '<td class="trow1 event_status">' . htmlspecialchars_uni($event['status']) . '</td>';
     $events_rows .= '<td class="trow1 event_you">' . $you . '</td>';
     $events_rows .= '</tr>';

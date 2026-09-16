@@ -95,8 +95,11 @@ function events_send_reminders()
     foreach($events as $event)
     {
         $user_ids = array();
+        // Troopers only: wranglers cannot author a troop report, so nagging them about a
+        // missing one is noise. It also keeps somebody who both trooped and wrangled from
+        // landing in $user_ids twice and being PMed twice.
         $rsvp_query = $db->simple_select("event_plugin_rsvps", "user_id",
-            "event_id = " . (int)$event['id'] . " AND status = 'attending'");
+            "event_id = " . (int)$event['id'] . " AND role = 'trooper' AND status = 'attending'");
         while($rsvp = $db->fetch_array($rsvp_query))
         {
             $user_ids[] = (int)$rsvp['user_id'];

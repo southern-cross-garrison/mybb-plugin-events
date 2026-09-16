@@ -30,9 +30,9 @@ if(!events_has_ended($event))
     error("This event has not ended yet.");
 }
 
-if(!events_has_rsvped($event_id))
+if(!events_has_rsvped($event_id, null, 'trooper'))
 {
-    error("You must have attended this event to write its troop report.");
+    error("You must have attended this event as a trooper to write its troop report.");
 }
 
 $report = events_get_troop_report($event_id);
@@ -42,7 +42,8 @@ if($report && !empty($report['posted_at']))
 }
 
 $event_title = htmlspecialchars_uni($event['title']);
-$attendees = events_get_attendees($event_id);
+$troopers = events_get_attendees($event_id, array('role' => 'trooper'));
+$wranglers = events_get_attendees($event_id, array('role' => 'wrangler'));
 
 add_breadcrumb("Events", "events.php");
 add_breadcrumb($event['title'], "event.php?id=" . $event_id);
@@ -145,7 +146,7 @@ $buckets = array(
     'other'  => array('title' => 'Others', 'attendees' => array()),
 );
 
-foreach($attendees as $attendee)
+foreach($troopers as $attendee)
 {
     $groups = events_user_group_ids($attendee);
 
@@ -163,7 +164,7 @@ foreach($attendees as $attendee)
     }
 }
 
-$draft_content = "[b]Event:[/b] " . $event['title'] . "\n";
+$draft_content = "[b]Event:[/b] " . events_escape_bbcode($event['title']) . "\n";
 $draft_content .= "[b]Date:[/b] " . events_format_date($event['start_date']) . " - " . events_format_date($event['end_date']) . "\n";
 $draft_content .= "[b]Region:[/b] " . $event['region'] . "\n\n";
 
@@ -177,22 +178,41 @@ foreach($buckets as $bucket)
     $draft_content .= "[b]" . $bucket['title'] . ":[/b]\n";
     foreach($bucket['attendees'] as $attendee)
     {
-        $line = "- " . $attendee['username'];
+        $line = "- " . events_escape_bbcode($attendee['username']);
         if($attendee['tk_id'] !== '')
         {
-            $line .= " (" . $attendee['tk_id'] . ")";
+            $line .= " (" . events_escape_bbcode($attendee['tk_id']) . ")";
         }
         if(!empty($attendee['costumes']))
         {
-            $line .= " - " . implode(', ', $attendee['costumes']);
+            $line .= " - " . events_escape_bbcode(implode(', ', $attendee['costumes']));
         }
         $draft_content .= $line . "\n";
     }
     $draft_content .= "\n";
 }
 
-$draft_content .= "[b]Total attendees:[/b] " . count($attendees) . "\n";
-$draft_content = htmlspecialchars_uni($draft_content);
+// Wranglers are not costumed and hold no Legion ID, so they get their own section
+// rather than being folded into the membership buckets above.
+if(!empty($wranglers))
+{
+    $draft_content .= "[b]Wranglers:[/b]\n";
+    foreach($wranglers as $wrangler)
+    {
+        $draft_content .= "- " . events_escape_bbcode($wrangler['username']) . "\n";
+    }
+    $draft_content .= "\n";
+}
+
+$draft_content .= "[b]Total attendees:[/b] " . count($troopers) . "\n";
+if(!empty($wranglers))
+{
+    $draft_content .= "[b]Total wranglers:[/b] " . count($wranglers) . "\n";
+}
+
+// Deliberately not htmlspecialchars_uni(): that preserves &#91;, which the browser would
+// decode back to "[" as the textarea's value and undo events_escape_bbcode() above.
+$draft_content = htmlspecialchars($draft_content, ENT_QUOTES, 'UTF-8');
 
 eval("\$page = \"" . $templates->get("events_troop_report") . "\";");
 output_page($page);

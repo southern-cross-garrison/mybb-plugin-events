@@ -19,6 +19,23 @@ test.describe('plugin installation', () => {
     ]);
   });
 
+  test('carries the signup role column and a role-aware unique key', async () => {
+    // The schema migration runs from events_activate(), so a stale snapshot is the one
+    // thing that silently breaks every wrangler test. Assert it directly.
+    const columns = await query(`SHOW COLUMNS FROM ${T('event_plugin_rsvps')} LIKE 'role'`);
+    expect(columns).toHaveLength(1);
+    expect(String((columns[0] as any).Type)).toBe("enum('trooper','wrangler')");
+    expect(String((columns[0] as any).Default)).toBe('trooper');
+
+    const index = await query(`SHOW INDEX FROM ${T('event_plugin_rsvps')} WHERE Key_name = 'event_user_role'`);
+    expect(index.map((row: any) => row.Column_name)).toEqual(['event_id', 'user_id', 'role']);
+    expect(Number((index[0] as any).Non_unique)).toBe(0);
+
+    // The old one-signup-per-member key must be gone, or nobody can hold both roles.
+    const legacy = await query(`SHOW INDEX FROM ${T('event_plugin_rsvps')} WHERE Key_name = 'event_user'`);
+    expect(legacy).toHaveLength(0);
+  });
+
   test('registers the reminder task against a task file that actually exists', async () => {
     const rows = await query(`SELECT file, enabled FROM ${T('tasks')} WHERE file = 'events_reminders'`);
     expect(rows).toHaveLength(1);

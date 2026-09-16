@@ -254,6 +254,13 @@ $users = array(
         'additionalgroups' => array($groups['scg']),
         'fields' => array('tk_id' => 'TK-20004', 'mobile' => '0400 000 004', 'emergency_contact' => 'Kin Trooper 0400 111 004', 'costume' => array($costume_options[4])),
     ),
+    // A non-costumed helper: contactable, but no TK ID, no WWCC and no costumes. Drives
+    // the wrangler flow, and proves the costume step is skipped rather than empty.
+    'wrangler' => array(
+        'usergroup' => 2,
+        'additionalgroups' => array(),
+        'fields' => array('mobile' => '0400 000 006', 'emergency_contact' => 'Kin Wrangler 0400 111 006'),
+    ),
     // Used for the per-event exclusion tests.
     'excluded' => array(
         'usergroup' => 2,

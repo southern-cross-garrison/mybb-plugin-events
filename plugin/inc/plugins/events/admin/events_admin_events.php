@@ -123,7 +123,8 @@ function events_admin_list_events()
 
     $query = $db->query("
         SELECT e.*, u.username AS gec_username,
-               (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.status = 'attending') AS rsvp_count
+               (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.role = 'trooper' AND r.status = 'attending') AS rsvp_count,
+           (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.role = 'wrangler' AND r.status = 'attending') AS wrangler_count
         FROM " . TABLE_PREFIX . "event_plugin_events e
         LEFT JOIN " . TABLE_PREFIX . "users u ON e.gec_user_id = u.uid
         WHERE {$where}
@@ -136,8 +137,9 @@ function events_admin_list_events()
     $table->construct_header("Status", array("width" => "10%"));
     $table->construct_header("Region", array("width" => "10%"));
     $table->construct_header("Starts", array("width" => "15%"));
-    $table->construct_header("RSVPs", array("width" => "7%"));
-    $table->construct_header("Coordinator", array("width" => "15%"));
+    $table->construct_header("Troopers", array("width" => "7%"));
+    $table->construct_header("Wranglers", array("width" => "7%"));
+    $table->construct_header("Coordinator", array("width" => "12%"));
     $table->construct_header("Actions", array("width" => "15%", "class" => "align_center"));
 
     while($event = $db->fetch_array($query))
@@ -147,6 +149,7 @@ function events_admin_list_events()
         $table->construct_cell(htmlspecialchars_uni($event['region']));
         $table->construct_cell(events_format_date($event['start_date']));
         $table->construct_cell((int)$event['rsvp_count']);
+        $table->construct_cell((int)$event['wrangler_count']);
         $table->construct_cell(htmlspecialchars_uni((string)$event['gec_username']));
 
         $popup = new PopupMenu("event_" . $event['id'], "Actions");
@@ -174,7 +177,7 @@ function events_admin_list_events()
 
     if($table->num_rows() == 0)
     {
-        $table->construct_cell("No events found.", array("colspan" => 7));
+        $table->construct_cell("No events found.", array("colspan" => 8));
         $table->construct_row();
     }
 

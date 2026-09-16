@@ -53,7 +53,12 @@ if($action === 'attendance')
 
     add_breadcrumb("Attendance Sheet", "event.php?id=" . $event_id . "&amp;action=attendance");
 
-    $attendees = events_get_attendees($event_id, array('day' => $filter_day));
+    // Fetched a role at a time rather than sorted in SQL: MySQL orders ENUMs by their
+    // declaration ordinal, which only matches alphabetical order here by coincidence.
+    $attendees = array_merge(
+        events_get_attendees($event_id, array('day' => $filter_day, 'role' => 'trooper')),
+        events_get_attendees($event_id, array('day' => $filter_day, 'role' => 'wrangler'))
+    );
 
     $attendance_day_heading = '';
     $attendance_day_filter = '';
@@ -88,6 +93,7 @@ if($action === 'attendance')
         $attendees_rows .= '<tr class="attendee_row" data-uid="' . $attendee['uid'] . '">';
         $attendees_rows .= '<td>' . $position . '</td>';
         $attendees_rows .= '<td class="attendee_username">' . htmlspecialchars_uni($attendee['username']) . '</td>';
+        $attendees_rows .= '<td class="attendee_role">' . events_role_label($attendee['role']) . '</td>';
         $attendees_rows .= '<td class="attendee_tkid">' . htmlspecialchars_uni($attendee['tk_id']) . '</td>';
         $attendees_rows .= '<td class="attendee_costumes">' . htmlspecialchars_uni(implode(', ', $attendee['costumes'])) . '</td>';
         $attendees_rows .= '<td class="attendee_mobile">' . htmlspecialchars_uni($attendee['mobile']) . '</td>';
@@ -98,7 +104,7 @@ if($action === 'attendance')
 
     if($attendees_rows === '')
     {
-        $attendees_rows = '<tr id="attendance_empty"><td colspan="7">No attendees yet.</td></tr>';
+        $attendees_rows = '<tr id="attendance_empty"><td colspan="8">No attendees yet.</td></tr>';
     }
 
     eval("\$page = \"" . $templates->get("events_attendance") . "\";");
@@ -114,13 +120,16 @@ $event_region = htmlspecialchars_uni($event['region']);
 $event_start_date = events_format_date($event['start_date']);
 $event_end_date = events_format_date($event['end_date']);
 $event_description = nl2br(htmlspecialchars_uni($event['description']));
-$rsvp_count = events_rsvp_count($event_id);
+$rsvp_count = events_rsvp_count($event_id, 'trooper');
+$wrangler_count = events_rsvp_count($event_id, 'wrangler');
 
 $event_cutoff_row = '';
 if(!empty($event['signup_cutoff']) && $event['signup_cutoff'] !== '0000-00-00 00:00:00')
 {
     $event_cutoff_row = '<p><strong>Signups close:</strong> <span id="event_cutoff">' . events_format_date($event['signup_cutoff']) . '</span></p>';
 }
+
+$event_wrangler_row = '<p><strong>Wranglers:</strong> <span id="event_wrangler_count">' . $wrangler_count . '</span></p>';
 
 $event_wwcc_row = '';
 if(!empty($event['requires_wwcc']))
@@ -139,14 +148,15 @@ if(!empty($event_days))
     $event_days_block = '<div id="event_days"><h3>Event Days</h3><ul>' . $items . '</ul></div>';
 }
 
-$has_rsvped = events_has_rsvped($event_id);
-$lock_reason = events_rsvp_lock_reason($event);
+$has_trooper_rsvp = events_has_rsvped($event_id, null, 'trooper');
+$has_wrangler_rsvp = events_has_rsvped($event_id, null, 'wrangler');
+$lock_reason = events_rsvp_lock_reason($event, null, 'trooper');
+$wrangler_lock_reason = events_rsvp_lock_reason($event, null, 'wrangler');
 
 $event_actions = '';
-if($has_rsvped)
+if($has_trooper_rsvp)
 {
     $event_actions .= '<span id="event_rsvp_status">You have RSVPed to this event</span> ';
-    $event_actions .= '<a href="ical.php?id=' . $event_id . '" id="event_ical">Download iCal</a> ';
 }
 elseif($lock_reason === null)
 {
@@ -156,6 +166,28 @@ else
 {
     $event_actions .= '<span id="event_rsvp_locked" data-lock-reason="' . htmlspecialchars_uni($lock_reason) . '">'
                     . htmlspecialchars_uni(events_rsvp_lock_message($lock_reason)) . '</span> ';
+}
+
+// The wrangler affordance is a link or a status, never a second lock message - an
+// excluded member should not be told they are excluded twice.
+if($has_wrangler_rsvp)
+{
+    $event_actions .= '<span id="event_wrangle_status">You are wrangling this event</span> ';
+}
+elseif($wrangler_lock_reason === null)
+{
+    $event_actions .= '<a href="rsvp.php?id=' . $event_id . '&amp;role=wrangler" id="event_wrangle">Sign Up to Wrangle</a> ';
+}
+elseif($wrangler_lock_reason === 'already_wrangling')
+{
+    $event_actions .= '<span id="event_wrangle_locked" data-lock-reason="already_wrangling">'
+                    . htmlspecialchars_uni(events_rsvp_lock_message('already_wrangling')) . '</span> ';
+}
+
+// A wrangler is attending, so they get the calendar file too.
+if($has_trooper_rsvp || $has_wrangler_rsvp)
+{
+    $event_actions .= '<a href="ical.php?id=' . $event_id . '" id="event_ical">Download iCal</a> ';
 }
 
 if(!empty($event['thread_id']))
@@ -187,7 +219,12 @@ if($is_gec)
 
     if($action === 'rsvps')
     {
-        $attendees = events_get_attendees($event_id, array('costume' => $filter_costume, 'day' => $filter_day));
+        // The costume filter can only ever match troopers, so wranglers drop out of a
+        // filtered list by definition. That is intended, not an oversight.
+        $attendees = array_merge(
+            events_get_attendees($event_id, array('costume' => $filter_costume, 'day' => $filter_day, 'role' => 'trooper')),
+            events_get_attendees($event_id, array('costume' => $filter_costume, 'day' => $filter_day, 'role' => 'wrangler'))
+        );
 
         $filter_day_select = '';
         if(!empty($event_days))
@@ -212,6 +249,7 @@ if($is_gec)
 
             $rsvp_rows .= '<tr class="rsvp_row" data-uid="' . $attendee['uid'] . '">';
             $rsvp_rows .= '<td class="trow1 rsvp_username">' . htmlspecialchars_uni($attendee['username']) . '</td>';
+            $rsvp_rows .= '<td class="trow1 rsvp_role">' . events_role_label($attendee['role']) . '</td>';
             $rsvp_rows .= '<td class="trow1 rsvp_tkid">' . htmlspecialchars_uni($attendee['tk_id']) . '</td>';
             $rsvp_rows .= '<td class="trow1 rsvp_costumes">' . htmlspecialchars_uni(implode(', ', $attendee['costumes'])) . '</td>';
             $rsvp_rows .= '<td class="trow1 rsvp_days">' . htmlspecialchars_uni(implode(', ', $day_labels)) . '</td>';
@@ -221,7 +259,7 @@ if($is_gec)
 
         if($rsvp_rows === '')
         {
-            $rsvp_rows = '<tr id="rsvp_list_empty"><td class="trow1" colspan="5">No RSVPs yet.</td></tr>';
+            $rsvp_rows = '<tr id="rsvp_list_empty"><td class="trow1" colspan="6">No RSVPs yet.</td></tr>';
         }
 
         $filter_costume = htmlspecialchars_uni($filter_costume);

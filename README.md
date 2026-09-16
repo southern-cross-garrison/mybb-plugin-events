@@ -1,6 +1,6 @@
 # MyBB Event Management plugin
 
-Event management for MyBB 1.8: events with RSVPs, prerequisite checks, multi-day support,
+Event management for MyBB 1.8: events with RSVPs and wrangler signups, prerequisite checks, multi-day support,
 attendance sheets, troop reports and iCal export. See [plugin/README.md](plugin/README.md)
 for what the plugin does; this file covers the development environment and the test suite.
 

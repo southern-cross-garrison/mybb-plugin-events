@@ -9,6 +9,7 @@ import {
   findThreadBySubject,
   getEvent,
   getTroopReport,
+  setUserField,
   fixtures,
 } from '../helpers/db';
 
@@ -101,6 +102,86 @@ test.describe('troop reports', () => {
     expect(draft.indexOf('trooper1')).toBeLessThan(legionIndex);
     expect(draft.indexOf('trooper2')).toBeGreaterThan(legionIndex);
     expect(draft.indexOf('newbie')).toBeGreaterThan(otherIndex);
+  });
+
+  test('lists wranglers in their own section, apart from the membership buckets', async ({ page }) => {
+    const eventId = await finishedEvent('Wrangled Troop');
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+    await createRsvp(eventId, 'trooper2', { costumes: [TD] });
+    await createRsvp(eventId, 'wrangler', { role: 'wrangler' });
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/troop_report.php?id=${eventId}`);
+
+    const draft = await page.locator('#troop_report_content').inputValue();
+
+    expect(draft).toContain('[b]Wranglers:[/b]');
+    expect(draft).toContain('- wrangler');
+
+    // Wranglers sit after the membership buckets, not inside them.
+    expect(draft.indexOf('wrangler\n')).toBeGreaterThan(draft.indexOf('[b]Wranglers:[/b]'));
+    expect(draft.indexOf('[b]Wranglers:[/b]')).toBeGreaterThan(draft.indexOf('[b]Others:[/b]'));
+
+    // The headline attendance figure stays the costumed count.
+    expect(draft).toContain('[b]Total attendees:[/b] 2');
+    expect(draft).toContain('[b]Total wranglers:[/b] 1');
+  });
+
+  test('omits the wrangler section entirely when nobody wrangled', async ({ page }) => {
+    const eventId = await finishedEvent('Unwrangled Troop');
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/troop_report.php?id=${eventId}`);
+
+    const draft = await page.locator('#troop_report_content').inputValue();
+    expect(draft).not.toContain('Wranglers');
+  });
+
+  test('are not offered to somebody who only wrangled', async ({ page }) => {
+    const eventId = await finishedEvent('Wrangler Only Troop');
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+    await createRsvp(eventId, 'wrangler', { role: 'wrangler' });
+
+    await loginAs(page, 'wrangler');
+    await page.goto(`/event.php?id=${eventId}`);
+    await expect(page.locator('#event_troop_report')).toHaveCount(0);
+
+    await page.goto(`/troop_report.php?id=${eventId}`);
+    await expect(page.locator('body')).toContainText('as a trooper');
+  });
+
+  test('are offered to somebody who both trooped and wrangled', async ({ page }) => {
+    const eventId = await finishedEvent('Dual Role Troop');
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+    await createRsvp(eventId, 'trooper1', { role: 'wrangler' });
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/event.php?id=${eventId}`);
+    await expect(page.locator('#event_troop_report')).toBeVisible();
+  });
+
+  test('neutralises BBCode in attendee data, all the way to the posted thread', async ({ page }) => {
+    const eventId = await finishedEvent('Injected Troop');
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+    // The TK ID is a free-text profile field, so it is the easiest injection vector.
+    await setUserField('trooper1', 'tk_id', 'TK-1[/b][url=http://evil.test]click me[/url]');
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/troop_report.php?id=${eventId}`);
+
+    // The draft must carry the brackets as entities, not as live markup.
+    const draft = await page.locator('#troop_report_content').inputValue();
+    expect(draft).toContain('&#91;/b&#93;');
+    expect(draft).not.toContain('[/b][url=');
+
+    await page.locator('#troop_report_submit').click();
+    await expect(page.locator('body')).toContainText('Injected Troop');
+
+    // In the posted thread the payload must read as text, with no link and no bold.
+    const post = page.locator('.post_body').first();
+    await expect(post).toContainText('[/b][url=http://evil.test]click me[/url]');
+    await expect(post.locator('a[href*="evil.test"]')).toHaveCount(0);
   });
 
   test('posting creates the forum thread and archives the event', async ({ page }) => {

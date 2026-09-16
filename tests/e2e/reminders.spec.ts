@@ -42,6 +42,35 @@ test.describe('troop report reminders', () => {
     expect(report?.last_reminder_sent).toBeTruthy();
   });
 
+  test('leaves wranglers alone: they cannot write the report', async () => {
+    const eventId = await createEvent({
+      title: 'Wrangled Overdue Troop',
+      start: relativeToTestNow({ days: -3 }),
+      end: relativeToTestNow({ days: -2 }),
+    });
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+    await createRsvp(eventId, 'wrangler', { role: 'wrangler' });
+
+    await runScheduledTask('events_reminders');
+
+    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+    expect(await countPrivateMessages('wrangler', SUBJECT)).toBe(0);
+  });
+
+  test('PMs a member who both trooped and wrangled exactly once', async () => {
+    const eventId = await createEvent({
+      title: 'Dual Role Overdue Troop',
+      start: relativeToTestNow({ days: -3 }),
+      end: relativeToTestNow({ days: -2 }),
+    });
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+    await createRsvp(eventId, 'trooper1', { role: 'wrangler' });
+
+    await runScheduledTask('events_reminders');
+
+    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+  });
+
   test('does not remind about events that have not finished yet', async () => {
     const eventId = await createEvent({
       title: 'Upcoming Troop',

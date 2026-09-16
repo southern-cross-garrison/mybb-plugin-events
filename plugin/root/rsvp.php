@@ -5,6 +5,11 @@
  * Steps: prerequisites -> costumes -> days (multi-day events only) -> confirm.
  * Each step POSTs the accumulated selections forward as hidden inputs, so nothing is
  * lost between steps and the flow survives a refresh or a back button.
+ *
+ * Wranglers - non-costumed helpers, who are not required to be full members - use the
+ * same wizard with the costumes step removed. The step sequence comes from
+ * events_rsvp_steps() rather than being hardcoded, so a wrangler who is missing nothing
+ * on a single-day event lands straight on 'confirm'.
  */
 
 define("IN_MYBB", 1);
@@ -29,7 +34,12 @@ if(!$event)
     error("Event not found.");
 }
 
-$lock_reason = events_rsvp_lock_reason($event);
+$role = events_rsvp_role($mybb->get_input('role'));
+$role_label = events_role_label($role);
+$is_wrangler = ($role === 'wrangler');
+
+// Scoped to the role: somebody who has already RSVPed as a trooper may still wrangle.
+$lock_reason = events_rsvp_lock_reason($event, null, $role);
 if($lock_reason !== null)
 {
     error(events_rsvp_lock_message($lock_reason));
@@ -46,7 +56,7 @@ foreach($event_days as $day)
 
 add_breadcrumb("Events", "events.php");
 add_breadcrumb($event['title'], "event.php?id=" . $event_id);
-add_breadcrumb("RSVP", "rsvp.php?id=" . $event_id);
+add_breadcrumb($is_wrangler ? "Wrangle" : "RSVP", "rsvp.php?id=" . $event_id . ($is_wrangler ? "&amp;role=wrangler" : ""));
 
 $user_costumes = events_get_user_costumes($mybb->user['uid']);
 
@@ -62,6 +72,13 @@ foreach((array)$mybb->get_input('costumes', MyBB::INPUT_ARRAY) as $costume)
 }
 $selected_costumes = array_values(array_unique($selected_costumes));
 
+if($is_wrangler)
+{
+    // Wranglers are not costumed. Dropping these here (rather than just skipping the
+    // step) is what stops a hand-crafted POST writing rsvp_costumes rows.
+    $selected_costumes = array();
+}
+
 $selected_days = array();
 foreach((array)$mybb->get_input('days', MyBB::INPUT_ARRAY) as $day_id)
 {
@@ -75,7 +92,8 @@ $selected_days = array_values(array_unique($selected_days));
 
 $errors = array();
 $render = 'prerequisites';
-$missing = events_check_prerequisites($event);
+$missing = events_check_prerequisites($event, null, $role);
+$steps = events_rsvp_steps($role, $has_days);
 
 if($mybb->request_method === 'post')
 {
@@ -83,10 +101,16 @@ if($mybb->request_method === 'post')
 
     $submitted = $mybb->get_input('step');
 
+    // A step that does not exist for this role (or junk input) restarts the sequence.
+    if(!in_array($submitted, $steps, true))
+    {
+        $submitted = 'prerequisites';
+    }
+
     if($submitted === 'prerequisites')
     {
         $values = array();
-        foreach(array_keys(events_prerequisite_labels()) as $field)
+        foreach(array_keys($missing) as $field)
         {
             if(isset($mybb->input[$field]))
             {
@@ -96,7 +120,7 @@ if($mybb->request_method === 'post')
 
         events_save_user_fields($mybb->user['uid'], $values);
 
-        $missing = events_check_prerequisites($event);
+        $missing = events_check_prerequisites($event, null, $role);
         if(!empty($missing))
         {
             $errors[] = 'Please complete every required field.';
@@ -104,7 +128,7 @@ if($mybb->request_method === 'post')
         }
         else
         {
-            $render = 'costumes';
+            $render = events_rsvp_step_after('prerequisites', $steps);
         }
     }
     elseif($submitted === 'costumes')
@@ -116,7 +140,7 @@ if($mybb->request_method === 'post')
         }
         else
         {
-            $render = $has_days ? 'days' : 'confirm';
+            $render = events_rsvp_step_after('costumes', $steps);
         }
     }
     elseif($submitted === 'days')
@@ -133,7 +157,11 @@ if($mybb->request_method === 'post')
     }
     elseif($submitted === 'confirm')
     {
-        if(empty($selected_costumes))
+        // For a wrangler on a single-day event 'confirm' is the first page rendered, so
+        // this is the only server-side prerequisite gate on the insert path.
+        $missing = events_check_prerequisites($event, null, $role);
+
+        if(!$is_wrangler && empty($selected_costumes))
         {
             $errors[] = 'Please select at least one costume.';
             $render = 'costumes';
@@ -143,11 +171,17 @@ if($mybb->request_method === 'post')
             $errors[] = 'Please select at least one day.';
             $render = 'days';
         }
+        elseif(!empty($missing))
+        {
+            $errors[] = 'Please complete every required field.';
+            $render = 'prerequisites';
+        }
         else
         {
             $rsvp_id = (int)$db->insert_query("event_plugin_rsvps", array(
                 'event_id'  => $event_id,
                 'user_id'   => (int)$mybb->user['uid'],
+                'role'      => $db->escape_string($role),
                 'rsvp_date' => $db->escape_string(date('Y-m-d H:i:s', TIME_NOW)),
                 'status'    => 'attending',
             ));
@@ -174,7 +208,7 @@ if($mybb->request_method === 'post')
 }
 elseif(empty($missing))
 {
-    $render = 'costumes';
+    $render = events_rsvp_step_after('prerequisites', $steps);
 }
 
 // ---------------------------------------------------------------------------
@@ -191,7 +225,17 @@ if($render === 'success')
         }
     }
 
-    $rsvp_summary = '<p id="rsvp_summary_costumes"><strong>Costumes:</strong> ' . htmlspecialchars_uni(implode(', ', $selected_costumes)) . '</p>';
+    $rsvp_success_title = $is_wrangler ? 'Wrangler Signup Confirmed' : 'RSVP Confirmed';
+    $rsvp_success_message = $is_wrangler
+        ? 'You have signed up to wrangle <strong>' . $event_title . '</strong>.'
+        : 'You have successfully RSVPed to <strong>' . $event_title . '</strong>.';
+
+    $rsvp_summary = '';
+    if(!$is_wrangler)
+    {
+        $rsvp_summary .= '<p id="rsvp_summary_costumes"><strong>Costumes:</strong> ' . htmlspecialchars_uni(implode(', ', $selected_costumes)) . '</p>';
+    }
+
     if(!empty($summary_days))
     {
         $rsvp_summary .= '<p id="rsvp_summary_days"><strong>Days:</strong> ' . htmlspecialchars_uni(implode(', ', $summary_days)) . '</p>';
@@ -208,9 +252,12 @@ if($render === 'success')
 $rsvp_step = $render;
 $rsvp_intro = '';
 $rsvp_body = '';
-$rsvp_carried_state = '';
+// Built in PHP rather than added to the template: events_install_templates() only writes
+// the master template set, so a board with a theme-level override would never receive a
+// new field and would silently drop the role, turning a wrangler signup into a trooper one.
+$rsvp_carried_state = '<input type="hidden" name="role" value="' . htmlspecialchars_uni($role) . '" />';
 $rsvp_submit_label = 'Continue';
-$rsvp_page_title = 'RSVP: ' . $event_title;
+$rsvp_page_title = ($is_wrangler ? 'Wrangle: ' : 'RSVP: ') . $event_title;
 
 if(!empty($errors))
 {
@@ -236,8 +283,8 @@ function events_hidden_inputs($name, array $values)
 
 if($rsvp_step === 'prerequisites')
 {
-    $rsvp_page_title = 'RSVP Prerequisites';
-    $rsvp_intro .= '<p>Before you can RSVP to <strong>' . $event_title . '</strong> we need the following details. They are saved to your profile.</p>';
+    $rsvp_page_title = $is_wrangler ? 'Wrangler Prerequisites' : 'RSVP Prerequisites';
+    $rsvp_intro .= '<p>Before you can ' . ($is_wrangler ? 'wrangle' : 'RSVP to') . ' <strong>' . $event_title . '</strong> we need the following details. They are saved to your profile.</p>';
 
     $labels = events_prerequisite_labels();
     foreach($missing as $field => $unused)
@@ -276,7 +323,7 @@ elseif($rsvp_step === 'days')
 {
     $rsvp_page_title = 'Select Days';
     $rsvp_intro .= '<p>Select the days you will attend.</p>';
-    $rsvp_carried_state = events_hidden_inputs('costumes', $selected_costumes);
+    $rsvp_carried_state .= events_hidden_inputs('costumes', $selected_costumes);
 
     foreach($event_days as $day)
     {
@@ -288,9 +335,9 @@ elseif($rsvp_step === 'days')
 }
 elseif($rsvp_step === 'confirm')
 {
-    $rsvp_page_title = 'Confirm RSVP';
-    $rsvp_carried_state = events_hidden_inputs('costumes', $selected_costumes) . events_hidden_inputs('days', $selected_days);
-    $rsvp_submit_label = 'Confirm RSVP';
+    $rsvp_page_title = $is_wrangler ? 'Confirm Wrangler Signup' : 'Confirm RSVP';
+    $rsvp_carried_state .= events_hidden_inputs('costumes', $selected_costumes) . events_hidden_inputs('days', $selected_days);
+    $rsvp_submit_label = $is_wrangler ? 'Confirm Signup' : 'Confirm RSVP';
 
     $summary_days = array();
     foreach($event_days as $day)
@@ -302,7 +349,12 @@ elseif($rsvp_step === 'confirm')
     }
 
     $rsvp_body = '<p><strong>Event:</strong> <span id="confirm_event">' . $event_title . '</span></p>'
-        . '<p><strong>Costumes:</strong> <span id="confirm_costumes">' . htmlspecialchars_uni(implode(', ', $selected_costumes)) . '</span></p>';
+        . '<p><strong>Role:</strong> <span id="confirm_role">' . $role_label . '</span></p>';
+
+    if(!$is_wrangler)
+    {
+        $rsvp_body .= '<p><strong>Costumes:</strong> <span id="confirm_costumes">' . htmlspecialchars_uni(implode(', ', $selected_costumes)) . '</span></p>';
+    }
 
     if(!empty($summary_days))
     {

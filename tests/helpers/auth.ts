@@ -8,9 +8,26 @@ import { ADMIN, AUTH_DIR, BASE_URL, FIXTURE_PASSWORD } from './config';
  * individual tests can switch identity without paying for a form round-trip.
  */
 
-export type FixtureUser = 'admin' | 'gec' | 'trooper1' | 'trooper2' | 'newbie' | 'nowwcc' | 'excluded';
+export type FixtureUser =
+  | 'admin'
+  | 'gec'
+  | 'trooper1'
+  | 'trooper2'
+  | 'newbie'
+  | 'nowwcc'
+  | 'wrangler'
+  | 'excluded';
 
-export const ALL_USERS: FixtureUser[] = ['admin', 'gec', 'trooper1', 'trooper2', 'newbie', 'nowwcc', 'excluded'];
+export const ALL_USERS: FixtureUser[] = [
+  'admin',
+  'gec',
+  'trooper1',
+  'trooper2',
+  'newbie',
+  'nowwcc',
+  'wrangler',
+  'excluded',
+];
 
 const statePath = (username: string) => path.join(AUTH_DIR, `${username}.json`);
 

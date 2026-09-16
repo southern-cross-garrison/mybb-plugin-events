@@ -40,7 +40,7 @@ function events_info()
         "website"       => "https://github.com/southern-cross-garrison/mybb-plugin-events",
         "author"        => "Kevin Brown (TK-33151)",
         "authorsite"    => "https://www.501scg.org/",
-        "version"       => "1.1",
+        "version"       => "1.2",
         "guid"          => "aa8e5870-f198-467f-a67a-0726e9690efc",
         "codename"      => "events",
         "compatibility" => "18*"
@@ -84,6 +84,7 @@ function events_install()
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_templates.php";
 
     events_install_database();
+    events_upgrade_database();
     events_install_templates();
 
     $query = $db->simple_select("settinggroups", "gid", "name = 'events'");
@@ -169,8 +170,13 @@ function events_activate()
 {
     global $db;
 
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_install.php";
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_templates.php";
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_tasks.php";
+
+    // MyBB has no upgrade hook, so schema changes land here - _install() only ever runs
+    // once, on a board that has no tables yet.
+    events_upgrade_database();
 
     // Re-sync templates so editing a .html file and re-activating picks up the change.
     events_install_templates();

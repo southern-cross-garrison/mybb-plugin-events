@@ -66,10 +66,14 @@ function events_admin_rsvps()
         return;
     }
 
-    $attendees = events_get_attendees($event_id, array('costume' => $filter_costume, 'day' => $filter_day));
+    $attendees = array_merge(
+        events_get_attendees($event_id, array('costume' => $filter_costume, 'day' => $filter_day, 'role' => 'trooper')),
+        events_get_attendees($event_id, array('costume' => $filter_costume, 'day' => $filter_day, 'role' => 'wrangler'))
+    );
 
     $table = new Table;
-    $table->construct_header("User", array("width" => "20%"));
+    $table->construct_header("User", array("width" => "16%"));
+    $table->construct_header("Role", array("width" => "8%"));
     $table->construct_header("TK ID", array("width" => "12%"));
     $table->construct_header("Costumes", array("width" => "26%"));
     $table->construct_header("Days Attending", array("width" => "18%"));
@@ -85,6 +89,7 @@ function events_admin_rsvps()
         }
 
         $table->construct_cell("<a href=\"index.php?module=user-users&amp;action=edit&amp;uid=" . $attendee['uid'] . "\">" . htmlspecialchars_uni($attendee['username']) . "</a>");
+        $table->construct_cell(events_role_label($attendee['role']));
         $table->construct_cell(htmlspecialchars_uni($attendee['tk_id']));
         $table->construct_cell(htmlspecialchars_uni(implode(', ', $attendee['costumes'])));
         $table->construct_cell(htmlspecialchars_uni(implode(', ', $days)));
@@ -95,7 +100,7 @@ function events_admin_rsvps()
 
     if($table->num_rows() == 0)
     {
-        $table->construct_cell("No RSVPs found.", array("colspan" => 6));
+        $table->construct_cell("No RSVPs found.", array("colspan" => 7));
         $table->construct_row();
     }
 

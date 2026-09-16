@@ -206,19 +206,25 @@ export async function getEventDays(eventId: number): Promise<RowDataPacket[]> {
 }
 
 /** Record an RSVP without walking the wizard, for tests that only need the end state. */
+export type SignupRole = 'trooper' | 'wrangler';
+
 export async function createRsvp(
   eventId: number,
   username: string,
-  options: { costumes?: string[]; dayIds?: number[]; at?: string } = {},
+  options: { costumes?: string[]; dayIds?: number[]; at?: string; role?: SignupRole } = {},
 ): Promise<number> {
+  const role: SignupRole = options.role ?? 'trooper';
+
   const result = await execute(
-    `INSERT INTO ${T('event_plugin_rsvps')} (event_id, user_id, rsvp_date, status) VALUES (?, ?, ?, 'attending')`,
-    [eventId, uid(username), options.at ?? relativeToTestNow({})],
+    `INSERT INTO ${T('event_plugin_rsvps')} (event_id, user_id, role, rsvp_date, status) VALUES (?, ?, ?, ?, 'attending')`,
+    [eventId, uid(username), role, options.at ?? relativeToTestNow({})],
   );
 
   const rsvpId = result.insertId;
 
-  for (const costume of options.costumes ?? [fixtures().costumeOptions[0]]) {
+  // Wranglers are never costumed, so they get no costume rows even by default.
+  const costumes = role === 'wrangler' ? [] : options.costumes ?? [fixtures().costumeOptions[0]];
+  for (const costume of costumes) {
     await execute(`INSERT INTO ${T('event_plugin_rsvp_costumes')} (rsvp_id, costume) VALUES (?, ?)`, [rsvpId, costume]);
   }
 
@@ -229,34 +235,53 @@ export async function createRsvp(
   return rsvpId;
 }
 
-export async function countRsvps(eventId: number): Promise<number> {
+/** Counts every role unless one is named. */
+export async function countRsvps(eventId: number, role?: SignupRole): Promise<number> {
   const row = await queryOne<RowDataPacket>(
-    `SELECT COUNT(*) AS total FROM ${T('event_plugin_rsvps')} WHERE event_id = ? AND status = 'attending'`,
-    [eventId],
+    `SELECT COUNT(*) AS total FROM ${T('event_plugin_rsvps')} WHERE event_id = ? AND status = 'attending'` +
+      (role ? ' AND role = ?' : ''),
+    role ? [eventId, role] : [eventId],
   );
   return Number(row?.total ?? 0);
 }
 
-export async function getRsvpCostumes(eventId: number, username: string): Promise<string[]> {
+/** The roles a member holds for an event, in insertion order. */
+export async function getSignupRoles(eventId: number, username: string): Promise<string[]> {
+  const rows = await query<RowDataPacket>(
+    `SELECT role FROM ${T('event_plugin_rsvps')} WHERE event_id = ? AND user_id = ? ORDER BY id ASC`,
+    [eventId, uid(username)],
+  );
+  return rows.map((row) => String(row.role));
+}
+
+export async function getRsvpCostumes(
+  eventId: number,
+  username: string,
+  role: SignupRole = 'trooper',
+): Promise<string[]> {
   const rows = await query<RowDataPacket>(
     `SELECT c.costume
        FROM ${T('event_plugin_rsvp_costumes')} c
        INNER JOIN ${T('event_plugin_rsvps')} r ON c.rsvp_id = r.id
-      WHERE r.event_id = ? AND r.user_id = ?
+      WHERE r.event_id = ? AND r.user_id = ? AND r.role = ?
       ORDER BY c.costume ASC`,
-    [eventId, uid(username)],
+    [eventId, uid(username), role],
   );
   return rows.map((row) => String(row.costume));
 }
 
-export async function getRsvpDayIds(eventId: number, username: string): Promise<number[]> {
+export async function getRsvpDayIds(
+  eventId: number,
+  username: string,
+  role: SignupRole = 'trooper',
+): Promise<number[]> {
   const rows = await query<RowDataPacket>(
     `SELECT d.event_day_id
        FROM ${T('event_plugin_rsvp_days')} d
        INNER JOIN ${T('event_plugin_rsvps')} r ON d.rsvp_id = r.id
-      WHERE r.event_id = ? AND r.user_id = ?
+      WHERE r.event_id = ? AND r.user_id = ? AND r.role = ?
       ORDER BY d.event_day_id ASC`,
-    [eventId, uid(username)],
+    [eventId, uid(username), role],
   );
   return rows.map((row) => Number(row.event_day_id));
 }

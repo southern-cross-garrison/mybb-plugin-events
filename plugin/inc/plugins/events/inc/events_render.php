@@ -41,6 +41,29 @@ function events_region_options($selected)
 }
 
 /**
+ * Neutralise BBCode in a value interpolated into a generated post.
+ *
+ * The troop report draft is a BBCode document that a human then edits and posts, so the
+ * document itself has to stay authorable - only the data interpolated into it is
+ * neutralised. Usernames, TK IDs and costumes are all user-controlled, and a value
+ * containing "[/b]" or "[url=...]" would otherwise be parsed as markup in the posted
+ * thread.
+ *
+ * MyBB's parser leaves numeric character references alone (see parse_html()), so &#91;
+ * survives to render as a literal bracket instead of opening a tag. Note that the draft
+ * must then be written into the textarea with a plain htmlspecialchars(), which escapes
+ * the ampersand - MyBB's own htmlspecialchars_uni() preserves &#91; and the browser
+ * would decode it straight back to "[" before the form was submitted.
+ *
+ * @param string $value
+ * @return string
+ */
+function events_escape_bbcode($value)
+{
+    return str_replace(array('[', ']'), array('&#91;', '&#93;'), (string)$value);
+}
+
+/**
  * Human label for a single event day.
  *
  * @param array $day
@@ -136,4 +159,48 @@ function events_calendar_grid($month_start, array $events, array $user_rsvps)
     }
 
     return $rows;
+}
+
+/**
+ * The wizard steps that apply to this role and event, in order.
+ *
+ * Wranglers are not costumed, so the costumes step does not exist for them at all -
+ * which also means a wrangler with nothing missing on a single-day event goes straight
+ * to 'confirm'.
+ *
+ * @param string $role
+ * @param bool $has_days
+ * @return array
+ */
+function events_rsvp_steps($role, $has_days)
+{
+    $steps = array('prerequisites');
+
+    if($role === 'trooper')
+    {
+        $steps[] = 'costumes';
+    }
+
+    if($has_days)
+    {
+        $steps[] = 'days';
+    }
+
+    $steps[] = 'confirm';
+
+    return $steps;
+}
+
+/**
+ * The step that follows $step, or 'confirm' at the end of the sequence.
+ *
+ * @param string $step
+ * @param array $steps
+ * @return string
+ */
+function events_rsvp_step_after($step, array $steps)
+{
+    $index = array_search($step, $steps, true);
+
+    return ($index === false || !isset($steps[$index + 1])) ? 'confirm' : $steps[$index + 1];
 }

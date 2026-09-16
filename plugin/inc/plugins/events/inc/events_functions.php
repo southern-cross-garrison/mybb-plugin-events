@@ -173,6 +173,42 @@ function events_is_event_gec($event_id, $user_id = null)
 }
 
 /**
+ * The two ways to sign up to an event.
+ *
+ * A trooper turns out in costume. A wrangler is a non-costumed helper, who is not
+ * required to be a full member and so has no Legion ID.
+ *
+ * @return array
+ */
+function events_rsvp_roles()
+{
+    return array('trooper', 'wrangler');
+}
+
+/**
+ * Normalise untrusted input to exactly one of the role tokens.
+ *
+ * Everything that reaches a query or a hidden input goes through here, so a role is
+ * always provably one of two literals.
+ *
+ * @param string $input
+ * @return string
+ */
+function events_rsvp_role($input)
+{
+    return in_array($input, events_rsvp_roles(), true) ? $input : 'trooper';
+}
+
+/**
+ * @param string $role
+ * @return string
+ */
+function events_role_label($role)
+{
+    return $role === 'wrangler' ? 'Wrangler' : 'Trooper';
+}
+
+/**
  * @param int $event_id
  * @return array|null
  */
@@ -249,9 +285,10 @@ function events_can_view_event($event, $user_id = null)
  *
  * @param int|array $event Event id or row
  * @param int|null $user_id
- * @return string|null one of: guest, not_found, not_live, excluded, cutoff_passed, event_ended, already_rsvped
+ * @param string $role Which signup is being attempted
+ * @return string|null one of: guest, not_found, not_live, excluded, cutoff_passed, event_ended, already_rsvped, already_wrangling
  */
-function events_rsvp_lock_reason($event, $user_id = null)
+function events_rsvp_lock_reason($event, $user_id = null, $role = 'trooper')
 {
     global $db;
 
@@ -276,6 +313,8 @@ function events_rsvp_lock_reason($event, $user_id = null)
         return 'not_live';
     }
 
+    // Exclusions have no role column: being excluded from an event excludes you from
+    // every way of signing up to it.
     $excluded = $db->simple_select("event_plugin_event_exclusions", "user_id",
         "event_id = " . (int)$event['id'] . " AND user_id = " . (int)$user['uid']);
     if($db->num_rows($excluded) > 0)
@@ -295,9 +334,10 @@ function events_rsvp_lock_reason($event, $user_id = null)
         return 'event_ended';
     }
 
-    if(events_has_rsvped($event['id'], $user['uid']))
+    $role = events_rsvp_role($role);
+    if(events_has_rsvped($event['id'], $user['uid'], $role))
     {
-        return 'already_rsvped';
+        return $role === 'wrangler' ? 'already_wrangling' : 'already_rsvped';
     }
 
     return null;
@@ -308,9 +348,9 @@ function events_rsvp_lock_reason($event, $user_id = null)
  * @param int|null $user_id
  * @return bool
  */
-function events_can_rsvp($event, $user_id = null)
+function events_can_rsvp($event, $user_id = null, $role = 'trooper')
 {
-    return events_rsvp_lock_reason($event, $user_id) === null;
+    return events_rsvp_lock_reason($event, $user_id, $role) === null;
 }
 
 /**
@@ -329,17 +369,24 @@ function events_rsvp_lock_message($reason)
         'cutoff_passed'  => 'RSVPs for this event have closed.',
         'event_ended'    => 'This event has finished, so RSVPs have closed.',
         'already_rsvped' => 'You have already RSVPed to this event.',
+        'already_wrangling' => 'You have already signed up to wrangle this event.',
     );
 
     return isset($messages[$reason]) ? $messages[$reason] : 'You cannot RSVP to this event.';
 }
 
 /**
+ * Has the user signed up to this event in the given role?
+ *
+ * Defaults to 'trooper' so that any caller which does not care keeps the meaning it had
+ * before wranglers existed.
+ *
  * @param int $event_id
  * @param int|null $user_id
+ * @param string $role
  * @return bool
  */
-function events_has_rsvped($event_id, $user_id = null)
+function events_has_rsvped($event_id, $user_id = null, $role = 'trooper')
 {
     global $db;
 
@@ -350,21 +397,31 @@ function events_has_rsvped($event_id, $user_id = null)
     }
 
     $query = $db->simple_select("event_plugin_rsvps", "id",
-        "event_id = " . (int)$event_id . " AND user_id = " . (int)$user['uid'] . " AND status = 'attending'");
+        "event_id = " . (int)$event_id . " AND user_id = " . (int)$user['uid']
+        . " AND role = '" . $db->escape_string(events_rsvp_role($role)) . "' AND status = 'attending'");
 
     return $db->num_rows($query) > 0;
 }
 
 /**
+ * How many people have signed up to an event in a given role?
+ *
  * @param int $event_id
+ * @param string|null $role null counts every role
  * @return int
  */
-function events_rsvp_count($event_id)
+function events_rsvp_count($event_id, $role = 'trooper')
 {
     global $db;
 
+    $where = "event_id = " . (int)$event_id . " AND status = 'attending'";
+    if($role !== null)
+    {
+        $where .= " AND role = '" . $db->escape_string(events_rsvp_role($role)) . "'";
+    }
+
     return (int)$db->fetch_field(
-        $db->simple_select("event_plugin_rsvps", "COUNT(*) AS rsvps", "event_id = " . (int)$event_id . " AND status = 'attending'"),
+        $db->simple_select("event_plugin_rsvps", "COUNT(*) AS rsvps", $where),
         "rsvps"
     );
 }
@@ -428,11 +485,15 @@ function events_get_user_costumes($user_id)
 /**
  * Which prerequisite profile fields is the user missing for this event?
  *
+ * Wranglers are not required to be full members, so they are never asked for a TK ID.
+ * They are still asked for the details a coordinator needs on the day.
+ *
  * @param int|array $event
  * @param int|null $user_id
+ * @param string $role
  * @return array field key => true
  */
-function events_check_prerequisites($event, $user_id = null)
+function events_check_prerequisites($event, $user_id = null, $role = 'trooper')
 {
     if(!is_array($event))
     {
@@ -445,7 +506,12 @@ function events_check_prerequisites($event, $user_id = null)
         return array();
     }
 
-    $required = array('tk_id', 'mobile', 'emergency_contact');
+    $required = array('mobile', 'emergency_contact');
+    if(events_rsvp_role($role) === 'trooper')
+    {
+        array_unshift($required, 'tk_id');
+    }
+
     if(!empty($event['requires_wwcc']))
     {
         $required[] = 'wwcc';
@@ -528,7 +594,7 @@ function events_prerequisite_labels()
  * troop report need.
  *
  * @param int $event_id
- * @param array $filters costume (string), day (int event_day_id)
+ * @param array $filters costume (string), day (int event_day_id), role (string)
  * @return array
  */
 function events_get_attendees($event_id, array $filters = array())
@@ -537,6 +603,11 @@ function events_get_attendees($event_id, array $filters = array())
 
     $event_id = (int)$event_id;
     $where = "r.event_id = " . $event_id . " AND r.status = 'attending'";
+
+    if(!empty($filters['role']))
+    {
+        $where .= " AND r.role = '" . $db->escape_string(events_rsvp_role($filters['role'])) . "'";
+    }
 
     if(!empty($filters['costume']))
     {
@@ -549,7 +620,7 @@ function events_get_attendees($event_id, array $filters = array())
     }
 
     $query = $db->query("
-        SELECT r.id, r.user_id, r.rsvp_date, u.username, u.usergroup, u.additionalgroups, uf.*
+        SELECT r.id, r.user_id, r.role, r.rsvp_date, u.username, u.usergroup, u.additionalgroups, uf.*
         FROM " . TABLE_PREFIX . "event_plugin_rsvps r
         INNER JOIN " . TABLE_PREFIX . "users u ON r.user_id = u.uid
         LEFT JOIN " . TABLE_PREFIX . "userfields uf ON u.uid = uf.ufid
@@ -583,6 +654,7 @@ function events_get_attendees($event_id, array $filters = array())
         $attendees[] = array(
             'rsvp_id'           => (int)$row['id'],
             'uid'               => (int)$row['user_id'],
+            'role'              => $row['role'],
             'username'          => $row['username'],
             'usergroup'         => (int)$row['usergroup'],
             'additionalgroups'  => $row['additionalgroups'],
@@ -652,8 +724,8 @@ function events_get_troop_report($event_id)
 /**
  * May this user draft/post the troop report for the event?
  *
- * The event must have ended, the user must have attended, and no report may have
- * been posted yet.
+ * The event must have ended, the user must have attended as a trooper, and no report
+ * may have been posted yet. Wranglers do not write troop reports.
  *
  * @param array $event
  * @param int|null $user_id
@@ -666,7 +738,7 @@ function events_can_create_troop_report($event, $user_id = null)
         return false;
     }
 
-    if(!events_has_rsvped($event['id'], $user_id))
+    if(!events_has_rsvped($event['id'], $user_id, 'trooper'))
     {
         return false;
     }
