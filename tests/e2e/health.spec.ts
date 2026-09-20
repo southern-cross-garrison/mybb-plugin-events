@@ -30,9 +30,10 @@ echo "cleared";
       '/events.php?view=calendar',
       '/events.php?region=Sydney',
       `/event.php?id=${eventId}`,
-      `/event.php?id=${eventId}&action=rsvps`,
       `/event.php?id=${eventId}&action=attendance`,
       `/rsvp.php?id=${eventId}`,
+      '/manage_event.php',
+      `/manage_event.php?id=${eventId}`,
     ]) {
       const response = await page.goto(url);
       expect(response?.status(), `${url} should not error`).toBeLessThan(400);

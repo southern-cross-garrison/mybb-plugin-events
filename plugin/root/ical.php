@@ -34,13 +34,22 @@ if(empty($days))
 {
     $days = array(array(
         'id'         => 0,
-        'date'       => date('Y-m-d', strtotime($event['start_date'])),
-        'start_time' => date('H:i:s', strtotime($event['start_date'])),
-        'end_time'   => date('H:i:s', strtotime($event['end_date'])),
+        'date'       => events_date('Y-m-d', events_strtotime($event['start_date'])),
+        'start_time' => events_date('H:i:s', events_strtotime($event['start_date'])),
+        'end_time'   => events_date('H:i:s', events_strtotime($event['end_date'])),
     ));
 }
 
 $host = parse_url($mybb->settings['bburl'], PHP_URL_HOST);
+
+// LOCATION is what a calendar app hands to its maps button, so the address is what belongs
+// in it. The region stays as the fallback: it is all an event without an address has, and
+// an entry with no location at all would be a step back from what the export used to say.
+$location = isset($event['address']) ? trim((string)$event['address']) : '';
+if($location === '')
+{
+    $location = $event['region'];
+}
 
 /**
  * Escape a value for an iCal text property.
@@ -62,8 +71,10 @@ $lines[] = "CALSCALE:GREGORIAN";
 
 foreach($days as $day)
 {
-    $start = strtotime($day['date'] . ' ' . ($day['start_time'] ? $day['start_time'] : '00:00:00'));
-    $end = strtotime($day['date'] . ' ' . ($day['end_time'] ? $day['end_time'] : '23:59:59'));
+    // The stored day is a wall clock in the event's timezone; DTSTART and DTEND are
+    // written as UTC instants, so reading it in that zone is what makes the two agree.
+    $start = events_strtotime($day['date'] . ' ' . ($day['start_time'] ? $day['start_time'] : '00:00:00'));
+    $end = events_strtotime($day['date'] . ' ' . ($day['end_time'] ? $day['end_time'] : '23:59:59'));
 
     $lines[] = "BEGIN:VEVENT";
     $lines[] = "UID:event-" . $event_id . "-" . (int)$day['id'] . "@" . $host;
@@ -72,7 +83,7 @@ foreach($days as $day)
     $lines[] = "DTEND:" . gmdate('Ymd\THis\Z', $end);
     $lines[] = "SUMMARY:" . events_ical_escape($event['title']);
     $lines[] = "DESCRIPTION:" . events_ical_escape(strip_tags($event['description']));
-    $lines[] = "LOCATION:" . events_ical_escape($event['region']);
+    $lines[] = "LOCATION:" . events_ical_escape($location);
     $lines[] = "URL:" . $mybb->settings['bburl'] . "/event.php?id=" . $event_id;
     $lines[] = "END:VEVENT";
 }

@@ -116,7 +116,9 @@ test.describe('signup wizard', () => {
     // The hint is the input's accessible description, not loose text beside it.
     await expect(page.locator('#prereq_tk_id')).toHaveClass(/events_input/);
     await expect(page.locator('#prereq_tk_id')).toHaveAttribute('aria-describedby', 'hint_tk_id');
-    await expect(page.locator('#hint_tk_id')).toHaveText('Your 501st legion ID, e.g. TK-12345.');
+    await expect(page.locator('#hint_tk_id')).toHaveText(
+      'Your 501st legion ID, e.g. if you are TK-12345 then type "12345" here.',
+    );
     await expect(page.locator('label[for="prereq_tk_id"]')).toHaveClass(/events_label/);
     await expect(page.locator('label[for="prereq_tk_id"]')).toContainText('Legion ID');
 
@@ -168,7 +170,7 @@ test.describe('signup wizard', () => {
     expect(await getUserField('nowwcc', 'wwcc')).toBe('WWCC-54321');
   });
 
-  test('defaults a multi-day signup to trooping every day', async ({ page }) => {
+  test('defaults a multi-day signup to trooping every day, with the grid closed', async ({ page }) => {
     const eventId = await createEvent({
       title: 'Full Weekend Troop',
       start: '2026-10-17 09:00:00',
@@ -180,6 +182,12 @@ test.describe('signup wizard', () => {
     await loginAs(page, 'trooper1');
     await page.goto(`/rsvp.php?id=${eventId}`);
 
+    // The whole question, for the signup almost everybody is making: one answer, and a
+    // grid that stays shut until a day genuinely differs.
+    await expect(page.locator('#signup_role_trooper')).toBeChecked();
+    await expect(page.locator('#signup_per_day')).not.toBeChecked();
+    await expect(page.locator('#signup_days')).toBeHidden();
+
     for (const dayId of dayIds) {
       await expect(page.locator(`#day_${dayId}_trooper`)).toBeChecked();
     }
@@ -188,6 +196,156 @@ test.describe('signup wizard', () => {
 
     expect(await getSignupRoles(eventId, 'trooper1')).toEqual(['trooper']);
     expect(await getRsvpDayIds(eventId, 'trooper1')).toEqual(dayIds);
+  });
+
+  test('the leading answer covers every day while the grid is closed', async ({ page }) => {
+    const eventId = await createEvent({
+      title: 'Wrangled Weekend',
+      start: '2026-10-17 09:00:00',
+      end: '2026-10-18 17:00:00',
+      days: [{ date: '2026-10-17' }, { date: '2026-10-18' }],
+    });
+    const dayIds = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+
+    await loginAs(page, 'trooper1');
+    await signUpThroughWizard(page, eventId, { role: 'wrangler' });
+
+    expect(await getSignupRoles(eventId, 'trooper1')).toEqual(['wrangler']);
+    expect(await getRsvpDayIds(eventId, 'trooper1', 'wrangler')).toEqual(dayIds);
+  });
+
+  test('the leading answer sets every day, and changing one day clears it', async ({ page }) => {
+    const eventId = await createEvent({
+      title: 'Cascade Weekend',
+      start: '2026-10-17 09:00:00',
+      end: '2026-10-18 17:00:00',
+      days: [{ date: '2026-10-17' }, { date: '2026-10-18' }],
+    });
+    const [saturday, sunday] = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+
+    // Wrangling the event, except for the Sunday. The Saturday is never touched: answering
+    // the question at the top is what put it on wrangling, and it stays there.
+    await page.locator('#signup_role_wrangler').check();
+    await page.locator('#signup_per_day').check();
+    await expect(page.locator('#signup_days')).toBeVisible();
+    await expect(page.locator(`#day_${saturday}_wrangler`)).toBeChecked();
+    await expect(page.locator(`#day_${sunday}_wrangler`)).toBeChecked();
+
+    await page.locator(`#day_${sunday}_trooper`).check();
+
+    // No single answer describes the two days any more, so the question above has none.
+    await expect(page.locator('#signup_role_wrangler')).not.toBeChecked();
+    await expect(page.locator('#signup_role_trooper')).not.toBeChecked();
+
+    await page.locator('#rsvp_submit').click();
+    await page.locator(`input.costume_checkbox[value="${TK}"]`).check();
+    await page.locator('#rsvp_submit').click();
+    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_success_message')).toBeVisible();
+
+    expect(await getRsvpDayIds(eventId, 'trooper1', 'wrangler')).toEqual([saturday]);
+    expect(await getRsvpDayIds(eventId, 'trooper1', 'trooper')).toEqual([sunday]);
+  });
+
+  test('changing a day and closing the grid again leaves the leading answer in charge', async ({ page }) => {
+    const eventId = await createEvent({
+      title: 'Reconsidered Weekend',
+      start: '2026-10-17 09:00:00',
+      end: '2026-10-18 17:00:00',
+      days: [{ date: '2026-10-17' }, { date: '2026-10-18' }],
+    });
+    const dayIds = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+
+    // The grid is closed with CSS, so its radios keep posting whatever they last held.
+    // Closing it has to put the member back on the answer the page is showing them.
+    await page.locator('#signup_per_day').check();
+    await page.locator(`#day_${dayIds[1]}_none`).check();
+    await page.locator('#signup_per_day').uncheck();
+
+    await page.locator('#rsvp_submit').click();
+    await page.locator(`input.costume_checkbox[value="${TK}"]`).check();
+    await page.locator('#rsvp_submit').click();
+    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_success_message')).toBeVisible();
+
+    expect(await getRsvpDayIds(eventId, 'trooper1')).toEqual(dayIds);
+  });
+
+  test('reopening a signup that is not the same throughout opens the grid on it', async ({ page }) => {
+    const eventId = await createEvent({
+      title: 'Mixed Weekend Edit',
+      start: '2026-10-17 09:00:00',
+      end: '2026-10-18 17:00:00',
+      days: [{ date: '2026-10-17' }, { date: '2026-10-18' }],
+    });
+    const [saturday, sunday] = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+    await createRsvp(eventId, 'trooper1', { costumes: [TK], dayIds: [saturday] });
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+
+    await expect(page.locator('#signup_per_day')).toBeChecked();
+    await expect(page.locator('#signup_days')).toBeVisible();
+    await expect(page.locator(`#day_${saturday}_trooper`)).toBeChecked();
+    await expect(page.locator(`#day_${sunday}_none`)).toBeChecked();
+    // The two days do not agree, so the question above is left unanswered rather than
+    // showing a chip that speaks for a day being sat out.
+    await expect(page.locator('#signup_role_trooper')).not.toBeChecked();
+    await expect(page.locator('#signup_role_wrangler')).not.toBeChecked();
+  });
+
+  test('putting the days back into agreement answers the question above again', async ({ page }) => {
+    const eventId = await createEvent({
+      title: 'Realigned Weekend',
+      start: '2026-10-17 09:00:00',
+      end: '2026-10-18 17:00:00',
+      days: [{ date: '2026-10-17' }, { date: '2026-10-18' }],
+    });
+    const [saturday, sunday] = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+
+    await page.locator('#signup_per_day').check();
+    await page.locator(`#day_${sunday}_wrangler`).check();
+    await expect(page.locator('#signup_role_trooper')).not.toBeChecked();
+
+    // Both days wrangling is wrangling the event, which is exactly what the question
+    // above asks - so it comes back lit rather than staying blank.
+    await page.locator(`#day_${saturday}_wrangler`).check();
+    await expect(page.locator('#signup_role_wrangler')).toBeChecked();
+
+    await page.locator('#rsvp_submit').click();
+    await page.locator('#rsvp_submit').click();
+
+    await expect(page.locator('#rsvp_success_message')).toBeVisible();
+    expect(await getSignupRoles(eventId, 'trooper1')).toEqual(['wrangler']);
+    expect(await getRsvpDayIds(eventId, 'trooper1', 'wrangler')).toEqual([saturday, sunday]);
+  });
+
+  test('the grid offers no "same as above" to contradict the answer above', async ({ page }) => {
+    const eventId = await createEvent({
+      title: 'No Same Option Troop',
+      start: '2026-10-17 09:00:00',
+      end: '2026-10-18 17:00:00',
+      days: [{ date: '2026-10-17' }, { date: '2026-10-18' }],
+    });
+    const dayIds = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+    await page.locator('#signup_per_day').check();
+
+    for (const dayId of dayIds) {
+      await expect(page.locator(`#day_${dayId}_same`)).toHaveCount(0);
+      await expect(page.locator(`.signup_day[data-day-id="${dayId}"] input.day_role_radio`)).toHaveCount(3);
+    }
   });
 
   test('a member can drop a day they cannot make', async ({ page }) => {
@@ -236,6 +394,7 @@ test.describe('signup wizard', () => {
     await loginAs(page, 'trooper1');
     await page.goto(`/rsvp.php?id=${eventId}`);
 
+    await page.locator('#signup_per_day').check();
     for (const dayId of dayIds) {
       await page.locator(`#day_${dayId}_none`).check();
     }

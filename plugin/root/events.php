@@ -19,7 +19,20 @@ if(!events_can_view_events_page())
 
 add_breadcrumb("Events", "events.php");
 
-$view = $mybb->get_input('view') === 'calendar' ? 'calendar' : 'list';
+// A view named in the URL wins and becomes the member's preference; a bare events.php
+// opens in whichever view they last used. Every link that leaves the index for one of its
+// own views carries `view` along, so the preference follows the toggle, the month paging
+// and the region filter alike.
+$view = $mybb->get_input('view');
+if(in_array($view, events_views(), true))
+{
+    events_save_view_preference($view);
+}
+else
+{
+    $view = events_view_preference();
+}
+
 $region_filter = $mybb->get_input('region');
 if(!in_array($region_filter, events_regions(), true))
 {
@@ -62,20 +75,38 @@ while($event = $db->fetch_array($query))
 }
 
 $region_options = events_region_options($region_filter);
+$events_view_toggle = events_view_toggle($view, $region_filter);
+
+// Coordinators build their own events now, so the listing is where a new one starts. It
+// sits in the toolbar on both views and is simply absent for everybody else.
+//
+// A submit button in a one-line GET form rather than a link, because it stands next to
+// the Filter button and has to read as the same kind of control on whatever theme is
+// installed. Themes style `input.button` and `button.button` - MyBB's own default theme
+// and the garrison's both do - and none of them style a bare `.button` on an anchor, so
+// an <a> would have to carry a look of its own and would drift from its neighbour the
+// first time a theme restyled its buttons.
+$events_manage_link = '';
+if(events_is_gec())
+{
+    $events_manage_link = '<form method="get" action="manage_event.php" class="events_filter_form">'
+        . '<input type="submit" class="button" id="events_create" value="Create Event" />'
+        . '</form>';
+}
 
 if($view === 'calendar')
 {
     $month_input = $mybb->get_input('month');
     if(!preg_match('/^\d{4}-\d{2}$/', $month_input))
     {
-        $month_input = my_date('Y-m', TIME_NOW, 0, 0);
+        $month_input = events_date('Y-m', TIME_NOW);
     }
 
-    $month_start = strtotime($month_input . '-01 00:00:00');
+    $month_start = events_strtotime($month_input . '-01 00:00:00');
     $calendar_month = $month_input;
-    $calendar_month_name = my_date('F Y', $month_start, 0, 0);
-    $calendar_prev = date('Y-m', strtotime('-1 month', $month_start));
-    $calendar_next = date('Y-m', strtotime('+1 month', $month_start));
+    $calendar_month_name = events_date('F Y', $month_start);
+    $calendar_prev = events_date('Y-m', events_strtotime('-1 month', $month_start));
+    $calendar_next = events_date('Y-m', events_strtotime('+1 month', $month_start));
     $calendar_content = events_calendar_grid($month_start, $events, $user_rsvps);
 
     $events_print_header = events_print_header('Events Calendar', array($calendar_month_name, $region_filter));
@@ -116,9 +147,15 @@ foreach($events as $event)
     }
 
     $events_rows .= '<tr class="event_row" data-event-id="' . (int)$event['id'] . '" data-event-status="' . htmlspecialchars_uni($event['status']) . '">';
-    $events_rows .= '<td class="trow1"><a class="event_link" href="event.php?id=' . (int)$event['id'] . '">' . htmlspecialchars_uni($event['title']) . '</a></td>';
+    // Under the title rather than in a column of its own: an address is as long as a
+    // whole row of this table, and giving it a column would squeeze everything beside it.
+    $address_link = events_address_link(isset($event['address']) ? $event['address'] : '', 'event_address_link');
+    $address_line = $address_link === '' ? '' : '<span class="event_address">' . $address_link . '</span>';
+
+    $events_rows .= '<td class="trow1"><a class="event_link" href="event.php?id=' . (int)$event['id'] . '">'
+        . htmlspecialchars_uni($event['title']) . '</a>' . $address_line . '</td>';
     $events_rows .= '<td class="trow1 event_region">' . htmlspecialchars_uni($event['region']) . '</td>';
-    $events_rows .= '<td class="trow1 event_start">' . events_format_date($event['start_date']) . '</td>';
+    $events_rows .= '<td class="trow1 event_start">' . events_format_list_date($event['start_date']) . '</td>';
     // Two lozenges rather than one number, so an event with only wranglers still reads as
     // "0 troopers, 1 wrangler" instead of an unexplained 0. The dot is backed up by a
     // title and a letter, so the breakdown does not depend on colour alone.

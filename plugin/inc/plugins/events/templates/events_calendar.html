@@ -11,10 +11,7 @@
 <tr><td class="thead"><strong>Events Calendar - {$calendar_month_name}</strong></td></tr>
 <tr class="no-print"><td class="trow1">
 <div class="events_toolbar">
-<span class="events_toolbar_group">
-<a href="events.php?view=list" id="events_view_list">List View</a> |
-<a href="events.php?view=calendar" id="events_view_calendar">Calendar View</a>
-</span>
+{$events_view_toggle}
 <span class="events_toolbar_group">
 <a href="events.php?view=calendar&amp;month={$calendar_prev}" id="events_calendar_prev">&laquo; Previous</a> |
 <a href="events.php?view=calendar&amp;month={$calendar_next}" id="events_calendar_next">Next &raquo;</a>
@@ -25,6 +22,7 @@
 <select name="region" id="events_region_filter" class="events_select">{$region_options}</select>
 <input type="submit" class="button" value="Filter" />
 </form>
+{$events_manage_link}
 </div>
 </td></tr>
 <tr><td class="trow1">

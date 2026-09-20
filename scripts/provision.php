@@ -154,7 +154,7 @@ function provision_usergroup($title)
 
 $groups = array(
     'gec' => provision_usergroup('Event Coordinators'),
-    'scg' => provision_usergroup('SCG Members'),
+    'garrison' => provision_usergroup('Garrison Members'),
     'legion' => provision_usergroup('501st Members'),
 );
 out('usergroups: ' . json_encode($groups));
@@ -216,6 +216,11 @@ $general_forum = $db->fetch_array($db->simple_select('forums', 'fid', "type = 'f
 $forums = array(
     'general' => $general_forum ? (int)$general_forum['fid'] : provision_forum('General Discussion', $category_fid),
     'troop_reports' => provision_forum('Troop Reports', $category_fid),
+    // Event announcements are posted by the plugin into the forum its settings name for
+    // the event's region, so the suite needs a default forum and a region-specific one
+    // to tell the two routes apart.
+    'events' => provision_forum('Event Announcements', $category_fid),
+    'events_hunter' => provision_forum('Hunter Event Announcements', $category_fid),
 );
 out('forums: ' . json_encode($forums));
 
@@ -228,13 +233,13 @@ $users = array(
     // A coordinator: sees pending events, manages RSVPs and attendance sheets.
     'gec' => array(
         'usergroup' => 2,
-        'additionalgroups' => array($groups['gec'], $groups['scg']),
+        'additionalgroups' => array($groups['gec'], $groups['garrison']),
         'fields' => array('tk_id' => 'TK-10001', 'wwcc' => 'WWCC-1001', 'mobile' => '0400 000 001', 'emergency_contact' => 'Jane Coordinator 0400 111 001', 'costume' => array($costume_options[0])),
     ),
     // Fully-provisioned members: can RSVP without touching the prerequisites step.
     'trooper1' => array(
         'usergroup' => 2,
-        'additionalgroups' => array($groups['scg']),
+        'additionalgroups' => array($groups['garrison']),
         'fields' => array('tk_id' => 'TK-20001', 'wwcc' => 'WWCC-2001', 'mobile' => '0400 000 002', 'emergency_contact' => 'Kin Trooper 0400 111 002', 'costume' => array($costume_options[0], $costume_options[2])),
     ),
     'trooper2' => array(
@@ -251,7 +256,7 @@ $users = array(
     // Has prerequisites but no WWCC - drives the WWCC-required branch.
     'nowwcc' => array(
         'usergroup' => 2,
-        'additionalgroups' => array($groups['scg']),
+        'additionalgroups' => array($groups['garrison']),
         'fields' => array('tk_id' => 'TK-20004', 'mobile' => '0400 000 004', 'emergency_contact' => 'Kin Trooper 0400 111 004', 'costume' => array($costume_options[4])),
     ),
     // A non-costumed helper: contactable, but no TK ID, no WWCC and no costumes. Drives
@@ -264,7 +269,7 @@ $users = array(
     // Used for the per-event exclusion tests.
     'excluded' => array(
         'usergroup' => 2,
-        'additionalgroups' => array($groups['scg']),
+        'additionalgroups' => array($groups['garrison']),
         'fields' => array('tk_id' => 'TK-20005', 'wwcc' => 'WWCC-2005', 'mobile' => '0400 000 005', 'emergency_contact' => 'Kin Trooper 0400 111 005', 'costume' => array($costume_options[0])),
     ),
 );
@@ -324,28 +329,49 @@ foreach ($users as $username => $spec) {
 out('users: ' . json_encode($user_ids));
 
 // ---------------------------------------------------------------------------
-// Install + activate the Events plugin through MyBB's real plugin code path
+// Install + activate plugins through MyBB's real plugin code path
 // ---------------------------------------------------------------------------
-$codename = 'events';
-$plugin_file = MYBB_ROOT . "inc/plugins/{$codename}.php";
-if (!file_exists($plugin_file)) {
-    fail("plugin file missing at {$plugin_file} - run scripts/deploy.sh");
-}
-require_once $plugin_file;
+/**
+ * @param string $codename  the plugin's file/function prefix
+ * @param string $missing   what to tell the operator when the file isn't there
+ */
+function provision_activate_plugin($codename, $missing)
+{
+    // A plugin file's top level is where MyBB plugins register their hooks, and it runs in
+    // whatever scope requires it - here, this function's. Smart Thread Link calls
+    // $plugins->add_hook() straight out of file scope, so without these the include fatals
+    // on a null $plugins. The rest are imported for the same reason: what a plugin file
+    // touches before its functions are called is its own business.
+    global $plugins, $mybb, $db, $cache, $lang;
 
-if (function_exists($codename . '_install') && !(function_exists($codename . '_is_installed') && call_user_func($codename . '_is_installed'))) {
-    call_user_func($codename . '_install');
-    out('plugin installed');
-}
-if (function_exists($codename . '_activate')) {
-    call_user_func($codename . '_activate');
-    out('plugin activated');
+    $plugin_file = MYBB_ROOT . "inc/plugins/{$codename}.php";
+    if (!file_exists($plugin_file)) {
+        fail("{$codename} plugin file missing at {$plugin_file} - {$missing}");
+    }
+    require_once $plugin_file;
+
+    if (function_exists($codename . '_install') && !(function_exists($codename . '_is_installed') && call_user_func($codename . '_is_installed'))) {
+        call_user_func($codename . '_install');
+        out("{$codename} plugin installed");
+    }
+    if (function_exists($codename . '_activate')) {
+        call_user_func($codename . '_activate');
+        out("{$codename} plugin activated");
+    }
+
+    $plugin_cache = $cache->read('plugins');
+    $active = isset($plugin_cache['active']) ? $plugin_cache['active'] : array();
+    $active[$codename] = $codename;
+    $cache->update('plugins', array('active' => $active));
 }
 
-$plugin_cache = $cache->read('plugins');
-$active = isset($plugin_cache['active']) ? $plugin_cache['active'] : array();
-$active[$codename] = $codename;
-$cache->update('plugins', array('active' => $active));
+provision_activate_plugin('events', 'run scripts/deploy.sh');
+
+// Smart Thread Link supplies {$thread['smartlink']}, which is what the garrison theme's
+// thread listings link with. Without it every thread subject in a forum renders as
+// <a href=""> - including the event announcements and troop reports this plugin posts, so
+// the suite cannot reach a thread from the forum it was posted into.
+provision_activate_plugin('smartlink', 'run scripts/install-smartlink.sh');
 
 // ---------------------------------------------------------------------------
 // Point the plugin's settings at the fixtures we just created
@@ -357,9 +383,19 @@ $plugin_settings = array(
     'events_mobile_field' => $field_ids['mobile'],
     'events_emergency_contact_field' => $field_ids['emergency_contact'],
     'events_event_coordinator_groups' => (string)$groups['gec'],
-    'events_scg_members_group' => (string)$groups['scg'],
+    'events_garrison_members_group' => (string)$groups['garrison'],
     'events_501st_members_group' => (string)$groups['legion'],
     'events_troop_report_forum' => (string)$forums['troop_reports'],
+    'events_event_forum' => (string)$forums['events'],
+    'events_event_forums' => 'Hunter=' . (int)$forums['events_hunter'],
+    // The region list is editable, so the suite pins it rather than inheriting whatever
+    // a previous run's settings page left behind.
+    'events_regions' => 'Sydney,Hunter,Canberra,Other',
+    // Same for the event timezone, and it has to match the container's own clock (UTC,
+    // see docker/php.ini): the suite drives time by moving that clock and asserts on
+    // dates rendered from it, so any other zone would offset every one of those reads.
+    // tests/e2e/timezone.spec.ts is where a zone other than UTC is exercised.
+    'events_timezone' => 'UTC',
     // The garrison theme hardcodes its logo into the header template rather than filling
     // in MyBB's theme logo property, so the print ribbon is pointed at the file that
     // scripts/install-theme.sh copies in.

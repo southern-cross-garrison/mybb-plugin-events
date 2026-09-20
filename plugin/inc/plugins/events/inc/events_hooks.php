@@ -29,8 +29,8 @@ function events_register_hooks()
  * page. The board's own calendar is unused - events live in this plugin - so its menu item
  * is taken over rather than sat beside, and the replacement reuses the markup the active
  * theme put there so it stays styled like its neighbours. That matters because themes
- * rewrite the header wholesale: the SCG theme replaces MyBB's <ul class="menu top_links">
- * with a Bootstrap navbar.
+ * rewrite the header wholesale - a Bootstrap-based theme, for instance, replaces MyBB's
+ * <ul class="menu top_links"> with a navbar.
  *
  * The Calendar item goes whoever is looking; the Events item only appears for users who
  * could actually open events.php.
@@ -57,7 +57,7 @@ function events_nav_menu(&$page)
     // Themes that leave MyBB's template HTML comments on wrap the item in them, so those
     // are swallowed too - otherwise removing the item would leave an empty pair behind.
     $calendar_item = '#(?:<!--\s*start:\s*header_menu_calendar\s*-->\s*)?'
-        . '(<li\b[^>]*>)\s*(<a\b[^>]*\bhref="[^"]*calendar\.php[^"]*"[^>]*>).*?</a>\s*</li>'
+        . '(<li\b[^>]*>)\s*(<a\b[^>]*\bhref="[^"]*calendar\.php[^"]*"[^>]*>)(.*?)</a>\s*</li>'
         . '(?:\s*<!--\s*end:\s*header_menu_calendar\s*-->)?#is';
 
     if(preg_match($calendar_item, $page, $match, PREG_OFFSET_CAPTURE))
@@ -75,7 +75,21 @@ function events_nav_menu(&$page)
                 $classes = array_merge($classes, array_diff(preg_split('#\s+#', trim($class_match[1]), -1, PREG_SPLIT_NO_EMPTY), array('calendar')));
             }
 
-            $replacement = $match[1][0] . '<a href="' . $url . '" id="nav_events" class="' . implode(' ', $classes) . '">Events</a></li>';
+            // A theme's menu items carry their icon inside the anchor - the garrison's uses
+            // a Font Awesome <i> element with the row's colour on it - so replacing the
+            // whole anchor threw the icon away and left Events as the one item in the row
+            // without one. The leading icon element rides across with the classes, and
+            // whatever the theme used for Calendar is what Events gets: matching the row it
+            // sits in matters more than the glyph, and naming one here would only hold for
+            // a theme that happened to use the same icon set. A Calendar item that had no
+            // icon still yields none.
+            $icon = '';
+            if(preg_match('#^\s*(<(i|span|svg)\b[^>]*>.*?</\2>\s*(?:&nbsp;|&\#160;|\s)*)#is', $match[3][0], $icon_match))
+            {
+                $icon = $icon_match[1];
+            }
+
+            $replacement = $match[1][0] . '<a href="' . $url . '" id="nav_events" class="' . implode(' ', $classes) . '">' . $icon . 'Events</a></li>';
         }
 
         $page = substr_replace($page, $replacement, $offset, strlen($item));
@@ -108,7 +122,9 @@ function events_thread_display()
  * PM every attendee of a finished event that still has no posted troop report.
  *
  * Reminders are re-sent at most once a week per event. All time comparisons are done
- * in PHP rather than with SQL NOW() so the behaviour follows the application clock.
+ * in PHP rather than with SQL NOW() so the behaviour follows the application clock -
+ * and the wall clocks they are compared against are the event timezone's, which is the
+ * zone the dates in those columns were written in.
  *
  * @return int number of events reminded about
  */
@@ -117,10 +133,11 @@ function events_send_reminders()
     global $db, $mybb;
 
     require_once MYBB_ROOT . "inc/datahandlers/pm.php";
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 
     $reminder_interval = 7 * 24 * 60 * 60;
-    $now = date('Y-m-d H:i:s', TIME_NOW);
-    $resend_before = date('Y-m-d H:i:s', TIME_NOW - $reminder_interval);
+    $now = events_date('Y-m-d H:i:s');
+    $resend_before = events_date('Y-m-d H:i:s', TIME_NOW - $reminder_interval);
 
     $query = $db->query("
         SELECT e.id, e.title, tr.id AS report_id, tr.last_reminder_sent

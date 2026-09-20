@@ -11,6 +11,7 @@ test.describe('plugin installation', () => {
       'events_attendance',
       'events_calendar',
       'events_event',
+      'events_event_form',
       'events_list',
       'events_rsvp_form',
       'events_rsvp_list',
@@ -26,7 +27,7 @@ test.describe('plugin installation', () => {
       `SELECT tid, attachedto FROM ${T('themestylesheets')} WHERE name = 'events.css'`,
     );
     expect(sheet?.tid).toBe(1);
-    expect(sheet?.attachedto).toBe('events.php|event.php|rsvp.php|troop_report.php');
+    expect(sheet?.attachedto).toBe('events.php|event.php|manage_event.php|rsvp.php|troop_report.php');
 
     // A stylesheet missing from a theme's display order is silently never output, so
     // assert on the rendered page rather than just the row.
@@ -68,6 +69,11 @@ test.describe('plugin installation', () => {
     expect(await getSetting('events_tk_id_field')).toBe(String(f.profileFields.tk_id));
     expect(await getSetting('events_event_coordinator_groups')).toBe(String(f.groups.gec));
     expect(await getSetting('events_troop_report_forum')).toBe(String(f.forums.troop_reports));
+
+    // Event announcements are routed per region, with a board-wide fallback. A region
+    // missing from the map is announced in the default forum, not silently unannounced.
+    expect(await getSetting('events_event_forum')).toBe(String(f.forums.events));
+    expect(await getSetting('events_event_forums')).toBe(`Hunter=${f.forums.events_hunter}`);
   });
 
   test('replaces the board Calendar link with an Events one', async ({ page }) => {
@@ -77,6 +83,14 @@ test.describe('plugin installation', () => {
     const link = page.locator('#nav_events');
     await expect(link).toHaveText('Events');
     await expect(page.locator('a[href*="calendar.php"]')).toHaveCount(0);
+
+    // A theme carries its menu icons inside the anchor, and the item is built by
+    // rewriting Calendar's - which threw that markup away and left Events as the one
+    // bare label in the row. Asserted as parity with a neighbour in the same menu rather
+    // than as a named glyph, so a theme whose menu has no icons is not failed for it.
+    const menu = link.locator('xpath=ancestor::ul[1]');
+    const icons = (selector: string) => menu.locator(`${selector} i, ${selector} svg`).count();
+    expect(await icons('#nav_events')).toBe(await icons('a[href*="memberlist.php"]'));
 
     await link.click();
     await expect(page).toHaveTitle(/^Events - /);
@@ -127,5 +141,10 @@ test.describe('admin module', () => {
     await page.locator('select[name="troop_report_forum"]').selectOption(String(f.forums.troop_reports));
     await page.locator('input[type="submit"][value="Save Settings"]').click();
     expect(await getSetting('events_troop_report_forum')).toBe(String(f.forums.troop_reports));
+
+    // The per-region map is one setting written from one dropdown per region, so saving
+    // the form at all is what could silently drop a region's forum.
+    expect(await getSetting('events_event_forum')).toBe(String(f.forums.events));
+    expect(await getSetting('events_event_forums')).toBe(`Hunter=${f.forums.events_hunter}`);
   });
 });

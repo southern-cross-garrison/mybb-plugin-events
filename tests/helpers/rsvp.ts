@@ -22,11 +22,12 @@ export interface SignupOptions {
   prerequisites?: Record<string, string>;
   costumes?: string[];
   /**
-   * Event day id => how that day is being attended. Days left out keep the form's
-   * default, which is trooping every day.
+   * Event day id => how that day is being attended. Days left out hold whatever the
+   * leading answer put them on, which is trooping the whole event unless `role` says
+   * otherwise.
    */
   dayRoles?: Record<number, SignupRole | 'none'>;
-  /** For an event with no configured days; defaults to trooping. */
+  /** The leading answer, covering every day not overridden above; defaults to trooping. */
   role?: SignupRole;
 }
 
@@ -46,11 +47,21 @@ export async function signUpThroughWizard(
   await page.goto(`/rsvp.php?id=${eventId}`);
   await settleOnStep(page, 'attendance');
 
-  for (const [dayId, role] of Object.entries(options.dayRoles ?? {})) {
-    await page.locator(`#day_${dayId}_${role}`).check();
-  }
   if (options.role) {
     await page.locator(`#signup_role_${options.role}`).check();
+  }
+  // The per-day grid is closed until the checkbox opens it, and the wizard only reads it
+  // when that box is ticked - a closed grid means the leading answer above covers every
+  // day. Tick it before reaching for a day, not after: the days are display: none until
+  // then, so check() would wait for a control that never becomes actionable. The leading
+  // answer is set first for the same reason it is on the page: it sets every day, so the
+  // overrides below have to come after it.
+  const dayRoles = Object.entries(options.dayRoles ?? {});
+  if (dayRoles.length > 0) {
+    await page.locator('#signup_per_day').check();
+    for (const [dayId, role] of dayRoles) {
+      await page.locator(`#day_${dayId}_${role}`).check();
+    }
   }
   await page.locator('#rsvp_submit').click();
   await settleOnStep(page, 'prerequisites', 'costumes', 'confirm');

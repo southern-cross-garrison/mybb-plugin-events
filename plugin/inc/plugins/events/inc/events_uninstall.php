@@ -22,7 +22,8 @@ function events_uninstall_database()
         'event_plugin_rsvps',
         'event_plugin_rsvp_days',
         'event_plugin_rsvp_costumes',
-        'event_plugin_troop_reports'
+        'event_plugin_troop_reports',
+        'event_plugin_user_prefs'
     );
     
     foreach($tables as $table)

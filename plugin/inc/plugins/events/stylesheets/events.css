@@ -80,6 +80,11 @@
  *
  * This stylesheet is installed last in the display order, so an equally specific rule in
  * the theme's own sheet would lose the tie and silently do nothing.
+ *
+ * The list/calendar switch is one button naming the view it goes to, so its id alternates
+ * between #events_view_calendar and #events_view_list. A theme that wants to single it
+ * out styles .events_view_toggle, which is on it either way round; it takes the theme's
+ * .button look otherwise, which is the intent.
  * ------------------------------------------------------------------------ */
 .events_toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; }
 .events_filter_form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
@@ -146,7 +151,10 @@
 	box-shadow: 0 0 0 3px var(--events-accent-soft, rgba(47, 111, 159, 0.18));
 }
 
-.events_textarea { min-height: 22em; resize: vertical; }
+textarea.events_input { resize: vertical; }
+/* The troop report is a document being edited, so it gets a floor no `rows` can undercut.
+   A shorter textarea - an event's description - takes its height from `rows` instead. */
+.events_textarea { min-height: 22em; }
 
 /* A list of tickable rows - costumes to wear, ways to attend a day. The whole row is the
    label, so the hit target is the row rather than the box and its few characters. */
@@ -160,6 +168,24 @@
 .events_option:hover { border-color: #bcbcbc; }
 .events_option input { margin: 0; flex: none; }
 
+/* A row of the event form's day grid: one day the event covers, and the hours it runs
+   that day. The date is derived from the event's start and end dates rather than typed,
+   so it reads as a label and posts as a hidden field. The row wraps to a stack on a
+   narrow screen, where the date and two controls will not sit side by side. */
+.events_day_row {
+	display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px;
+	padding: 10px 0;
+	border-bottom: 1px solid #ededed;
+}
+.events_day_row:last-child { border-bottom: 0; }
+.events_day_date { flex: none; align-self: center; min-width: 9.5em; font-weight: 600; opacity: 0.75; }
+.events_day_cell { flex: 1 1 9em; min-width: 8em; }
+.events_day_cell_label { display: block; margin: 0 0 4px; font-size: 0.85em; opacity: 0.75; }
+
+/* The day rows are the page's one wide block, so they opt out of the 32em field column. */
+#event_form_days { max-width: none; }
+#event_form_days_hint { margin: 0 0 4px; }
+
 /* ---------------------------------------------------------------------------
  * Events list - signup counts, action buttons, status pills
  * ------------------------------------------------------------------------ */
@@ -169,12 +195,31 @@
 .event_count_wrangler .event_count_dot { background: var(--events-wrangle, #c77700); }
 .event_count_key { font-size: 0.85em; opacity: 0.7; margin-left: 2px; }
 
+/* The address under an event's title, rather than a column of its own: a venue runs as
+   long as the rest of the row put together, and a column for it would squeeze the five
+   beside it. Small and quiet, because it is the answer to a second question - the title
+   is still what the eye runs down. */
+.event_address { display: block; margin-top: 3px; font-size: 0.85em; line-height: 1.3; }
+
 .event_btn {
 	display: inline-block; padding: 5px 12px; border-radius: 4px; line-height: 1.2;
 	background: var(--events-accent, #2f6f9f); border: 1px solid var(--events-accent-border, #2a6390); color: #fff;
 	font-weight: 600; font-size: 0.9em; text-decoration: none;
 }
 .event_btn:hover { text-decoration: none; filter: brightness(1.08); }
+
+/* Hover has to restate the text colour, and the selectors have to name the element to do
+   it. A theme's `a:hover { color: ... }` is (0,1,1) and out-specifies a lone class, so a
+   button whose colour is only set in its resting rule loses its white text the moment the
+   pointer lands on it - which on a theme whose link colour is close to the accent leaves
+   the label invisible against its own fill rather than merely off-palette. Naming the
+   element takes these to (0,2,1) and settles it outright rather than on load order. */
+a.event_btn:link, a.event_btn:visited, a.event_btn:hover, a.event_btn:focus,
+a.event_action_primary:link, a.event_action_primary:visited,
+a.event_action_primary:hover, a.event_action_primary:focus { color: #fff; }
+
+a.event_action_secondary:link, a.event_action_secondary:visited,
+a.event_action_secondary:hover, a.event_action_secondary:focus { color: #333; }
 
 .event_pill {
 	display: inline-block; padding: 4px 10px; border-radius: 999px;
@@ -200,7 +245,7 @@
 a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 .event_action_primary { background: var(--events-accent, #2f6f9f); border-color: var(--events-accent-border, #2a6390); color: #fff; }
 .event_action_secondary { background: #fdfdfd; border-color: #bcbcbc; color: #333; }
-.event_action_secondary:hover { background: #f3f3f3; }
+.event_action_secondary:hover { background: #f3f3f3; border-color: #9a9a9a; }
 .event_action_locked { background: #f2f2f2; border-color: #dedede; color: #767676; font-weight: normal; }
 
 .event_action_status {
@@ -217,24 +262,161 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 .event_signup_tick { margin-right: 4px; }
 
 /* ---------------------------------------------------------------------------
+ * Event page - who is attending
+ *
+ * One bullet per person inside the event's own card, under the description, rather than
+ * a second table beneath it: who is going is part of reading the event, not a separate
+ * thing to go and fetch.
+ * ------------------------------------------------------------------------ */
+/* A section heading inside the event card - "Event Days", "Who is Attending".
+ *
+ * Not left to the theme's own h3, which on a Bootstrap-derived theme is a 28px display
+ * heading: twice the card's body text, and reading as a page title dropped into a panel
+ * rather than as a heading belonging to it. The card already has a level for naming
+ * something - the bold of its Status / Region / Troopers / Wranglers rows - so the sections
+ * sit at that level and the card has one typographic scale instead of two.
+ *
+ * Sized in em against the card rather than in px, so a theme that scales its body text
+ * carries the headings with it. */
+.events_section_heading {
+	margin: 18px 0 6px;
+	font-size: 1em;
+	font-weight: 600;
+	line-height: 1.4;
+	color: inherit;
+}
+
+#rsvp_list { margin-top: 18px; }
+#rsvp_list_count { font-weight: normal; opacity: 0.7; }
+
+/* The filters are a <details> whose <summary> is the heading row, so the panel opens and
+   closes without a line of JavaScript. Nobody wants to filter a list of a dozen people
+   most of the time, so the controls stay folded away behind the funnel and the section
+   reads as a list. A filtered page renders it already open - see event.php. */
+#rsvp_filter { margin: 0; }
+#rsvp_filter_toggle {
+	display: flex; align-items: center; gap: 10px; cursor: pointer;
+	/* Both halves of dropping the default triangle: the funnel is the affordance here. */
+	list-style: none;
+}
+#rsvp_filter_toggle::-webkit-details-marker { display: none; }
+/* The wrapper carries the gap above the heading, and the row carries the one below. */
+#rsvp_filter_toggle .events_section_heading { margin: 0; }
+
+.rsvp_filter_funnel {
+	/* The word "Filter" is in the markup for a screen reader and pushed out of sight
+	   here, since the funnel says it to everybody else. The icon is an inline data URI
+	   for the same reason the select's arrow is - see .events_select above. */
+	display: inline-block; width: 18px; height: 18px; flex: none;
+	overflow: hidden; text-indent: 100%; white-space: nowrap;
+	opacity: 0.6;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23555' d='M1.6 2.5h12.8a.6.6 0 0 1 .46.98L10 9.6v3.6a.6.6 0 0 1-.33.54l-2.8 1.4a.6.6 0 0 1-.87-.54V9.6L1.14 3.48A.6.6 0 0 1 1.6 2.5z'/%3E%3C/svg%3E");
+	background-repeat: no-repeat; background-position: center; background-size: 16px 16px;
+}
+#rsvp_filter_toggle:hover .rsvp_filter_funnel { opacity: 0.85; }
+#rsvp_filter[open] .rsvp_filter_funnel { opacity: 1; }
+
+#rsvp_filter_form { margin: 10px 0 0; }
+#rsvp_rows { margin: 14px 0 0; padding-left: 22px; }
+#rsvp_rows li { margin: 0 0 5px; line-height: 1.8; }
+#rsvp_list_empty { list-style: none; margin-left: -22px; opacity: 0.75; }
+
+.rsvp_username { font-weight: 600; }
+/* The pill sets its own spacing, since the dot separators below skip it. */
+.rsvp_row .event_pill { margin: 0 7px; }
+/* Separators are drawn rather than written into the markup, so each span holds only its
+   own value: a wrangler with no Legion ID and no costume simply has fewer spans, and the
+   first one left standing still starts the run without a leading dot. */
+.rsvp_detail + .rsvp_detail::before { content: "\00b7"; margin: 0 7px; opacity: 0.55; }
+.rsvp_date { opacity: 0.7; font-size: 0.9em; }
+
+/* ---------------------------------------------------------------------------
  * Signup wizard - the attendance step
  *
- * One fieldset per day (or one for the whole event, when no days are configured), with
- * the day as the legend and the three ways to answer it as radios. A fieldset rather
- * than a table row because the legend is what associates the day with its radio group
- * for a screen reader, and because it wraps onto a phone without a horizontal scroll.
+ * The step leads with one question - trooping or wrangling - that covers the whole
+ * event, and hides the per-day grid behind a checkbox, because all but a handful of
+ * signups are the same the whole way through.
+ *
+ * That disclosure is a real checkbox and a sibling selector rather than a script: a
+ * drawer that needed one would leave the grid unreachable on a board that blocks it. The
+ * script that does run here only keeps the leading answer and the grid from contradicting
+ * each other as they are touched, and the page is answerable without it.
+ *
+ * Each answer is a chip: the radio is left in the document at full size and painted out
+ * here rather than hidden, so the whole chip is the hit target while the control keeps
+ * its place in the tab order, its arrow-key behaviour and its accessible name. Hiding it
+ * with display: none would cost all three.
  * ------------------------------------------------------------------------ */
-.signup_day {
-	display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 16px;
-	border: 1px solid #dedede; border-radius: 4px; margin: 0 0 8px; padding: 8px 12px;
+.signup_primary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 12px; }
+.signup_primary_label { font-weight: 600; }
+
+.signup_choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.signup_choice { position: relative; display: inline-flex; }
+.signup_choice input {
+	position: absolute; top: 0; left: 0;
+	width: 100%; height: 100%;
+	margin: 0;
+	opacity: 0;
+	cursor: pointer;
 }
+.signup_choice_text {
+	display: inline-block;
+	padding: 6px 14px;
+	line-height: 1.3;
+	font-size: 0.95em;
+	white-space: nowrap;
+	color: #333;
+	background: #fff;
+	border: 1px solid #cfcfcf;
+	border-radius: 999px;
+}
+.signup_choice input:hover + .signup_choice_text { border-color: #9a9a9a; }
+.signup_choice input:focus-visible + .signup_choice_text {
+	outline: 2px solid var(--events-accent, #2f6f9f);
+	outline-offset: 2px;
+}
+.signup_choice input:checked + .signup_choice_text {
+	font-weight: 600;
+	color: #fff;
+	background: var(--events-accent, #2f6f9f);
+	border-color: var(--events-accent-border, #2a6390);
+}
+/* A chosen chip carries the colour its role carries everywhere else on the plugin's
+   pages, so a grid of mixed days reads without being counted through. */
+.signup_choice input[value="wrangler"]:checked + .signup_choice_text {
+	background: var(--events-wrangle, #c77700);
+	border-color: var(--events-wrangle, #c77700);
+}
+.signup_choice input[value="none"]:checked + .signup_choice_text { background: #767676; border-color: #767676; }
+
+/* The gap below the leading question is set from above rather than below it: the
+   disclosure checkbox has to stay a sibling of the grid for the rule that opens it, so
+   there is no wrapper of its own to space. */
+.signup_role_help { font-size: 0.9em; opacity: 0.85; margin: 0 0 16px; }
+
+.signup_per_day { width: 15px; height: 15px; margin: 0; vertical-align: -2px; accent-color: var(--events-accent, #2f6f9f); }
+.signup_per_day_label { margin-left: 8px; font-weight: 600; cursor: pointer; }
+.signup_per_day:not(:checked) ~ .signup_days { display: none; }
+
+.signup_days {
+	margin: 12px 0 0;
+	padding: 14px;
+	border: 1px solid #dedede;
+	border-radius: 4px;
+	background: #fafafa;
+}
+.signup_days_hint { margin: 0 0 10px; font-size: 0.9em; opacity: 0.85; }
+
+.signup_day {
+	display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+	margin: 0 0 8px; padding: 10px 12px;
+	background: #fff;
+	border: 1px solid #e6e6e6; border-radius: 4px;
+}
+.signup_day:last-child { margin-bottom: 0; }
 /* Fixed basis rather than natural width, so the answers line up down the list however
    long an individual day's label runs. It collapses to its own line on a phone. */
-.signup_day_label { font-weight: 600; flex: 0 0 16em; max-width: 100%; }
-.signup_choices { display: flex; flex-wrap: wrap; gap: 2px 18px; }
-.signup_choice { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.signup_choice input { margin: 0; }
-.signup_role_help { font-size: 0.9em; opacity: 0.85; }
+.signup_day_label { font-weight: 600; flex: 0 0 15em; max-width: 100%; }
 .signup_summary_days { margin: 2px 0; }
 
 /* ---------------------------------------------------------------------------
@@ -245,6 +427,12 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 #events_calendar td.other_month { background: #f5f5f5; }
 #events_calendar .calendar_event { display: block; font-size: 11px; margin: 2px 0; padding: 2px; background: #4CAF50; color: #fff; }
 #events_calendar .calendar_event.rsvped { background: #2196F3; }
+/* The address under the chip, not inside it: one anchor cannot go to two places, and in a
+   cell this size the venue has to give way to the event it belongs to. */
+#events_calendar .calendar_event_address {
+	display: block; font-size: 10px; line-height: 1.25; margin: 0 0 4px; padding: 0 2px;
+	opacity: 0.8; word-break: break-word;
+}
 
 /* ---------------------------------------------------------------------------
  * Attendance sheet - built to be printed, so it keeps its own plain table rules
@@ -352,6 +540,7 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 	.events_filter_form,
 	.event_action,
 	.event_btn,
+	.rsvp_filter_funnel,
 	#gec_controls,
 	#rsvp_filter_form { display: none !important; }
 

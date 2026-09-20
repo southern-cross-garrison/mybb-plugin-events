@@ -86,7 +86,7 @@ if($mybb->request_method === 'post' && $mybb->get_input('action') === 'post')
     $thread = $posthandler->insert_thread();
     $thread_id = (int)$thread['tid'];
 
-    $now = date('Y-m-d H:i:s', TIME_NOW);
+    $now = events_date('Y-m-d H:i:s');
     if($report)
     {
         $db->update_query("event_plugin_troop_reports", array(
@@ -137,22 +137,22 @@ if($mybb->request_method === 'post' && $mybb->get_input('action') === 'post')
 // ---------------------------------------------------------------------------
 // Build the draft
 // ---------------------------------------------------------------------------
-$scg_group = (int)events_get_setting('scg_members_group');
+$garrison_group = (int)events_get_setting('garrison_members_group');
 $legion_group = (int)events_get_setting('501st_members_group');
 
 $buckets = array(
-    'scg'    => array('title' => 'Southern Cross Garrison Members', 'attendees' => array()),
-    'legion' => array('title' => 'Other 501st Members', 'attendees' => array()),
-    'other'  => array('title' => 'Others', 'attendees' => array()),
+    'garrison' => array('title' => 'Garrison Members', 'attendees' => array()),
+    'legion'   => array('title' => 'Other 501st Members', 'attendees' => array()),
+    'other'    => array('title' => 'Others', 'attendees' => array()),
 );
 
 foreach($troopers as $attendee)
 {
     $groups = events_user_group_ids($attendee);
 
-    if($scg_group && in_array($scg_group, $groups, true))
+    if($garrison_group && in_array($garrison_group, $groups, true))
     {
-        $buckets['scg']['attendees'][] = $attendee;
+        $buckets['garrison']['attendees'][] = $attendee;
     }
     elseif($legion_group && in_array($legion_group, $groups, true))
     {

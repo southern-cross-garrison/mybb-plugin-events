@@ -15,7 +15,8 @@ npx playwright test
 
 `bootstrap.sh` downloads the pinned MyBB release into `test-forum/`, starts the containers,
 runs MyBB's installer non-interactively, deploys the plugin, imports the garrison's custom
-theme, provisions the fixtures, and takes a database snapshot the suite resets to.
+theme and the Smart Thread Link plugin it depends on, provisions the fixtures, and takes a
+database snapshot the suite resets to.
 
 When it finishes:
 
@@ -86,6 +87,25 @@ presumably sit on the production server un-committed - worth adding to the theme
 The plugin's own templates are unaffected by any of this: they live in the master template
 set (`sid = -2`), which every theme falls back to, so the theme import never touches them.
 
+### Smart Thread Link
+
+The theme links threads with `{$thread['smartlink']}`, not MyBB's own
+`{$thread['threadlink']}`. That variable comes from [Smart Thread Link][smartlink], a small
+garrison plugin that points a thread at the reader's first unread post when there is one and
+at the thread start otherwise. It is a hard dependency of the theme, not an extra: on a board
+running the theme without it, every thread subject in a forum renders as `<a href="">` and
+nothing in `forumdisplay.php` - or the portal, stats, UserCP or printthread - is clickable.
+
+`scripts/install-smartlink.sh` copies it into `test-forum/inc/plugins/`, pinned by
+`SMARTLINK_REF` in [scripts/env.sh](scripts/env.sh), and `scripts/provision.php` activates
+it alongside the events plugin. To move to a newer commit, bump the ref and re-run:
+
+```bash
+./scripts/install-smartlink.sh
+docker compose exec -T web php /dev/stdin < scripts/provision.php
+./scripts/db-snapshot.sh
+```
+
 ## How the plugin gets skinned
 
 The plugin's pages are built from MyBB's own table vocabulary - `.tborder`, `.thead`,
@@ -118,6 +138,7 @@ why the plugin's pages first rendered as bare text on it.
 puts them back and sets the accent; `THEME_REF` points at that branch until it merges.
 
 [theme]: https://github.com/southern-cross-garrison/mybb-custom-theme
+[smartlink]: https://github.com/southern-cross-garrison/mybb-plugin-smartlink
 
 ## How the suite works
 
@@ -148,7 +169,7 @@ users are shaped around the scenarios:
 |---|---|
 | `admin` | Admin CP access |
 | `gec` | Event coordinator: manages events from the front end, no Admin CP rights |
-| `trooper1` | SCG member with a complete profile - signs up without prerequisites |
+| `trooper1` | Garrison member with a complete profile - signs up without prerequisites |
 | `trooper2` | 501st member with a complete profile |
 | `newbie` | No profile details at all - drives the prerequisites step |
 | `nowwcc` | Everything except a WWCC - drives the WWCC-required branch |
@@ -163,15 +184,19 @@ All of them use the password `testpass123`.
 |---|---|
 | `plugin-setup` | Templates installed, task registered, settings mapped, nav link, guest access, Admin CP module |
 | `admin-events` | Event create/edit/delete, validation, multi-day, exclusions, publish and archive, coordinator has no Admin CP access |
-| `events-listing` | List and calendar views, region filter, attendance markers, pending visibility, multi-day spanning, month paging |
+| `manage-events` | The front-end event form: a coordinator creating and editing without the Admin CP, the pending default, multi-day round-trips, exclusions, validation, and who is turned away |
+| `events-listing` | List and calendar views, the view toggle and the remembered per-member view, region filter, attendance markers, pending visibility, multi-day spanning, month paging |
 | `signup-flow` | The whole wizard: attendance, prerequisites, costumes, confirmation; validation; state carried between steps; editing an existing signup; multiselect costume parsing |
 | `signup-locking` | **Clock travel:** cutoffs, event end, late signups during an event, pending/archived status, exclusions, guests, and that an existing signup survives the lock |
 | `signup-roles` | Choosing trooping or wrangling, mixing the two across days, what each role is asked for, the event page and listing, and how both roles reach the coordinator surfaces |
 | `coordinator` | RSVP list and filters, attendance sheet and its day filter, permissions |
-| `troop-report` | Availability after the event ends, draft segmentation by club, posting, archiving, duplicate prevention, linked-thread comment |
+| `troop-report` | Availability after the event ends, draft segmentation by club, posting, archiving, duplicate prevention, announcement-thread comment |
+| `event-announcements` | The generated forum thread for an event: which region's forum it lands in, the default fallback, pending events staying unannounced, edits rewriting the post rather than adding another, and BBCode neutralised |
 | `reminders` | The scheduled task under a moved clock: who gets PMed, the weekly cadence, and when reminders stop |
 | `ical` | Feed contents, one VEVENT per day, escaping, permissions |
+| `timezone` | **Clock travel:** the board's event timezone, with the server on another one - cutoffs, the end of an event, what the pages show, and the UTC instants in the feed |
 | `print` | Print media: the board chrome is gone, the branded ribbon is there and will actually print, and the attendance sheet paginates with a repeating header |
+| `regions` | The board's region list in the Admin CP: renaming one and its events and forum following it, adding one and filing an event under it, the delete dialog's two steps and where the events go, and that all of it works with JavaScript turned off |
 | `health` | Every page renders with no PHP warning or SQL error logged |
 
 ## Continuous integration
@@ -189,6 +214,8 @@ plugin/                     the plugin (source of truth)
   inc/plugins/events/templates/  templates, synced into MyBB on activate
   inc/tasks/                MyBB scheduled task entry points
   root/                     front-end pages, deployed to the web root
+                            (events.php, event.php, manage_event.php, rsvp.php,
+                             troop_report.php, ical.php)
   admin_modules/events/     Admin CP module registration
 scripts/                    environment tooling (bootstrap, install, deploy, provision, snapshot)
 tests/                      Playwright suite

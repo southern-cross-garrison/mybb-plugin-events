@@ -21,7 +21,7 @@ test.describe('events listing', () => {
 
     const row = page.locator(`tr.event_row[data-event-id="${eventId}"]`);
     await expect(row.locator('.event_region')).toHaveText('Canberra');
-    await expect(row.locator('.event_start')).toHaveText('2026-10-20 10:00');
+    await expect(row.locator('.event_start')).toHaveText('Oct 20 - 10AM');
     await expect(row.locator('.event_rsvp_count')).toHaveText('2');
     await expect(row.locator('.event_status')).toHaveText('live');
   });
@@ -70,6 +70,38 @@ test.describe('events listing', () => {
     await loginAs(page, 'gec');
     await page.goto('/events.php');
     await expect(page.locator(`tr[data-event-id="${pending}"] .event_status`)).toHaveText('pending');
+  });
+
+  test('an address is a map link on both views, and absent when the event has none', async ({ page }) => {
+    const withAddress = await createEvent({
+      title: 'Address Troop',
+      address: '1 Showground Rd, Sydney Olympic Park NSW 2127',
+      start: '2026-10-20 10:00:00',
+      end: '2026-10-20 16:00:00',
+    });
+    const without = await createEvent({ title: 'Addressless Troop' });
+
+    await loginAs(page, 'trooper1');
+    await page.goto('/events.php');
+
+    const link = page.locator(`tr[data-event-id="${withAddress}"] .event_address_link`);
+    await expect(link).toHaveText('1 Showground Rd, Sydney Olympic Park NSW 2127');
+    // A search rather than a pin: the address is typed, so there is nothing to point at.
+    await expect(link).toHaveAttribute(
+      'href',
+      'https://www.google.com/maps/search/?api=1&query=1%20Showground%20Rd%2C%20Sydney%20Olympic%20Park%20NSW%202127',
+    );
+    // The map opens beside the board rather than over it - a member reading the listing
+    // has not finished with it.
+    await expect(link).toHaveAttribute('target', '_blank');
+    await expect(page.locator(`tr[data-event-id="${without}"] .event_address_link`)).toHaveCount(0);
+
+    await page.goto('/events.php?view=calendar');
+    const cell = page.locator('td[data-date="2026-10-20"]');
+    await expect(cell.locator('.calendar_event_address')).toHaveText(
+      '1 Showground Rd, Sydney Olympic Park NSW 2127',
+    );
+    await expect(cell.locator('.calendar_event_address')).toHaveAttribute('target', '_blank');
   });
 
   test('the calendar view places events on their dates and spans multi-day events', async ({ page }) => {
@@ -125,6 +157,51 @@ test.describe('events listing', () => {
     await page.goto('/events.php?view=calendar');
 
     await expect(page.locator(`td[data-date="2027-02-14"] .calendar_event[data-event-id="${eventId}"]`)).toBeVisible();
+  });
+
+  test('the toolbar offers the view you are not looking at, and carries the filter across', async ({ page }) => {
+    await createEvent({ title: 'Hunter Troop', region: 'Hunter' });
+
+    await loginAs(page, 'trooper1');
+    await page.goto('/events.php?region=Hunter');
+
+    await expect(page.locator('#events_view_calendar')).toHaveValue('Calendar');
+    await expect(page.locator('#events_view_list')).toHaveCount(0);
+
+    await page.locator('#events_view_calendar').click();
+
+    await expect(page.locator('#events_calendar')).toBeVisible();
+    await expect(page.locator('#events_region_filter')).toHaveValue('Hunter');
+    await expect(page.locator('#events_view_list')).toHaveValue('List');
+    await expect(page.locator('#events_view_calendar')).toHaveCount(0);
+
+    await page.locator('#events_view_list').click();
+
+    await expect(page.locator('#events_calendar')).toHaveCount(0);
+    await expect(page.locator('#events_region_filter')).toHaveValue('Hunter');
+  });
+
+  test('opens in the view the member last used, per account', async ({ page }) => {
+    await loginAs(page, 'trooper1');
+    await page.goto('/events.php');
+    await page.locator('#events_view_calendar').click();
+    await expect(page.locator('#events_calendar')).toBeVisible();
+
+    // A bare events.php - the navigation link, a bookmark - comes back to the calendar.
+    await page.goto('/events.php');
+    await expect(page.locator('#events_calendar')).toBeVisible();
+
+    // Another member's preference is their own.
+    await loginAs(page, 'trooper2');
+    await page.goto('/events.php');
+    await expect(page.locator('#events_calendar')).toHaveCount(0);
+
+    await loginAs(page, 'trooper1');
+    await page.goto('/events.php');
+    await page.locator('#events_view_list').click();
+    await page.goto('/events.php');
+    await expect(page.locator('#events_calendar')).toHaveCount(0);
+    await expect(page.locator('#events_view_calendar')).toBeVisible();
   });
 
   test('links from the list through to the event page', async ({ page }) => {

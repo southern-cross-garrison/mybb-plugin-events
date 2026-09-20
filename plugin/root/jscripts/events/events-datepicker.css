@@ -1,0 +1,160 @@
+/**
+ * The event form's calendar picker.
+ *
+ * jQuery UI's own themes are not used. Its base theme needs core.css plus a ~30KB theme
+ * sheet and still arrives looking like jQuery UI rather than like the board, and the Admin
+ * CP's redmond bundle is no help either: all three of the sheets MyBB ships carry zero
+ * .ui-datepicker rules, because the jQuery UI build it pairs them with has no datepicker
+ * in it. So the calendar is styled here instead, once, for both roots.
+ *
+ * Colours come from the same custom properties the plugin's other controls use, so a theme
+ * that sets --events-accent restyles the calendar along with everything else and does not
+ * have to know the picker exists. The fallbacks are what an unthemed board gets.
+ *
+ * The picker is appended to <body>, outside .events_page_wrap, so these rules cannot be
+ * nested under it the way the rest of the front-end stylesheet is.
+ */
+.ui-datepicker {
+	display: none;
+	width: 21em;
+	padding: 8px;
+	font: inherit;
+	font-size: 13px;
+	line-height: 1.4;
+	color: #333;
+	background: #fff;
+	border: 1px solid #bcbcbc;
+	border-radius: 6px;
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+	/* Above MyBB's own furniture: the Admin CP's sticky panels and the board's header both
+	   sit in the low hundreds, and a calendar hidden behind one reads as a dead control. */
+	z-index: 9999 !important;
+}
+.ui-datepicker a { text-decoration: none; }
+
+/* --- Header: month, year, and the two arrows ---------------------------------------- */
+.ui-datepicker .ui-datepicker-header {
+	position: relative;
+	padding: 2px 0 8px;
+	text-align: center;
+}
+.ui-datepicker .ui-datepicker-title {
+	margin: 0 2.2em;
+	font-weight: 600;
+}
+/* The month and year dropdowns in the header are the plugin's .events_select, declaration
+   for declaration - see the block of that name in events.css, which is the original and the
+   one to change if this look is ever revised.
+ *
+ * They are copied rather than shared because neither sheet can reach the other's case. The
+ * picker is appended to <body>, outside .events_page_wrap, and events.css is installed as a
+ * theme stylesheet, so it is not loaded at all on the Admin CP form - where this same
+ * calendar opens and its dropdowns would otherwise fall back to the browser's own control,
+ * 14px in a 23px box, beside a header sized to 13px.
+ *
+ * Only the sizing differs, and only because the header is 19em wide rather than a form
+ * column: they are held to just under half of it each so a long month name and a year sit
+ * side by side instead of wrapping the title onto two lines. */
+.ui-datepicker .ui-datepicker-title select {
+	font: inherit;
+	font-weight: normal;
+	line-height: 1.4;
+	color: #333;
+	background-color: #fff;
+	border: 1px solid #bcbcbc;
+	border-radius: 4px;
+	padding: 5px 30px 5px 10px;
+	margin: 0 2px;
+	max-width: 48%;
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	appearance: none;
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m3 6 5 5 5-5'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 10px center;
+	background-size: 11px 11px;
+}
+.ui-datepicker .ui-datepicker-title select:focus {
+	border-color: var(--events-accent, #2f6f9f);
+	outline: none;
+}
+.ui-datepicker .ui-datepicker-prev,
+.ui-datepicker .ui-datepicker-next {
+	position: absolute;
+	top: 0;
+	width: 1.9em;
+	height: 1.9em;
+	border-radius: 4px;
+	cursor: pointer;
+	/* The arrows are jQuery UI's .ui-icon sprite spans, which need its theme images. The
+	   span is emptied and the glyph drawn on the anchor instead, so no image is needed. */
+	overflow: hidden;
+	text-indent: -9999px;
+}
+.ui-datepicker .ui-datepicker-prev { left: 0; }
+.ui-datepicker .ui-datepicker-next { right: 0; }
+.ui-datepicker .ui-datepicker-prev:before,
+.ui-datepicker .ui-datepicker-next:before {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	text-indent: 0;
+	text-align: center;
+	line-height: 1.9em;
+	color: #555;
+}
+.ui-datepicker .ui-datepicker-prev:before { content: "\2039"; font-size: 18px; }
+.ui-datepicker .ui-datepicker-next:before { content: "\203A"; font-size: 18px; }
+.ui-datepicker .ui-datepicker-prev:hover,
+.ui-datepicker .ui-datepicker-next:hover { background: #ededed; }
+/* jQuery UI leaves the arrow in the DOM at the ends of minDate/maxDate and marks it
+   disabled, so it has to read as unavailable rather than merely do nothing when clicked. */
+.ui-datepicker .ui-state-disabled { opacity: 0.35; cursor: default; }
+.ui-datepicker .ui-state-disabled:hover { background: none; }
+
+/* --- The month grid ------------------------------------------------------------------ */
+.ui-datepicker table {
+	width: 100%;
+	margin: 0;
+	border-collapse: collapse;
+	border: 0;
+	font-size: inherit;
+}
+.ui-datepicker th {
+	padding: 4px 0;
+	font-size: 0.85em;
+	font-weight: 600;
+	text-align: center;
+	border: 0;
+	opacity: 0.7;
+}
+.ui-datepicker td { padding: 1px; border: 0; }
+.ui-datepicker td span,
+.ui-datepicker td a {
+	display: block;
+	padding: 6px 0;
+	text-align: center;
+	color: #333;
+	border-radius: 4px;
+}
+.ui-datepicker td a:hover { background: #ededed; }
+.ui-datepicker td.ui-datepicker-unselectable span { opacity: 0.35; }
+
+/* Today is outlined and the chosen day is filled, so the two stay apart when they are the
+   same day - which they are every time the picker opens on an event starting today. */
+.ui-datepicker td.ui-datepicker-today a { box-shadow: inset 0 0 0 1px var(--events-accent, #2f6f9f); }
+.ui-datepicker td.ui-datepicker-current-day a,
+.ui-datepicker td a.ui-state-active {
+	color: #fff;
+	background: var(--events-accent, #2f6f9f);
+}
+.ui-datepicker td.ui-datepicker-current-day a:hover { background: var(--events-accent, #2f6f9f); }
+
+/* --- The pair of controls on the form ------------------------------------------------ */
+/* Date and time sit side by side where there is room and stack on a phone. The date box is
+   given room for YYYY-MM-DD and no more; without a basis it would take the full column and
+   leave the time box stranded on the next line at every width. */
+.events_datetime { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.events_datetime .events_datepicker { flex: 0 1 11em; width: auto; }
+.events_datetime .events_time_input { flex: 0 1 8em; width: auto; }

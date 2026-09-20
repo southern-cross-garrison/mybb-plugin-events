@@ -104,6 +104,9 @@ function events_install_settings()
 {
     global $db;
 
+    // For EVENTS_DEFAULT_REGIONS and EVENTS_DEFAULT_TIMEZONE.
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
+
     $query = $db->simple_select("settinggroups", "gid", "name = 'events'");
     if($db->num_rows($query) == 0)
     {
@@ -122,17 +125,33 @@ function events_install_settings()
         $gid = $group['gid'];
     }
 
+    // The garrison group setting used to be named after one particular garrison. Rename
+    // it in place rather than inserting the new name alongside it, so a board that has
+    // already pointed it at a group keeps that group instead of silently reverting to
+    // "no garrison" on the next activation.
+    if($db->num_rows($db->simple_select("settings", "sid", "name = 'events_scg_members_group'")) > 0
+        && $db->num_rows($db->simple_select("settings", "sid", "name = 'events_garrison_members_group'")) == 0)
+    {
+        $db->update_query("settings",
+            array("name" => "events_garrison_members_group"),
+            "name = 'events_scg_members_group'");
+    }
+
     $settings = array(
         array("name" => "events_costume_field", "title" => "Costume Profile Field", "description" => "The custom profile field that holds a member's costumes", "optionscode" => "text", "disporder" => 1),
         array("name" => "events_tk_id_field", "title" => "TK ID Profile Field", "description" => "The custom profile field that holds a member's TK ID", "optionscode" => "text", "disporder" => 2),
         array("name" => "events_wwcc_field", "title" => "WWCC Profile Field", "description" => "The custom profile field that holds a member's WWCC number", "optionscode" => "text", "disporder" => 3),
         array("name" => "events_mobile_field", "title" => "Mobile Number Profile Field", "description" => "The custom profile field that holds a member's mobile number", "optionscode" => "text", "disporder" => 4),
         array("name" => "events_emergency_contact_field", "title" => "Emergency Contact Profile Field", "description" => "The custom profile field that holds a member's emergency contact", "optionscode" => "text", "disporder" => 5),
-        array("name" => "events_event_coordinator_groups", "title" => "Event Coordinator User Groups", "description" => "User groups that may coordinate events", "optionscode" => "groupselect", "disporder" => 6),
-        array("name" => "events_scg_members_group", "title" => "SCG Members Group", "description" => "Used to segment attendees on the troop report", "optionscode" => "groupselectsingle", "disporder" => 7),
+        array("name" => "events_event_coordinator_groups", "title" => "Event Coordinator User Groups", "description" => "User groups that may coordinate events. Their members are what the Coordinator dropdown on an event is drawn from.", "optionscode" => "groupselect", "disporder" => 6),
+        array("name" => "events_garrison_members_group", "title" => "Garrison Members Group", "description" => "Used to segment attendees on the troop report", "optionscode" => "groupselectsingle", "disporder" => 7),
         array("name" => "events_501st_members_group", "title" => "501st Members Group", "description" => "Used to segment attendees on the troop report", "optionscode" => "groupselectsingle", "disporder" => 8),
         array("name" => "events_troop_report_forum", "title" => "Troop Report Forum", "description" => "The forum troop reports are posted to", "optionscode" => "forumselectsingle", "disporder" => 9),
-        array("name" => "events_print_logo", "title" => "Print Logo", "description" => "Shown in the ribbon at the top of printed pages. A URL, or a path relative to the board root (e.g. images/logo.png). Leave blank to fall back to the theme's own logo.", "optionscode" => "text", "disporder" => 10),
+        array("name" => "events_event_forum", "title" => "Default Event Forum", "description" => "The forum an event's announcement thread is posted to when its region has no forum of its own", "optionscode" => "forumselectsingle", "disporder" => 10),
+        array("name" => "events_event_forums", "title" => "Event Forums by Region", "description" => "Which forum each region's events are announced in, as a comma separated list of Region=forum id pairs. Set it in Admin CP -> Event Management -> Settings rather than here.", "optionscode" => "text", "disporder" => 11),
+        array("name" => "events_regions", "title" => "Regions", "description" => "The regions an event can belong to, as a comma separated list. Set it in Admin CP -> Event Management -> Settings rather than here - removing a region there also rehomes the events that were in it, and removing it here would leave them pointing at a region that no longer exists.", "optionscode" => "text", "disporder" => 13, "value" => EVENTS_DEFAULT_REGIONS),
+        array("name" => "events_print_logo", "title" => "Print Logo", "description" => "Shown in the ribbon at the top of printed pages. A URL, or a path relative to the board root (e.g. images/logo.png). Leave blank to fall back to the theme's own logo.", "optionscode" => "text", "disporder" => 12),
+        array("name" => "events_timezone", "title" => "Event Timezone", "description" => "Where the garrison is, not where the forum is hosted: every event date is entered, stored and shown in this zone, and the server's own timezone is ignored. A PHP timezone identifier such as Australia/Sydney. Pick it from the list in Admin CP -> Event Management -> Settings rather than typing it here - a name PHP does not recognise falls back to UTC.", "optionscode" => "text", "disporder" => 14, "value" => EVENTS_DEFAULT_TIMEZONE),
     );
 
     foreach($settings as $setting)
@@ -150,7 +169,10 @@ function events_install_settings()
             'optionscode' => $db->escape_string($setting['optionscode']),
             'disporder'   => (int)$setting['disporder'],
             'gid'         => (int)$gid,
-            'value'       => '',
+            // Most settings start empty and are pointed at board data on provisioning.
+            // A setting whose value is a list the plugin ships with needs that list on
+            // the first install, or the board comes up with none of them.
+            'value'       => isset($setting['value']) ? $db->escape_string($setting['value']) : '',
         );
 
         $db->insert_query("settings", $row);
@@ -213,9 +235,10 @@ function events_activate()
 
     $group_settings = array(
         'events_event_coordinator_groups' => 'groupselect',
-        'events_scg_members_group'        => 'groupselectsingle',
+        'events_garrison_members_group'        => 'groupselectsingle',
         'events_501st_members_group'      => 'groupselectsingle',
         'events_troop_report_forum'       => 'forumselectsingle',
+        'events_event_forum'              => 'forumselectsingle',
     );
 
     foreach($group_settings as $setting_name => $optionscode)

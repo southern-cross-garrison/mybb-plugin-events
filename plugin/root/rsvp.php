@@ -3,10 +3,10 @@
  * MyBB Event Plugin - Signup wizard
  *
  * One flow covers both ways of turning up. The member signs up to *attend*, and chooses
- * per day whether they are trooping (in costume) or wrangling (a non-costumed helper),
- * so a weekend event can be trooped on the Saturday and wrangled on the Sunday. Every
- * day defaults to trooping, which is the overwhelmingly common case; overriding a day is
- * one radio button.
+ * whether they are trooping (in costume) or wrangling (a non-costumed helper). That one
+ * answer covers the whole event, because that is what almost every signup is; a per-day
+ * grid behind a checkbox is what lets a weekend event be trooped on the Saturday and
+ * wrangled on the Sunday, or be sat out on the Sunday altogether.
  *
  * Steps: attendance -> prerequisites -> costumes -> confirm. Attendance comes first
  * because it decides the rest of the sequence: the TK ID is only a prerequisite once a
@@ -92,17 +92,54 @@ $posted_solo_role = $mybb->get_input('signup_role');
 // form came from is what proves the attendance answers were carried - not their presence.
 $attendance_posted = !empty($posted_day_roles) || $posted_solo_role !== '' || $submitted_step === 'attendance';
 
+// The attendance step asks one question - trooping or wrangling - and applies the answer
+// to the whole event, because all but a handful of signups are the same the whole way
+// through. Three values hold that shape:
+//
+//   $signup_role  the leading answer, always one of the role tokens
+//   $day_choices  one entry per configured day: a role, or 'none' for a day being
+//                 skipped. This is the form's state, so it carries the skipped days
+//                 that $day_roles below drops
+//   $per_day      whether the member opened the per-day grid
+//
+// $per_day is what decides whether the grid is consulted at all. The grid is closed with
+// CSS, so its radios keep posting whatever they last held - and a member who opened it,
+// changed a day and closed it again would otherwise be signed up to something the page
+// was no longer showing them.
+$signup_role = $preferred_role;
+$day_choices = array();
+$per_day = false;
 $day_roles = array();
 $solo_role = '';
 
 if($attendance_posted)
 {
-    foreach($posted_day_roles as $day_id => $value)
+    $signup_role = events_rsvp_role($posted_solo_role);
+    $per_day = $mybb->get_input('per_day', MyBB::INPUT_INT) === 1;
+
+    foreach($valid_day_ids as $day_id)
     {
-        $day_id = (int)$day_id;
-        if(in_array($day_id, $valid_day_ids, true) && in_array($value, events_rsvp_roles(), true))
+        if(!$per_day)
         {
-            $day_roles[$day_id] = $value;
+            $day_choices[$day_id] = $signup_role;
+            continue;
+        }
+
+        $value = isset($posted_day_roles[$day_id]) ? $posted_day_roles[$day_id] : '';
+
+        if($value === 'none')
+        {
+            $day_choices[$day_id] = 'none';
+        }
+        elseif(in_array($value, events_rsvp_roles(), true))
+        {
+            $day_choices[$day_id] = $value;
+        }
+        else
+        {
+            // Every row in the grid holds a real answer, so this is a day that was never
+            // drawn or one that came back mangled: it falls back to the leading answer.
+            $day_choices[$day_id] = $signup_role;
         }
     }
 
@@ -110,27 +147,46 @@ if($attendance_posted)
 }
 elseif($is_update && !$role_requested)
 {
+    $held_days = array();
+
     foreach($existing_signup as $role => $held)
     {
         foreach($held['days'] as $day_id)
         {
             if(in_array((int)$day_id, $valid_day_ids, true))
             {
-                $day_roles[(int)$day_id] = $role;
+                $held_days[(int)$day_id] = $role;
             }
         }
 
         $solo_role = $role;
     }
 
-    // A signup made before the event gained days, or one whose days were deleted, has
-    // nothing to pre-select. Fall back to the default rather than showing an empty form.
-    if($has_days && empty($day_roles))
+    $signup_role = $solo_role !== '' ? $solo_role : $preferred_role;
+
+    if($has_days && empty($held_days))
     {
+        // A signup made before the event gained days, or one whose days were deleted, has
+        // nothing to pre-select. Fall back to the default rather than showing an empty
+        // form - or, worse, one with every day already marked as skipped.
         foreach($valid_day_ids as $day_id)
         {
-            $day_roles[$day_id] = $solo_role !== '' ? $solo_role : $preferred_role;
+            $day_choices[$day_id] = $signup_role;
         }
+    }
+    else
+    {
+        // A day the member is not attending is simply absent from their signup, so it
+        // comes back as skipped rather than as nothing.
+        foreach($valid_day_ids as $day_id)
+        {
+            $day_choices[$day_id] = isset($held_days[$day_id]) ? $held_days[$day_id] : 'none';
+        }
+
+        // A signup that is not the same the whole way through opens the grid, so the
+        // member is shown the shape of what they hold rather than a leading answer that
+        // quietly speaks for days it does not describe.
+        $per_day = count(array_unique($day_choices)) > 1;
     }
 }
 else
@@ -138,10 +194,36 @@ else
     // The default is the whole event, trooping.
     foreach($valid_day_ids as $day_id)
     {
-        $day_roles[$day_id] = $preferred_role;
+        $day_choices[$day_id] = $preferred_role;
     }
 
     $solo_role = $preferred_role;
+    $signup_role = $preferred_role;
+}
+
+// The leading question and the grid are two views of one answer, so they are kept in
+// step rather than layered: with the grid open, what the days agree on *is* the leading
+// answer, and days that disagree leave it unanswered, because no single chip up there
+// describes them. (The script that does this live on the page is only mirroring what the
+// next render would show anyway, which is what keeps the two honest with each other.)
+$day_values = array_values($day_choices);
+$uniform_choice = (count($day_values) > 0 && count(array_unique($day_values)) === 1) ? $day_values[0] : '';
+$primary_choice = $per_day
+    ? (in_array($uniform_choice, events_rsvp_roles(), true) ? $uniform_choice : '')
+    : $solo_role;
+
+// Closing the grid makes the leading answer the only one on the page, so a member who
+// cleared it by setting the days apart has to answer it again rather than be signed up
+// to the fallback that resolves the days above.
+$primary_missing = $attendance_posted && $has_days && !$per_day && $solo_role === '';
+
+// The grid holds every day; the signup only holds the ones being attended.
+foreach($day_choices as $day_id => $choice)
+{
+    if($choice !== 'none')
+    {
+        $day_roles[$day_id] = $choice;
+    }
 }
 
 // role => day ids. An event with no days still records the role, against no days.
@@ -204,7 +286,12 @@ if($mybb->request_method === 'post')
 
     if($submitted === 'attendance')
     {
-        if(empty($role_days))
+        if($primary_missing)
+        {
+            $errors[] = 'Please choose how you will be attending.';
+            $render = 'attendance';
+        }
+        elseif(empty($role_days))
         {
             $errors[] = $has_days ? 'Please choose at least one day to attend.' : 'Please choose how you will be attending.';
             $render = 'attendance';
@@ -261,7 +348,12 @@ if($mybb->request_method === 'post')
         // whichever one happened to be tested first.
         $missing = events_check_prerequisites($event, null, $roles);
 
-        if(empty($role_days))
+        if($primary_missing)
+        {
+            $errors[] = 'Please choose how you will be attending.';
+            $render = 'attendance';
+        }
+        elseif(empty($role_days))
         {
             $errors[] = $has_days ? 'Please choose at least one day to attend.' : 'Please choose how you will be attending.';
             $render = 'attendance';
@@ -320,15 +412,7 @@ $rsvp_carried_state = '';
 $rsvp_submit_label = 'Continue';
 $rsvp_page_title = ($is_update ? 'Update Signup: ' : 'Sign Up: ') . $event_title;
 
-if(!empty($errors))
-{
-    $rsvp_intro .= '<div class="error" id="rsvp_errors"><ul>';
-    foreach($errors as $error)
-    {
-        $rsvp_intro .= '<li>' . htmlspecialchars_uni($error) . '</li>';
-    }
-    $rsvp_intro .= '</ul></div>';
-}
+$rsvp_intro .= events_form_errors($errors, 'rsvp_errors');
 
 /**
  * Everything selected so far is re-posted with each step.
@@ -362,62 +446,79 @@ function events_hidden_map($name, array $map)
 // the master template set, so a board with a theme-level override would never receive a
 // new field and would silently drop the attendance answers, turning a mixed signup into
 // the default one.
+//
+// The grid is carried as every day's choice, skipped days included, alongside the answer
+// they were resolved against - a later step re-posts the lot, and a day that came back
+// absent would read as one following the leading answer rather than one being sat out.
 $attendance_state = $has_days
-    ? events_hidden_map('day_role', $day_roles)
+    ? '<input type="hidden" name="signup_role" value="' . htmlspecialchars_uni($signup_role) . '" />'
+      . ($per_day ? '<input type="hidden" name="per_day" value="1" />' : '')
+      . events_hidden_map('day_role', $day_choices)
     : '<input type="hidden" name="signup_role" value="' . htmlspecialchars_uni($solo_role) . '" />';
 
 if($rsvp_step === 'attendance')
 {
     $rsvp_page_title = $is_update ? 'Update Your Signup' : 'Sign Up to Attend';
+    $day_count = count($event_days);
 
-    $role_help = '<p class="signup_role_help">A <strong>trooper</strong> turns out in costume. A <strong>wrangler</strong> is a '
-               . 'non-costumed helper - handling crowds, kit and queues - and does not need to be a full member.</p>';
+    $rsvp_intro .= $day_count > 1
+        ? '<p>You are signing up for all <strong>' . $day_count . ' days</strong> of <strong>' . $event_title . '</strong>.</p>'
+        : '<p>You are signing up to <strong>' . $event_title . '</strong>.</p>';
 
-    if($has_days)
+    // The leading question, and for all but a handful of signups the only one. A div with
+    // role="radiogroup" rather than a fieldset: a <legend> is lifted out of the fieldset's
+    // box by the browser and themes restyle it freely, so the layout would be at the mercy
+    // of whichever theme the board runs.
+    $rsvp_body .= '<div class="signup_primary" role="radiogroup" aria-labelledby="signup_role_label">'
+                . '<span class="signup_primary_label" id="signup_role_label">How are you attending?</span>'
+                . events_signup_choices(
+                    'signup_role',
+                    array('trooper' => 'Trooping', 'wrangler' => 'Wrangling'),
+                    $primary_choice,
+                    'signup_role',
+                    'signup_role_radio'
+                )
+                . '</div>';
+
+    $rsvp_body .= '<p class="signup_role_help">A <strong>trooper</strong> turns out in costume. A <strong>wrangler</strong> is a '
+                . 'non-costumed helper - handling crowds, kit and queues - and does not need to be a full member.</p>';
+
+    // One day, or none configured at all, and the answer above is the whole answer. The
+    // grid only exists to say that one day differs from another.
+    if($day_count > 1)
     {
-        $rsvp_intro .= '<p>You are signed up for every day of <strong>' . $event_title . '</strong> as a trooper unless you '
-                     . 'say otherwise. Change any day you would rather wrangle, or mark it as one you cannot make.</p>' . $role_help;
+        // The checkbox is the disclosure: the stylesheet opens the grid off its :checked
+        // state, so it works with no JavaScript on the page, and its value is also what
+        // tells the POST handler to read the grid rather than the answer above.
+        $rsvp_body .= '<input type="checkbox" class="signup_per_day" id="signup_per_day" name="per_day" value="1"'
+                    . ($per_day ? ' checked="checked"' : '') . ' aria-controls="signup_days" />'
+                    . '<label class="signup_per_day_label" for="signup_per_day">I am not doing the same thing every day</label>';
 
-        $choices = array('trooper' => 'Trooping', 'wrangler' => 'Wrangling', 'none' => 'Not attending');
+        $rsvp_body .= '<div class="signup_days" id="signup_days">'
+                    . '<p class="signup_days_hint">Set how you are attending on each day.</p>';
+
+        // Every row says what that day is, rather than offering a "same as above" that
+        // defers to the question above: two controls for one answer is what made the step
+        // hard to read, because the chip above and the chips below could each be showing
+        // something the other contradicted.
+        $choices = array(
+            'trooper'  => 'Trooping',
+            'wrangler' => 'Wrangling',
+            'none'     => 'Not attending',
+        );
 
         foreach($event_days as $day)
         {
             $day_id = (int)$day['id'];
-            $current = isset($day_roles[$day_id]) ? $day_roles[$day_id] : 'none';
+            $current = isset($day_choices[$day_id]) ? $day_choices[$day_id] : $signup_role;
 
-            // A div with role="radiogroup" rather than a fieldset: a <legend> is lifted out
-            // of the fieldset's box by the browser and themes restyle it freely, so the
-            // layout would be at the mercy of whichever theme the board runs.
-            $rsvp_body .= '<div class="signup_day" role="radiogroup" aria-labelledby="day_' . $day_id . '_label" data-day-id="' . $day_id . '">';
-            $rsvp_body .= '<span class="signup_day_label" id="day_' . $day_id . '_label">' . events_day_label($day) . '</span>';
-            $rsvp_body .= '<span class="signup_choices">';
-
-            foreach($choices as $choice => $label)
-            {
-                $checked = ($current === $choice) ? ' checked="checked"' : '';
-                $rsvp_body .= '<label class="signup_choice"><input type="radio" class="day_role_radio" id="day_' . $day_id . '_' . $choice . '"'
-                            . ' name="day_role[' . $day_id . ']" value="' . $choice . '"' . $checked . ' /> ' . $label . '</label>';
-            }
-
-            $rsvp_body .= '</span></div>';
-        }
-    }
-    else
-    {
-        $rsvp_intro .= '<p>Choose how you will be attending <strong>' . $event_title . '</strong>.</p>' . $role_help;
-
-        $rsvp_body .= '<div class="signup_day" role="radiogroup" aria-labelledby="signup_role_label" id="signup_role_choice">';
-        $rsvp_body .= '<span class="signup_day_label" id="signup_role_label">How will you be attending?</span>';
-        $rsvp_body .= '<span class="signup_choices">';
-
-        foreach(array('trooper' => 'Trooping', 'wrangler' => 'Wrangling') as $choice => $label)
-        {
-            $checked = ($solo_role === $choice) ? ' checked="checked"' : '';
-            $rsvp_body .= '<label class="signup_choice"><input type="radio" class="signup_role_radio" id="signup_role_' . $choice . '"'
-                        . ' name="signup_role" value="' . $choice . '"' . $checked . ' /> ' . $label . '</label>';
+            $rsvp_body .= '<div class="signup_day" role="radiogroup" aria-labelledby="day_' . $day_id . '_label" data-day-id="' . $day_id . '">'
+                        . '<span class="signup_day_label" id="day_' . $day_id . '_label">' . events_day_label($day) . '</span>'
+                        . events_signup_choices('day_role[' . $day_id . ']', $choices, $current, 'day_' . $day_id, 'day_role_radio')
+                        . '</div>';
         }
 
-        $rsvp_body .= '</span></div>';
+        $rsvp_body .= '</div>' . events_signup_days_script();
     }
 }
 elseif($rsvp_step === 'prerequisites')

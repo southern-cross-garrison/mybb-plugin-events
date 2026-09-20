@@ -1,0 +1,30 @@
+<html>
+<head>
+<title>{$manage_page_title} - {$mybb->settings['bbname']}</title>
+{$headerinclude}
+{$manage_datepicker}
+</head>
+<body>
+{$header}
+<div id="manage_event_page" class="events_page_wrap" data-event-id="{$event_id}" data-manage-mode="{$manage_mode}">
+{$events_print_header}
+<form method="post" action="manage_event.php" id="manage_event_form">
+<input type="hidden" name="my_post_key" value="{$mybb->post_code}" />
+<input type="hidden" name="id" value="{$event_id}" />
+<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
+<tr><td class="thead"><strong>{$manage_page_title}</strong></td></tr>
+<tr><td class="trow1">{$manage_errors}{$manage_details}</td></tr>
+{$manage_days}
+<tr><td class="tcat"><strong>Excluded Members</strong></td></tr>
+<tr><td class="trow1">{$manage_exclusions}</td></tr>
+<tr><td class="trow2">
+<input type="submit" class="button" id="manage_event_submit" value="{$manage_submit_label}" />
+<a href="{$manage_cancel_url}" id="manage_event_cancel">Cancel</a>
+</td></tr>
+</table>
+</form>
+{$manage_days_script}
+</div>
+{$footer}
+</body>
+</html>

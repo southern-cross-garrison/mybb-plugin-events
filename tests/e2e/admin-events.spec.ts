@@ -1,7 +1,29 @@
 import { test, expect } from '../helpers/fixtures';
 import { loginToAdminCp, gotoEventsAdmin, loginAs } from '../helpers/auth';
-import { query, T, getEvent, getEventDays, uid, createEvent, createRsvp } from '../helpers/db';
+import {
+  query,
+  T,
+  getEvent,
+  getEventDays,
+  uid,
+  createEvent,
+  createRsvp,
+  fixtures,
+  setAdditionalGroups,
+} from '../helpers/db';
 import { relativeToTestNow } from '../helpers/clock';
+import { addTags, excludedValue, tag } from '../helpers/tag-field';
+
+/**
+ * A date and its time are two controls now that the date box carries a calendar picker, so
+ * a 'YYYY-MM-DD HH:MM:SS' fixture is split across the pair. The time input takes whole
+ * minutes, which is all it shows or posts.
+ */
+async function fillDateTime(page: any, name: string, value: string) {
+  const [date, time] = value.split(' ');
+  await page.locator(`input[name="${name}"]`).fill(date ?? '');
+  await page.locator(`input[name="${name}_time"]`).fill(time ? time.slice(0, 5) : '');
+}
 
 async function fillEventForm(
   page: any,
@@ -10,11 +32,12 @@ async function fillEventForm(
     description?: string;
     status?: string;
     region?: string;
+    address?: string;
     start: string;
     end: string;
     cutoff?: string;
     requiresWwcc?: boolean;
-    exclusions?: string;
+    exclusions?: string[];
     days?: Array<{ date: string; start?: string; end?: string }>;
   },
 ) {
@@ -22,23 +45,29 @@ async function fillEventForm(
   await page.locator('textarea[name="description"]').fill(values.description ?? `${values.title} details`);
   await page.locator('select[name="status"]').selectOption(values.status ?? 'live');
   await page.locator('select[name="region"]').selectOption(values.region ?? 'Sydney');
-  await page.locator('input[name="start_date"]').fill(values.start);
-  await page.locator('input[name="end_date"]').fill(values.end);
-  await page.locator('input[name="signup_cutoff"]').fill(values.cutoff ?? '');
+
+  if (values.address !== undefined) {
+    await page.locator('input[name="address"]').fill(values.address);
+  }
+
+  await fillDateTime(page, 'start_date', values.start);
+  await fillDateTime(page, 'end_date', values.end);
+  await fillDateTime(page, 'signup_cutoff', values.cutoff ?? '');
 
   if (values.requiresWwcc) {
     await page.locator('input[name="requires_wwcc"]').check();
   }
 
   if (values.exclusions !== undefined) {
-    await page.locator('input[name="exclusions"]').fill(values.exclusions);
+    await addTags(page, '#exclusions', values.exclusions);
   }
 
-  (values.days ?? []).forEach(() => {});
-  for (const [index, day] of (values.days ?? []).entries()) {
-    await page.locator(`input[name="event_days[${index}][date]"]`).fill(day.date);
-    await page.locator(`input[name="event_days[${index}][start_time]"]`).fill(day.start ?? '09:00:00');
-    await page.locator(`input[name="event_days[${index}][end_time]"]`).fill(day.end ?? '17:00:00');
+  // The day rows follow the start and end dates rather than being typed, so a day is
+  // addressed by its date and only its hours are filled in.
+  for (const day of values.days ?? []) {
+    const row = page.locator(`[data-events-day-date="${day.date}"]`);
+    await row.locator('input[type="time"]').nth(0).fill((day.start ?? '09:00:00').slice(0, 5));
+    await row.locator('input[type="time"]').nth(1).fill((day.end ?? '17:00:00').slice(0, 5));
   }
 }
 
@@ -58,6 +87,7 @@ test.describe('admin event management', () => {
       start: relativeToTestNow({ days: 14 }),
       end: relativeToTestNow({ days: 14, hours: 6 }),
       region: 'Hunter',
+      address: '12 Lonsdale St, Dandenong VIC 3175',
     });
 
     await page.locator('input[type="submit"][value="Create Event"]').click();
@@ -68,6 +98,31 @@ test.describe('admin event management', () => {
     expect(rows).toHaveLength(1);
     expect((rows[0] as any).region).toBe('Hunter');
     expect((rows[0] as any).status).toBe('live');
+    // The two forms write the same row, so the Admin CP has to be posting the address
+    // under the same name manage_event.php does.
+    expect((rows[0] as any).address).toBe('12 Lonsdale St, Dandenong VIC 3175');
+  });
+
+  test('the coordinator dropdown is drawn from the configured groups, alphabetically', async ({ page }) => {
+    // The Admin CP form and manage_event.php share events_coordinator_choices(), so the
+    // list an admin picks from is the same one a coordinator gets - members of the Event
+    // Coordinator User Groups, plus whoever is filling the form in. trooper1 is left out
+    // of the group on purpose; admin is in no coordinator group and is only here because
+    // they are the one creating the event.
+    const gecGroup = fixtures().groups.gec;
+    const restore = [
+      await setAdditionalGroups('trooper2', [gecGroup]),
+      await setAdditionalGroups('trooper1', []),
+    ];
+
+    try {
+      await loginToAdminCp(page);
+      await gotoEventsAdmin(page, '&action=add');
+
+      await expect(page.locator('#gec_user_id option')).toHaveText(['admin', 'gec', 'trooper2']);
+    } finally {
+      for (const undo of restore) await undo();
+    }
   });
 
   test('rejects an end date before the start date', async ({ page }) => {
@@ -108,9 +163,12 @@ test.describe('admin event management', () => {
     const days = await getEventDays(event.id);
     expect(days.map((day: any) => String(day.date))).toEqual(['2026-10-17', '2026-10-18']);
 
+    expect(days.map((day: any) => String(day.start_time))).toEqual(['09:00:00', '10:00:00']);
+
     await gotoEventsAdmin(page, `&action=edit&id=${event.id}`);
-    await expect(page.locator('input[name="event_days[0][date]"]')).toHaveValue('2026-10-17');
-    await expect(page.locator('input[name="event_days[1][date]"]')).toHaveValue('2026-10-18');
+    await expect(page.locator('[data-events-day-date]')).toHaveCount(2);
+    await expect(page.locator('[data-events-day-date="2026-10-17"] input[type="time"]').first()).toHaveValue('09:00');
+    await expect(page.locator('[data-events-day-date="2026-10-18"] input[type="time"]').first()).toHaveValue('10:00');
   });
 
   test('saves excluded members by username', async ({ page }) => {
@@ -121,7 +179,7 @@ test.describe('admin event management', () => {
       title: 'Restricted Troop',
       start: relativeToTestNow({ days: 10 }),
       end: relativeToTestNow({ days: 10, hours: 4 }),
-      exclusions: 'excluded, newbie',
+      exclusions: ['excluded', 'newbie'],
     });
 
     await page.locator('input[type="submit"][value="Create Event"]').click();
@@ -136,8 +194,11 @@ test.describe('admin event management', () => {
     expect(rows.map((row: any) => Number(row.user_id)).sort()).toEqual([uid('newbie'), uid('excluded')].sort());
 
     // And the exclusion survives a round-trip through the edit form.
+    // And the exclusions come back as lozenges, over a field still posting the same list.
     await gotoEventsAdmin(page, `&action=edit&id=${event.id}`);
-    await expect(page.locator('input[name="exclusions"]')).toHaveValue(/excluded/);
+    await expect(tag(page, 'excluded')).toBeVisible();
+    await expect(tag(page, 'newbie')).toBeVisible();
+    await expect(excludedValue(page)).toHaveValue(/excluded/);
   });
 
   test('publishes a pending event with the Make Live action', async ({ page }) => {

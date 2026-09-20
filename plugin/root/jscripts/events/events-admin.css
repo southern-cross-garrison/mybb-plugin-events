@@ -1,0 +1,168 @@
+/**
+ * Admin CP controls the plugin adds that MyBB has no styling for.
+ *
+ * A file here rather than a block in events.css because events.css is a *theme*
+ * stylesheet: the Admin CP loads no theme at all, so anything styled only there is a
+ * heap of unstyled markup in the one place these controls live. It sits beside
+ * events-datepicker.css and events-tags.css and is loaded the same way, from
+ * ../jscripts/events/.
+ *
+ * Nothing here styles a control the server has not rendered: the X and the Add Region
+ * button are ordinary links whether or not the script runs, and the dialog carries
+ * `hidden` until something opens it - so with the script off, none of the .events_modal
+ * rules ever match anything visible.
+ *
+ * The palette is MyBB's own Admin CP, not the plugin's --events-* properties: there is
+ * no theme here to inherit them from, and these controls should look like the rest of
+ * the Admin CP rather than like the front end.
+ */
+
+/* The region's name box and its delete control, kept on one line. */
+.events_region_row {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+/* Borderless by design: it sits beside a text box on every row, and a bordered button
+   on each of them would read as the row's primary control rather than as the small
+   destructive one. The colour only arrives on hover, so a page of regions is not a
+   column of red. */
+a.events_region_delete {
+	font-size: 18px;
+	line-height: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	padding: 0;
+	color: #888;
+	text-decoration: none;
+	background: none;
+	border: 0;
+	border-radius: 4px;
+}
+
+a.events_region_delete:hover,
+a.events_region_delete:focus {
+	color: #fff;
+	text-decoration: none;
+	background-color: #c33;
+}
+
+/* Visible focus, because the border that would normally carry it is not there. */
+a.events_region_delete:focus-visible {
+	outline: 2px solid #0072bc;
+	outline-offset: 1px;
+}
+
+/* A link, because that is what it has to be to work with the script off - but it is the
+   list's own control and reads as one, so it is dressed as the button beside every other
+   list in the Admin CP. MyBB styles input.button, not a.button. */
+a.events_region_add {
+	font-size: 11px;
+	display: inline-block;
+	margin-top: 4px;
+	padding: 4px 10px;
+	color: #333;
+	text-decoration: none;
+	background: #f4f4f4 linear-gradient(#fff, #e8e8e8);
+	border: 1px solid #bbb;
+	border-radius: 3px;
+}
+
+a.events_region_add:hover,
+a.events_region_add:focus {
+	color: #000;
+	text-decoration: none;
+	border-color: #999;
+}
+
+/* ---------------------------------------------------------------- the dialog ----- */
+
+.events_modal {
+	position: fixed;
+	z-index: 1000;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 16px;
+}
+
+/* `hidden` is what the script toggles, and a display rule elsewhere in a stylesheet
+   would out-specify the attribute and leave the dialog permanently on screen. */
+.events_modal[hidden] {
+	display: none;
+}
+
+.events_modal_backdrop {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	background-color: rgba(0, 0, 0, 0.45);
+}
+
+.events_modal_card {
+	position: relative;
+	box-sizing: border-box;
+	width: 420px;
+	max-width: 100%;
+	padding: 18px 20px 16px;
+	color: #333;
+	background-color: #fff;
+	border: 1px solid #ccc;
+	border-radius: 6px;
+	box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+}
+
+.events_modal_title {
+	font-size: 15px;
+	margin: 0 0 10px;
+}
+
+.events_modal_message {
+	margin: 0 0 12px;
+	line-height: 1.5;
+}
+
+.events_modal_field {
+	margin: 0 0 12px;
+}
+
+.events_modal_field[hidden] {
+	display: none;
+}
+
+.events_modal_field label {
+	display: block;
+	margin-bottom: 4px;
+	font-weight: bold;
+}
+
+.events_modal_field input[type="text"],
+.events_modal_field select {
+	box-sizing: border-box;
+	width: 100%;
+	padding: 5px 6px;
+	border: 1px solid #bcbcbc;
+	border-radius: 4px;
+}
+
+/* The confirming button last, so the row reads Cancel then Confirm in the order the
+   Admin CP's own dialogs use. */
+.events_modal_actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+}
+
+.events_modal_submit {
+	font-weight: bold;
+}

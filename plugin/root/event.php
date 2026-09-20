@@ -1,6 +1,6 @@
 <?php
 /**
- * MyBB Event Plugin - Single event view, coordinator RSVP list and attendance sheet
+ * MyBB Event Plugin - Single event view with its signup list, and the attendance sheet
  */
 
 define("IN_MYBB", 1);
@@ -38,6 +38,9 @@ add_breadcrumb("Events", "events.php");
 add_breadcrumb($event['title'], "event.php?id=" . $event_id);
 
 $event_title = htmlspecialchars_uni($event['title']);
+// Read defensively: an event written before the column existed has no key at all until the
+// board has been re-activated, and both the sheet and the page below want it.
+$event_address = isset($event['address']) ? trim((string)$event['address']) : '';
 $filter_costume = $mybb->get_input('filter_costume');
 $filter_day = $mybb->get_input('filter_day', MyBB::INPUT_INT);
 
@@ -209,10 +212,13 @@ if($action === 'attendance')
     // The printed sheet leaves the board behind, so the facts a coordinator needs on the
     // clipboard - which event, where, when, and how many people to tick off - ride along
     // in the masthead rather than being left on the screen behind them.
+    // The address goes on the clipboard as plain text: a link is no use on paper, and the
+    // sheet is the one thing a coordinator has in their hand on the way to the venue.
     $events_print_header = events_print_header(
         $event['title'],
         array(
             $event['region'],
+            $event_address,
             events_format_date($event['start_date']),
             count($attendees) . ' ' . (count($attendees) === 1 ? 'attendee' : 'attendees'),
         ),
@@ -234,6 +240,15 @@ $event_end_date = events_format_date($event['end_date']);
 $event_description = nl2br(htmlspecialchars_uni($event['description']));
 $rsvp_count = events_rsvp_count($event_id, 'trooper');
 $wrangler_count = events_rsvp_count($event_id, 'wrangler');
+
+// Built here rather than sat in the template, because an event with no address has no
+// row at all and a MyBB template cannot ask.
+$event_address_row = '';
+$event_address_link = events_address_link($event_address, 'event_address_link');
+if($event_address_link !== '')
+{
+    $event_address_row = '<p><strong>Address:</strong> <span id="event_address">' . $event_address_link . '</span></p>';
+}
 
 $event_cutoff_row = '';
 if(!empty($event['signup_cutoff']) && $event['signup_cutoff'] !== '0000-00-00 00:00:00')
@@ -257,7 +272,7 @@ if(!empty($event_days))
     {
         $items .= '<li class="event_day" data-day-id="' . (int)$day['id'] . '">' . events_day_label($day) . '</li>';
     }
-    $event_days_block = '<div id="event_days"><h3>Event Days</h3><ul>' . $items . '</ul></div>';
+    $event_days_block = '<div id="event_days"><h3 class="events_section_heading">Event Days</h3><ul>' . $items . '</ul></div>';
 }
 
 $signup = events_get_user_signup($event_id);
@@ -341,65 +356,93 @@ if($is_gec)
     $gec_block = '<table border="0" cellspacing="' . (int)$theme['borderwidth'] . '" cellpadding="' . (int)$theme['tablespace'] . '" class="tborder" id="gec_controls">'
         . '<tr><td class="thead"><strong>Coordinator Controls</strong></td></tr>'
         . '<tr><td class="trow1"><div class="gec_actions">'
-        . '<a class="event_action event_action_secondary" href="event.php?id=' . $event_id . '&amp;action=rsvps" id="gec_view_rsvps">View RSVPs</a>'
+        . '<a class="event_action event_action_secondary" href="manage_event.php?id=' . $event_id . '" id="gec_edit">Edit Event</a>'
         . '<a class="event_action event_action_secondary" href="event.php?id=' . $event_id . '&amp;action=attendance" id="gec_attendance">View Attendance Sheet</a>'
         . '</div></td></tr></table>';
-
-    if($action === 'rsvps')
-    {
-        // The costume filter can only ever match troopers, so wranglers drop out of a
-        // filtered list by definition. That is intended, not an oversight.
-        $attendees = array_merge(
-            events_get_attendees($event_id, array('costume' => $filter_costume, 'day' => $filter_day, 'role' => 'trooper')),
-            events_get_attendees($event_id, array('costume' => $filter_costume, 'day' => $filter_day, 'role' => 'wrangler'))
-        );
-
-        $filter_day_select = '';
-        if(!empty($event_days))
-        {
-            $options = '<option value="0">All days</option>';
-            foreach($event_days as $day)
-            {
-                $selected = ($filter_day === (int)$day['id']) ? ' selected="selected"' : '';
-                $options .= '<option value="' . (int)$day['id'] . '"' . $selected . '>' . events_day_label($day) . '</option>';
-            }
-            $filter_day_select = '<label>Day: <select name="filter_day" id="filter_day" class="events_select">' . $options . '</select></label> ';
-        }
-
-        $rsvp_rows = '';
-        foreach($attendees as $attendee)
-        {
-            $attended_day_ids = array();
-            foreach($attendee['days'] as $day)
-            {
-                $attended_day_ids[] = (int)$day['id'];
-            }
-            $day_labels = events_day_labels($event_days, $attended_day_ids, 'short');
-
-            $rsvp_rows .= '<tr class="rsvp_row" data-uid="' . $attendee['uid'] . '">';
-            $rsvp_rows .= '<td class="trow1 rsvp_username">' . htmlspecialchars_uni($attendee['username']) . '</td>';
-            $rsvp_rows .= '<td class="trow1 rsvp_role">' . events_role_label($attendee['role']) . '</td>';
-            $rsvp_rows .= '<td class="trow1 rsvp_tkid">' . htmlspecialchars_uni($attendee['tk_id']) . '</td>';
-            $rsvp_rows .= '<td class="trow1 rsvp_costumes">' . htmlspecialchars_uni(implode(', ', $attendee['costumes'])) . '</td>';
-            $rsvp_rows .= '<td class="trow1 rsvp_days">' . htmlspecialchars_uni(implode(', ', $day_labels)) . '</td>';
-            $rsvp_rows .= '<td class="trow1 rsvp_date">' . events_format_date($attendee['rsvp_date']) . '</td>';
-            $rsvp_rows .= '</tr>';
-        }
-
-        if($rsvp_rows === '')
-        {
-            $rsvp_rows = '<tr id="rsvp_list_empty"><td class="trow1" colspan="6">No RSVPs yet.</td></tr>';
-        }
-
-        $filter_costume = htmlspecialchars_uni($filter_costume);
-
-        eval("\$rsvp_list = \"" . $templates->get("events_rsvp_list") . "\";");
-        $gec_block .= $rsvp_list;
-    }
 }
+
+// ---------------------------------------------------------------------------
+// Signup list
+// ---------------------------------------------------------------------------
+// Anyone who can see the event can see who is going, so the list is part of the event
+// page rather than something to go and fetch. It carries no contact details - mobile and
+// emergency contact live on the attendance sheet, which stays behind
+// events_is_event_gec() above.
+// The costume filter can only ever match troopers, so wranglers drop out of a
+// filtered list by definition. That is intended, not an oversight.
+$attendees = array_merge(
+    events_get_attendees($event_id, array('costume' => $filter_costume, 'day' => $filter_day, 'role' => 'trooper')),
+    events_get_attendees($event_id, array('costume' => $filter_costume, 'day' => $filter_day, 'role' => 'wrangler'))
+);
+
+$filter_day_select = '';
+if(!empty($event_days))
+{
+    $options = '<option value="0">All days</option>';
+    foreach($event_days as $day)
+    {
+        $selected = ($filter_day === (int)$day['id']) ? ' selected="selected"' : '';
+        $options .= '<option value="' . (int)$day['id'] . '"' . $selected . '>' . events_day_label($day) . '</option>';
+    }
+    $filter_day_select = '<label>Day: <select name="filter_day" id="filter_day" class="events_select">' . $options . '</select></label> ';
+}
+
+$rsvp_rows = '';
+foreach($attendees as $attendee)
+{
+    $attended_day_ids = array();
+    foreach($attendee['days'] as $day)
+    {
+        $attended_day_ids[] = (int)$day['id'];
+    }
+    $day_labels = events_day_labels($event_days, $attended_day_ids, 'short');
+
+    // Only the parts a person actually has. A wrangler carries no Legion ID and no
+    // costume, and an event with no days has no days to name - an empty span each time
+    // would leave the separator dots hanging off the end of the line.
+    $details = array(
+        'rsvp_tkid'     => htmlspecialchars_uni($attendee['tk_id']),
+        'rsvp_costumes' => htmlspecialchars_uni(implode(', ', $attendee['costumes'])),
+        'rsvp_days'     => htmlspecialchars_uni(implode(', ', $day_labels)),
+        'rsvp_date'     => events_format_date($attendee['rsvp_date']),
+    );
+
+    $rsvp_rows .= '<li class="rsvp_row" data-uid="' . $attendee['uid'] . '">';
+    $rsvp_rows .= '<span class="rsvp_username">' . htmlspecialchars_uni($attendee['username']) . '</span>';
+    $rsvp_rows .= '<span class="rsvp_role event_pill event_pill_' . $attendee['role'] . '">'
+                . events_role_label($attendee['role']) . '</span>';
+
+    foreach($details as $class => $value)
+    {
+        if($value === '')
+        {
+            continue;
+        }
+
+        $rsvp_rows .= '<span class="rsvp_detail ' . $class . '">' . $value . '</span>';
+    }
+
+    $rsvp_rows .= '</li>';
+}
+
+$rsvp_list_count = count($attendees);
+
+if($rsvp_rows === '')
+{
+    $rsvp_rows = '<li id="rsvp_list_empty">Nobody has signed up yet.</li>';
+}
+
+// A filter that is doing something stays on show, so a short list is never a mystery:
+// the panel that explains why it is short is already open above it.
+$rsvp_filter_open = ($filter_costume !== '' || $filter_day) ? ' open' : '';
+
+$filter_costume = htmlspecialchars_uni($filter_costume);
+
+eval("\$rsvp_list = \"" . $templates->get("events_rsvp_list") . "\";");
 
 $events_print_header = events_print_header($event['title'], array(
     $event['region'],
+    $event_address,
     events_format_date($event['start_date']),
 ));
 

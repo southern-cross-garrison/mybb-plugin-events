@@ -10,88 +10,9 @@ if(!defined("IN_MYBB"))
 
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
-
-/**
- * Users who can be assigned as an event's coordinator: admins, members of the
- * configured coordinator groups, and anyone already assigned to an event.
- *
- * @return array uid => username
- */
-function events_admin_coordinator_choices()
-{
-    global $db;
-
-    $group_ids = array();
-    foreach(explode(',', (string)events_get_setting('event_coordinator_groups')) as $gid)
-    {
-        $gid = (int)$gid;
-        if($gid)
-        {
-            $group_ids[] = $gid;
-        }
-    }
-
-    $conditions = array("u.usergroup IN (SELECT gid FROM " . TABLE_PREFIX . "usergroups WHERE cancp = 1)");
-    $conditions[] = "u.uid IN (SELECT gec_user_id FROM " . TABLE_PREFIX . "event_plugin_events)";
-
-    foreach($group_ids as $gid)
-    {
-        $conditions[] = "u.usergroup = " . $gid;
-        $conditions[] = "CONCAT(',', u.additionalgroups, ',') LIKE '%," . $gid . ",%'";
-    }
-
-    $query = $db->query("
-        SELECT u.uid, u.username
-        FROM " . TABLE_PREFIX . "users u
-        WHERE " . implode(' OR ', $conditions) . "
-        ORDER BY u.username ASC
-    ");
-
-    $users = array();
-    while($user = $db->fetch_array($query))
-    {
-        $users[$user['uid']] = $user['username'];
-    }
-
-    return $users;
-}
-
-/**
- * Turn the free-text exclusion box into a list of user ids.
- *
- * Accepts a comma separated list of usernames and/or user ids.
- *
- * @param string $input
- * @return array of int
- */
-function events_admin_parse_exclusions($input)
-{
-    global $db;
-
-    $uids = array();
-    foreach(explode(',', (string)$input) as $token)
-    {
-        $token = trim($token);
-        if($token === '')
-        {
-            continue;
-        }
-
-        if(ctype_digit($token))
-        {
-            $uids[] = (int)$token;
-            continue;
-        }
-
-        $user = $db->fetch_array($db->simple_select("users", "uid", "username = '" . $db->escape_string($token) . "'"));
-        if($user)
-        {
-            $uids[] = (int)$user['uid'];
-        }
-    }
-
-    return array_values(array_unique($uids));
-}
+// Reading, validating and writing an event is shared with manage_event.php on the front
+// end, so the two forms cannot disagree about what is valid. This module only renders.
+require_once MYBB_ROOT . "inc/plugins/events/inc/events_form.php";
 
 function events_admin_list_events()
 {
@@ -217,153 +138,32 @@ function events_admin_edit_event()
     }
 
     $errors = array();
+    $values = events_event_form_values($event);
 
     if($mybb->request_method === "post")
     {
-        $title = trim($mybb->get_input('title'));
-        $start_date = trim($mybb->get_input('start_date'));
-        $end_date = trim($mybb->get_input('end_date'));
-        $signup_cutoff = trim($mybb->get_input('signup_cutoff'));
-        $status = $mybb->get_input('status');
-        $region = $mybb->get_input('region');
-
-        if($title === '')
-        {
-            $errors[] = "A title is required.";
-        }
-        if(!strtotime($start_date))
-        {
-            $errors[] = "The start date must be a valid date and time (YYYY-MM-DD HH:MM:SS).";
-        }
-        if(!strtotime($end_date))
-        {
-            $errors[] = "The end date must be a valid date and time (YYYY-MM-DD HH:MM:SS).";
-        }
-        if(strtotime($start_date) && strtotime($end_date) && strtotime($end_date) < strtotime($start_date))
-        {
-            $errors[] = "The end date cannot be before the start date.";
-        }
-        if($signup_cutoff !== '' && !strtotime($signup_cutoff))
-        {
-            $errors[] = "The signup cutoff must be a valid date and time, or empty.";
-        }
-        if(!in_array($status, array('pending', 'live', 'archived'), true))
-        {
-            $errors[] = "Invalid status.";
-        }
-        if(!in_array($region, events_regions(), true))
-        {
-            $errors[] = "Invalid region.";
-        }
-
-        $event_days = array();
-        foreach((array)$mybb->get_input('event_days', MyBB::INPUT_ARRAY) as $day)
-        {
-            if(empty($day['date']))
-            {
-                continue;
-            }
-
-            if(!strtotime($day['date']))
-            {
-                $errors[] = "Event day '" . htmlspecialchars_uni($day['date']) . "' is not a valid date.";
-                continue;
-            }
-
-            $event_days[] = array(
-                'date'       => date('Y-m-d', strtotime($day['date'])),
-                'start_time' => !empty($day['start_time']) ? $db->escape_string($day['start_time']) : '00:00:00',
-                'end_time'   => !empty($day['end_time']) ? $db->escape_string($day['end_time']) : '23:59:59',
-            );
-        }
-
-        $exclusions = events_admin_parse_exclusions($mybb->get_input('exclusions'));
+        // Re-rendering from the submitted values rather than from the database is what
+        // puts a failed submit back on screen as it was typed.
+        $values = events_event_form_input();
+        $errors = events_validate_event_input($values, $event);
 
         if(empty($errors))
         {
-            $data = array(
-                'title'          => $db->escape_string($title),
-                'description'    => $db->escape_string($mybb->get_input('description')),
-                'status'         => $db->escape_string($status),
-                'region'         => $db->escape_string($region),
-                'start_date'     => $db->escape_string(date('Y-m-d H:i:s', strtotime($start_date))),
-                'end_date'       => $db->escape_string(date('Y-m-d H:i:s', strtotime($end_date))),
-                'requires_wwcc'  => $mybb->get_input('requires_wwcc', MyBB::INPUT_INT) ? 1 : 0,
-                'gec_user_id'    => $mybb->get_input('gec_user_id', MyBB::INPUT_INT),
-                'updated_at'     => $db->escape_string(date('Y-m-d H:i:s', TIME_NOW)),
-            );
+            $thread_error = null;
+            events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error);
 
-            // MyBB quotes insert/update values but has no way to express SQL NULL, and an
-            // empty string is not a valid DATETIME under strict mode, so the nullable
-            // columns are cleared in a second statement.
-            $nullable = array();
-
-            if($signup_cutoff !== '')
+            $message = $is_edit ? "Event updated successfully." : "Event created successfully.";
+            if($thread_error !== null)
             {
-                $data['signup_cutoff'] = $db->escape_string(date('Y-m-d H:i:s', strtotime($signup_cutoff)));
+                // The event saved; only its announcement did not.
+                flash_message($message . " " . $thread_error, "error");
             }
             else
             {
-                $nullable[] = 'signup_cutoff';
+                flash_message($message, "success");
             }
-
-            $thread_id = $mybb->get_input('thread_id', MyBB::INPUT_INT);
-            if($thread_id > 0)
-            {
-                $data['thread_id'] = $thread_id;
-            }
-            else
-            {
-                $nullable[] = 'thread_id';
-            }
-
-            if($is_edit)
-            {
-                $db->update_query("event_plugin_events", $data, "id = " . $event_id);
-            }
-            else
-            {
-                $data['created_by'] = (int)$mybb->user['uid'];
-                $data['created_at'] = $db->escape_string(date('Y-m-d H:i:s', TIME_NOW));
-                $event_id = (int)$db->insert_query("event_plugin_events", $data);
-            }
-
-            if(!empty($nullable))
-            {
-                $db->write_query("UPDATE " . TABLE_PREFIX . "event_plugin_events
-                    SET " . implode(' = NULL, ', $nullable) . " = NULL
-                    WHERE id = " . (int)$event_id);
-            }
-
-            $db->delete_query("event_plugin_event_days", "event_id = " . $event_id);
-            foreach($event_days as $day)
-            {
-                $db->insert_query("event_plugin_event_days", array_merge(array('event_id' => $event_id), $day));
-            }
-
-            $db->delete_query("event_plugin_event_exclusions", "event_id = " . $event_id);
-            foreach($exclusions as $uid)
-            {
-                $db->insert_query("event_plugin_event_exclusions", array('event_id' => $event_id, 'user_id' => $uid));
-            }
-
-            flash_message($is_edit ? "Event updated successfully." : "Event created successfully.", "success");
             admin_redirect("index.php?module=events");
         }
-
-        // Re-render the form with what was submitted.
-        $event = array_merge($event, array(
-            'title'         => $title,
-            'description'   => $mybb->get_input('description'),
-            'status'        => $status,
-            'region'        => $region,
-            'start_date'    => $start_date,
-            'end_date'      => $end_date,
-            'signup_cutoff' => $signup_cutoff,
-            'requires_wwcc' => $mybb->get_input('requires_wwcc', MyBB::INPUT_INT),
-            'gec_user_id'   => $mybb->get_input('gec_user_id', MyBB::INPUT_INT),
-            'thread_id'     => $mybb->get_input('thread_id', MyBB::INPUT_INT),
-        ));
     }
 
     if(!empty($errors))
@@ -371,91 +171,69 @@ function events_admin_edit_event()
         $page->output_inline_error($errors);
     }
 
-    $existing_days = $is_edit ? events_get_event_days($event_id) : array();
-    if($mybb->request_method === "post")
-    {
-        $existing_days = array();
-        foreach((array)$mybb->get_input('event_days', MyBB::INPUT_ARRAY) as $day)
-        {
-            if(!empty($day['date']))
-            {
-                $existing_days[] = $day;
-            }
-        }
-    }
-
-    $existing_exclusions = array();
-    if($is_edit)
-    {
-        $query = $db->query("
-            SELECT u.username
-            FROM " . TABLE_PREFIX . "event_plugin_event_exclusions x
-            INNER JOIN " . TABLE_PREFIX . "users u ON x.user_id = u.uid
-            WHERE x.event_id = " . $event_id . "
-        ");
-        while($row = $db->fetch_array($query))
-        {
-            $existing_exclusions[] = $row['username'];
-        }
-    }
-    if($mybb->request_method === "post")
-    {
-        $existing_exclusions = array($mybb->get_input('exclusions'));
-    }
-
-    $coordinators = events_admin_coordinator_choices();
-    if(empty($coordinators))
-    {
-        $coordinators = array((int)$mybb->user['uid'] => $mybb->user['username']);
-    }
-
-    $threads = array('' => 'None');
-    $query = $db->query("
-        SELECT t.tid, t.subject, f.name AS forum_name
-        FROM " . TABLE_PREFIX . "threads t
-        LEFT JOIN " . TABLE_PREFIX . "forums f ON t.fid = f.fid
-        WHERE t.visible = 1
-        ORDER BY t.dateline DESC
-        LIMIT 100
-    ");
-    while($thread = $db->fetch_array($query))
-    {
-        $threads[$thread['tid']] = $thread['subject'] . " (" . $thread['forum_name'] . ")";
-    }
+    // The event's stored coordinator rather than the posted one: a forged uid that failed
+    // validation should not earn itself a place on the list when the form comes back.
+    $coordinators = events_coordinator_choices(array(
+        $mybb->user['uid'],
+        isset($event['gec_user_id']) ? $event['gec_user_id'] : 0,
+    ));
 
     $form = new Form("index.php?module=events&amp;action=" . ($is_edit ? "edit&amp;id=" . $event_id : "add"), "post");
 
     $container = new FormContainer($is_edit ? "Edit Event" : "Add Event");
-    $container->output_row("Title", "The event's name", $form->generate_text_box("title", isset($event['title']) ? $event['title'] : "", array("id" => "title")), "title");
-    $container->output_row("Description", "Shown on the event page", $form->generate_text_area("description", isset($event['description']) ? $event['description'] : "", array("id" => "description", "rows" => 8)), "description");
-    $container->output_row("Status", "Pending events are only visible to coordinators", $form->generate_select_box("status", array('pending' => 'Pending', 'live' => 'Live', 'archived' => 'Archived'), isset($event['status']) ? $event['status'] : 'pending', array("id" => "status")), "status");
-    $container->output_row("Region", "Used by the region filter", $form->generate_select_box("region", array_combine(events_regions(), events_regions()), isset($event['region']) ? $event['region'] : 'Sydney', array("id" => "region")), "region");
-    $container->output_row("Start Date", "YYYY-MM-DD HH:MM:SS", $form->generate_text_box("start_date", isset($event['start_date']) ? $event['start_date'] : "", array("id" => "start_date")), "start_date");
-    $container->output_row("End Date", "YYYY-MM-DD HH:MM:SS", $form->generate_text_box("end_date", isset($event['end_date']) ? $event['end_date'] : "", array("id" => "end_date")), "end_date");
-    $container->output_row("Signup Cutoff", "Optional. RSVPs close at this time; leave blank to keep them open until the event ends.", $form->generate_text_box("signup_cutoff", isset($event['signup_cutoff']) ? $event['signup_cutoff'] : "", array("id" => "signup_cutoff")), "signup_cutoff");
-    $container->output_row("Requires WWCC", "Attendees must have a WWCC number on file", $form->generate_check_box("requires_wwcc", 1, "This event requires a WWCC", array("id" => "requires_wwcc", "checked" => !empty($event['requires_wwcc']))), "requires_wwcc");
-    $container->output_row("Coordinator", "The member who manages this event", $form->generate_select_box("gec_user_id", $coordinators, isset($event['gec_user_id']) ? $event['gec_user_id'] : $mybb->user['uid'], array("id" => "gec_user_id")), "gec_user_id");
-    $container->output_row("Linked Thread", "Optional discussion thread", $form->generate_select_box("thread_id", $threads, isset($event['thread_id']) ? $event['thread_id'] : '', array("id" => "thread_id")), "thread_id");
+    $container->output_row("Title", "The event's name", $form->generate_text_box("title", $values['title'], array("id" => "title")), "title");
+    $container->output_row("Description", "Shown on the event page", $form->generate_text_area("description", $values['description'], array("id" => "description", "rows" => 8)), "description");
+    $container->output_row("Status", "Pending events are only visible to coordinators; setting an event live posts its announcement thread", $form->generate_select_box("status", events_event_statuses(), $values['status'], array("id" => "status")), "status");
+    $container->output_row("Region", "Used by the region filter", $form->generate_select_box("region", array_combine(events_regions(), events_regions()), $values['region'], array("id" => "region")), "region");
+    $container->output_row("Address", "Optional. Where the event happens; shown as a Google Maps link on the event pages and in the announcement thread", $form->generate_text_box("address", $values['address'], array("id" => "address", "maxlength" => 255)), "address");
+    // The date boxes are not generate_text_box(): it can set a class, an id and a style and
+    // nothing else, so it cannot produce the time input beside each one. events_datetime_field()
+    // renders both halves for the Admin CP and the front end alike, wearing whichever form's
+    // class it is handed - MyBB's own .text_input here.
+    $date_options = array("input_class" => "text_input");
+    $container->output_row("Start Date", "When the event itself begins. Pick a date from the calendar, or type it as YYYY-MM-DD.", events_datetime_field("start_date", "start_date", $values['start_date'], $date_options + array("required" => true, "label" => "Start")), "start_date");
+    $container->output_row("End Date", "When it finishes. Signups close here when no cutoff is set below.", events_datetime_field("end_date", "end_date", $values['end_date'], $date_options + array("required" => true, "label" => "End")), "end_date");
+    $container->output_row("Signup Cutoff", "Optional. RSVPs close at this time; leave blank to keep them open until the event ends.", events_datetime_field("signup_cutoff", "signup_cutoff", $values['signup_cutoff'], $date_options + array("label" => "Signup cutoff")), "signup_cutoff");
+    $container->output_row("Requires WWCC", "Attendees must have a WWCC number on file", $form->generate_check_box("requires_wwcc", 1, "This event requires a WWCC", array("id" => "requires_wwcc", "checked" => !empty($values['requires_wwcc']))), "requires_wwcc");
+    $container->output_row("Coordinator", "The member who manages this event", $form->generate_select_box("gec_user_id", $coordinators, $values['gec_user_id'], array("id" => "gec_user_id")), "gec_user_id");
+
+    // Event days: one row per day between the start and end dates, worked out rather than
+    // typed, and nothing at all for a single-day event - see events_event_days_grid().
+    //
+    // It sits in the main container rather than one of its own so that the whole row can
+    // be hidden: a FormContainer of its own would leave an empty "Event Days" box behind.
+    $days_grid = events_event_days_grid($values, array(
+        'container_id' => 'event_days_grid',
+        'start_input'  => 'start_date',
+        'end_input'    => 'end_date',
+        'id_prefix'    => 'event_day_',
+        'input_class'  => 'text_input',
+    ));
+
+    // The heading goes inside the cell rather than being output_row()'s title, because the
+    // whole section has to be hideable and Table::construct_row() will not carry a style
+    // onto the <tr> - a row with a heading and nothing under it is worse than no row.
+    $container->output_row("", "", '<div data-events-day-section="1"'
+        . ($days_grid['rows'] ? '' : ' style="display: none;"') . '>'
+        . '<label>Event Days</label>'
+        . '<div class="description">The hours the event runs on each of its days (HH:MM:SS).'
+        . ' Leave a day blank to run it in full.</div>'
+        . $days_grid['html']
+        . '</div>');
     $container->end();
 
-    // Event days: existing rows plus three blanks so extra days can be added.
-    $days_container = new FormContainer("Event Days");
-    $day_count = count($existing_days) + 3;
-    for($i = 0; $i < $day_count; $i++)
-    {
-        $day = isset($existing_days[$i]) ? $existing_days[$i] : array();
-        $row = $form->generate_text_box("event_days[{$i}][date]", isset($day['date']) ? $day['date'] : "", array("id" => "event_day_{$i}_date", "style" => "width: 140px;")) . " ";
-        $row .= $form->generate_text_box("event_days[{$i}][start_time]", isset($day['start_time']) ? $day['start_time'] : "", array("id" => "event_day_{$i}_start", "style" => "width: 100px;")) . " ";
-        $row .= $form->generate_text_box("event_days[{$i}][end_time]", isset($day['end_time']) ? $day['end_time'] : "", array("id" => "event_day_{$i}_end", "style" => "width: 100px;"));
-        $days_container->output_row("Day " . ($i + 1), "Date (YYYY-MM-DD), start time and end time (HH:MM:SS)", $row);
-    }
-    $days_container->end();
-
+    // Not generate_text_box(): the field is a tag input built around the box that posts -
+    // see events_exclusions_field() - and the search it types against is reached by a path
+    // that differs between here and the board.
     $exclusions_container = new FormContainer("Excluded Members");
     $exclusions_container->output_row(
         "Excluded Members",
-        "Comma separated usernames (or user ids). These members can see the event but cannot RSVP.",
-        $form->generate_text_box("exclusions", implode(', ', $existing_exclusions), array("id" => "exclusions")),
+        "Start typing a username and pick from the list. These members can see the event but cannot RSVP.",
+        events_exclusions_field($values['exclusions'], array(
+            'id'          => 'exclusions',
+            'input_class' => 'text_input',
+            'search_url'  => '../xmlhttp.php?action=get_users&search_type=2',
+        )),
         "exclusions"
     );
     $exclusions_container->end();
@@ -463,6 +241,15 @@ function events_admin_edit_event()
     $buttons = array($form->generate_submit_button($is_edit ? "Update Event" : "Create Event"));
     $form->output_submit_wrapper($buttons);
     $form->end();
+
+    // Keeps the day rows in step with the dates as they are picked, so a three-day event
+    // can be created in one pass rather than saved and then reopened, and turns the
+    // excluded members box into a tag input.
+    echo events_datepicker_assets('../jscripts/events/');
+    echo events_tag_field_assets('../jscripts/events/');
+    echo events_datepicker_script();
+    echo events_event_days_script();
+    echo events_tag_field_script();
 }
 
 /**
@@ -498,8 +285,19 @@ function events_admin_set_status()
 
     $db->update_query("event_plugin_events", array(
         'status'     => $db->escape_string($status),
-        'updated_at' => $db->escape_string(date('Y-m-d H:i:s', TIME_NOW)),
+        'updated_at' => $db->escape_string(events_date('Y-m-d H:i:s')),
     ), "id = " . $event_id);
+
+    // An event reaches "live" from here as often as it does from the form, and that is
+    // the point at which it is announced.
+    $thread_error = null;
+    events_sync_event_thread($event_id, $thread_error);
+
+    if($thread_error !== null)
+    {
+        flash_message("Event is now " . $status . ". " . $thread_error, "error");
+        admin_redirect("index.php?module=events");
+    }
 
     flash_message("Event is now " . $status . ".", "success");
     admin_redirect("index.php?module=events");

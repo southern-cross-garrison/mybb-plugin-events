@@ -13,11 +13,49 @@ test.describe('coordinator controls on the event page', () => {
     await page.goto(`/event.php?id=${eventId}`);
     await expect(page.locator('#gec_controls')).toHaveCount(0);
 
-    await page.goto(`/event.php?id=${eventId}&action=rsvps`);
-    await expect(page.locator('#rsvp_list')).toHaveCount(0);
-
     await page.goto(`/event.php?id=${eventId}&action=attendance`);
     await expect(page.locator('#attendance_sheet')).toHaveCount(0);
+    await expect(page.locator('body')).toContainText(/not have permission|no permission/i);
+  });
+
+  test('the signup list is open to everyone who can see the event, with no click', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Open List Troop', coordinator: 'gec' });
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+    await createRsvp(eventId, 'trooper2', { costumes: [TD] });
+
+    // trooper2 is neither the coordinator nor an admin - just somebody who can see it.
+    await loginAs(page, 'trooper2');
+    await page.goto(`/event.php?id=${eventId}`);
+    await expect(page.locator('#gec_controls')).toHaveCount(0);
+
+    // Who is going is part of the event, not somewhere else to go and look.
+    await expect(page.locator('#rsvp_list')).toBeVisible();
+    await expect(page.locator('li.rsvp_row')).toHaveCount(2);
+    await expect(page.locator('li.rsvp_row')).toContainText(['trooper1', 'trooper2']);
+  });
+
+  test('the signup list carries no contact details, which stay on the attendance sheet', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Contact Details Troop' });
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+
+    await loginAs(page, 'trooper2');
+    await page.goto(`/event.php?id=${eventId}`);
+    await expect(page.locator('#rsvp_list')).toBeVisible();
+
+    // Opening the list up to the board is only safe while it stays the roster it looks
+    // like. Mobile and emergency contact belong to the coordinator's attendance sheet.
+    await expect(page.locator('#rsvp_list')).not.toContainText(/mobile|emergency/i);
+    await expect(page.locator('#rsvp_list .attendee_mobile, #rsvp_list .attendee_emergency')).toHaveCount(0);
+  });
+
+  test('a pending event is not listed to somebody who cannot see the event', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Pending Troop', status: 'pending' });
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+
+    await loginAs(page, 'trooper2');
+    await page.goto(`/event.php?id=${eventId}`);
+
+    await expect(page.locator('#rsvp_list')).toHaveCount(0);
     await expect(page.locator('body')).toContainText(/not have permission|no permission/i);
   });
 
@@ -30,10 +68,8 @@ test.describe('coordinator controls on the event page', () => {
     await page.goto(`/event.php?id=${eventId}`);
     await expect(page.locator('#gec_controls')).toBeVisible();
 
-    await page.locator('#gec_view_rsvps').click();
-
-    await expect(page.locator('tr.rsvp_row')).toHaveCount(2);
-    const trooper1Row = page.locator('tr.rsvp_row').filter({ hasText: 'trooper1' });
+    await expect(page.locator('li.rsvp_row')).toHaveCount(2);
+    const trooper1Row = page.locator('li.rsvp_row').filter({ hasText: 'trooper1' });
     await expect(trooper1Row.locator('.rsvp_tkid')).toHaveText('TK-20001');
     await expect(trooper1Row.locator('.rsvp_costumes')).toContainText(TK);
     await expect(trooper1Row.locator('.rsvp_costumes')).toContainText(TB);
@@ -45,17 +81,27 @@ test.describe('coordinator controls on the event page', () => {
     await createRsvp(eventId, 'trooper2', { costumes: [TD] });
 
     await loginAs(page, 'gec');
-    await page.goto(`/event.php?id=${eventId}&action=rsvps`);
-    await expect(page.locator('tr.rsvp_row')).toHaveCount(2);
+    await page.goto(`/event.php?id=${eventId}`);
+    await expect(page.locator('li.rsvp_row')).toHaveCount(2);
+
+    // The filters live behind the funnel beside the heading, so an unfiltered list is
+    // just a list.
+    await expect(page.locator('#rsvp_filter_form')).not.toBeVisible();
+    await page.locator('#rsvp_filter_toggle').click();
 
     await page.locator('#filter_costume').fill('Sandtrooper');
     await page.locator('#rsvp_filter_form input[value="Filter"]').click();
 
-    await expect(page.locator('tr.rsvp_row')).toHaveCount(1);
-    await expect(page.locator('tr.rsvp_row')).toContainText('trooper2');
+    await expect(page.locator('li.rsvp_row')).toHaveCount(1);
+    await expect(page.locator('li.rsvp_row')).toContainText('trooper2');
+
+    // A filter that is doing something comes back open, so the short list explains
+    // itself and the way to undo it is in reach.
+    await expect(page.locator('#rsvp_filter_form')).toBeVisible();
 
     await page.locator('#rsvp_filter_reset').click();
-    await expect(page.locator('tr.rsvp_row')).toHaveCount(2);
+    await expect(page.locator('li.rsvp_row')).toHaveCount(2);
+    await expect(page.locator('#rsvp_filter_form')).not.toBeVisible();
   });
 
   test('filter the RSVP list by day', async ({ page }) => {
@@ -70,14 +116,15 @@ test.describe('coordinator controls on the event page', () => {
     await createRsvp(eventId, 'trooper2', { costumes: [TD], dayIds: [saturday, sunday] });
 
     await loginAs(page, 'gec');
-    await page.goto(`/event.php?id=${eventId}&action=rsvps`);
-    await expect(page.locator('tr.rsvp_row')).toHaveCount(2);
+    await page.goto(`/event.php?id=${eventId}`);
+    await expect(page.locator('li.rsvp_row')).toHaveCount(2);
 
+    await page.locator('#rsvp_filter_toggle').click();
     await page.locator('#filter_day').selectOption(String(sunday));
     await page.locator('#rsvp_filter_form input[value="Filter"]').click();
 
-    await expect(page.locator('tr.rsvp_row')).toHaveCount(1);
-    await expect(page.locator('tr.rsvp_row')).toContainText('trooper2');
+    await expect(page.locator('li.rsvp_row')).toHaveCount(1);
+    await expect(page.locator('li.rsvp_row')).toContainText('trooper2');
   });
 });
 

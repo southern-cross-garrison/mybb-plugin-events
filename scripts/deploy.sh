@@ -7,6 +7,12 @@
 #   plugin/root/*.php         -> test-forum/*.php          (front-end entry points; MyBB
 #                                                           pages must sit at the web root
 #                                                           because they require ./global.php)
+#   plugin/root/jscripts/...  -> test-forum/jscripts/...  (the event form's shared assets -
+#                                                           the calendar picker and the tag
+#                                                           field's stylesheet; one copy,
+#                                                           loaded by the board as
+#                                                           jscripts/events/ and by the Admin
+#                                                           CP as ../jscripts/events/)
 #   plugin/admin_modules/...  -> test-forum/admin/modules/...
 . "$(dirname "${BASH_SOURCE[0]}")/env.sh"
 
@@ -17,6 +23,9 @@ cp "$REPO_ROOT/plugin/inc/plugins/events.php" "$FORUM_DIR/inc/plugins/events.php
 cp "$REPO_ROOT/plugin/inc/tasks/events_reminders.php" "$FORUM_DIR/inc/tasks/events_reminders.php"
 
 cp "$REPO_ROOT"/plugin/root/*.php "$FORUM_DIR/"
+
+mkdir -p "$FORUM_DIR/jscripts/events"
+rsync -a --delete "$REPO_ROOT/plugin/root/jscripts/events/" "$FORUM_DIR/jscripts/events/"
 
 mkdir -p "$FORUM_DIR/admin/modules/events"
 rsync -a --delete "$REPO_ROOT/plugin/admin_modules/events/" "$FORUM_DIR/admin/modules/events/"

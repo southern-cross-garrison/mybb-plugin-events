@@ -1,22 +1,18 @@
-<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder" id="rsvp_list">
-<tr><td class="thead" colspan="6"><strong>RSVPs for this Event</strong></td></tr>
-<tr class="no-print"><td class="trow1" colspan="6">
-<form method="get" action="event.php" id="rsvp_filter_form" class="events_filter_form">
+<div id="rsvp_list">
+<details id="rsvp_filter"{$rsvp_filter_open}>
+<summary id="rsvp_filter_toggle">
+<h3 id="rsvp_list_heading" class="events_section_heading">Who is Attending <span id="rsvp_list_count">({$rsvp_list_count})</span></h3>
+<span class="rsvp_filter_funnel">Filter</span>
+</summary>
+<form method="get" action="event.php" id="rsvp_filter_form" class="events_filter_form no-print">
 <input type="hidden" name="id" value="{$event_id}" />
-<input type="hidden" name="action" value="rsvps" />
 <label>Costume: <input type="text" class="textbox" name="filter_costume" id="filter_costume" value="{$filter_costume}" /></label>
 {$filter_day_select}
 <input type="submit" class="button" value="Filter" />
-<a href="event.php?id={$event_id}&amp;action=rsvps" id="rsvp_filter_reset">Reset</a>
+<a href="event.php?id={$event_id}#rsvp_list" id="rsvp_filter_reset">Reset</a>
 </form>
-</td></tr>
-<tr>
-<td class="tcat"><strong>Username</strong></td>
-<td class="tcat"><strong>Role</strong></td>
-<td class="tcat"><strong>Legion ID</strong></td>
-<td class="tcat"><strong>Costumes</strong></td>
-<td class="tcat"><strong>Days</strong></td>
-<td class="tcat"><strong>RSVPed</strong></td>
-</tr>
+</details>
+<ul id="rsvp_rows">
 {$rsvp_rows}
-</table>
+</ul>
+</div>

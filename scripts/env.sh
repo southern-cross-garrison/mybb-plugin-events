@@ -28,10 +28,19 @@ THEME_REPO="${THEME_REPO:-https://github.com/southern-cross-garrison/mybb-custom
 THEME_REF="${THEME_REF:-dcfdb15817dc43caf63e184975f9e415f7a4b77d}"
 THEME_XML="${THEME_XML:-SCG-Responsive.xml}"
 
+# Smart Thread Link, the companion plugin the custom theme's thread listings need. The
+# theme links threads with {$thread['smartlink']}, which is this plugin's variable and not
+# one MyBB sets, so a board with the theme but not the plugin renders every thread subject
+# on forumdisplay as href="" and nothing in a forum is clickable. Pinned like the theme so
+# the provisioned snapshot stays reproducible.
+SMARTLINK_REPO="${SMARTLINK_REPO:-https://github.com/southern-cross-garrison/mybb-plugin-smartlink.git}"
+SMARTLINK_REF="${SMARTLINK_REF:-734b21eca0b617ea982feec0d994700f3ab48aad}"
+
 FORUM_DIR="$REPO_ROOT/test-forum"
 DEVENV_DIR="$REPO_ROOT/.devenv"
 CACHE_DIR="$DEVENV_DIR/cache"
 THEME_DIR="$CACHE_DIR/theme"
+SMARTLINK_DIR="$CACHE_DIR/smartlink"
 SNAPSHOT_FILE="$DEVENV_DIR/snapshot.sql"
 FAKETIME_FILE="$DEVENV_DIR/faketime/faketime.rc"
 

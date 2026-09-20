@@ -12,15 +12,17 @@
 <div id="event_meta">
 <p><strong>Status:</strong> <span id="event_status">{$event_status}</span></p>
 <p><strong>Region:</strong> <span id="event_region">{$event_region}</span></p>
+{$event_address_row}
 <p><strong>Starts:</strong> <span id="event_start">{$event_start_date}</span></p>
 <p><strong>Ends:</strong> <span id="event_end">{$event_end_date}</span></p>
 {$event_cutoff_row}
 {$event_wwcc_row}
-<p><strong>RSVPs:</strong> <span id="event_rsvp_count">{$rsvp_count}</span></p>
+<p><strong>Troopers:</strong> <span id="event_rsvp_count">{$rsvp_count}</span></p>
 {$event_wrangler_row}
 </div>
 <div id="event_description">{$event_description}</div>
 {$event_days_block}
+{$rsvp_list}
 </td></tr>
 <tr><td class="trow2"><div id="event_actions">{$event_actions}</div></td></tr>
 </table>

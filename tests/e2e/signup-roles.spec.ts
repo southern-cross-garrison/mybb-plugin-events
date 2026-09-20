@@ -177,6 +177,7 @@ test.describe('mixing trooping and wrangling', () => {
 
     await loginAs(page, 'trooper1');
     await page.goto(`/rsvp.php?id=${eventId}`);
+    await page.locator('#signup_per_day').check();
     await page.locator(`#day_${sunday}_wrangler`).check();
     await page.locator('#rsvp_submit').click();
     await page.locator(`input.costume_checkbox[value="${TK}"]`).check();
@@ -200,8 +201,10 @@ test.describe('mixing trooping and wrangling', () => {
     await loginAs(page, 'trooper1');
     await page.goto(`/rsvp.php?id=${eventId}`);
 
-    // The day already on the signup comes back as trooping; the one that is not comes
-    // back as not attending.
+    // The signup is not the same across both days, so it comes back with the grid open,
+    // with the day already on it set to trooping and the one that is not set to not
+    // attending.
+    await expect(page.locator('#signup_per_day')).toBeChecked();
     await expect(page.locator(`#day_${saturday}_trooper`)).toBeChecked();
     await expect(page.locator(`#day_${sunday}_none`)).toBeChecked();
 
@@ -351,14 +354,16 @@ test.describe('wranglers on coordinator surfaces', () => {
     await createRsvp(eventId, 'wrangler', { role: 'wrangler' });
 
     await loginAs(page, 'gec');
-    await page.goto(`/event.php?id=${eventId}&action=rsvps`);
+    await page.goto(`/event.php?id=${eventId}`);
 
-    await expect(page.locator('tr.rsvp_row')).toHaveCount(2);
-    const rows = page.locator('tr.rsvp_row');
+    await expect(page.locator('li.rsvp_row')).toHaveCount(2);
+    const rows = page.locator('li.rsvp_row');
     await expect(rows.nth(0).locator('.rsvp_role')).toHaveText('Trooper');
     await expect(rows.nth(1).locator('.rsvp_role')).toHaveText('Wrangler');
-    await expect(rows.nth(1).locator('.rsvp_tkid')).toHaveText('');
-    await expect(rows.nth(1).locator('.rsvp_costumes')).toHaveText('');
+    // A wrangler has neither, so the bullet simply leaves them out rather than carrying
+    // two empty slots and the separators between them.
+    await expect(rows.nth(1).locator('.rsvp_tkid')).toHaveCount(0);
+    await expect(rows.nth(1).locator('.rsvp_costumes')).toHaveCount(0);
   });
 
   test('drop out of the RSVP list when it is filtered by costume', async ({ page }) => {
@@ -367,10 +372,10 @@ test.describe('wranglers on coordinator surfaces', () => {
     await createRsvp(eventId, 'wrangler', { role: 'wrangler' });
 
     await loginAs(page, 'gec');
-    await page.goto(`/event.php?id=${eventId}&action=rsvps&filter_costume=${encodeURIComponent(TK)}`);
+    await page.goto(`/event.php?id=${eventId}&filter_costume=${encodeURIComponent(TK)}`);
 
-    await expect(page.locator('tr.rsvp_row')).toHaveCount(1);
-    await expect(page.locator('tr.rsvp_row .rsvp_username')).toHaveText('trooper1');
+    await expect(page.locator('li.rsvp_row')).toHaveCount(1);
+    await expect(page.locator('li.rsvp_row .rsvp_username')).toHaveText('trooper1');
   });
 
   test('are on the attendance sheet with contact details but no TK ID or costume', async ({ page }) => {
@@ -403,16 +408,16 @@ test.describe('wranglers on coordinator surfaces', () => {
     await createRsvp(eventId, 'trooper1', { role: 'wrangler', dayIds: [sunday] });
 
     await loginAs(page, 'gec');
-    await page.goto(`/event.php?id=${eventId}&action=rsvps`);
+    await page.goto(`/event.php?id=${eventId}`);
 
-    await expect(page.locator('tr.rsvp_row')).toHaveCount(2);
-    await expect(page.locator('tr.rsvp_row').nth(0).locator('.rsvp_days')).toHaveText('17 Oct');
-    await expect(page.locator('tr.rsvp_row').nth(1).locator('.rsvp_days')).toHaveText('18 Oct');
+    await expect(page.locator('li.rsvp_row')).toHaveCount(2);
+    await expect(page.locator('li.rsvp_row').nth(0).locator('.rsvp_days')).toHaveText('17 Oct');
+    await expect(page.locator('li.rsvp_row').nth(1).locator('.rsvp_days')).toHaveText('18 Oct');
 
     // Filtering by a day shows only the half of the signup that covers it.
-    await page.goto(`/event.php?id=${eventId}&action=rsvps&filter_day=${sunday}`);
-    await expect(page.locator('tr.rsvp_row')).toHaveCount(1);
-    await expect(page.locator('tr.rsvp_row .rsvp_role')).toHaveText('Wrangler');
+    await page.goto(`/event.php?id=${eventId}&filter_day=${sunday}`);
+    await expect(page.locator('li.rsvp_row')).toHaveCount(1);
+    await expect(page.locator('li.rsvp_row .rsvp_role')).toHaveText('Wrangler');
   });
 
   test('are counted separately from troopers on the event page', async ({ page }) => {

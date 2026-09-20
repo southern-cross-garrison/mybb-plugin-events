@@ -10,15 +10,13 @@
 <table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
 <tr class="no-print"><td class="trow1" colspan="6">
 <div class="events_toolbar">
-<span class="events_toolbar_group">
-<a href="events.php?view=list" id="events_view_list">List View</a> |
-<a href="events.php?view=calendar" id="events_view_calendar">Calendar View</a>
-</span>
+{$events_view_toggle}
 <form method="get" action="events.php" class="events_filter_form">
 <input type="hidden" name="view" value="list" />
 <select name="region" id="events_region_filter" class="events_select">{$region_options}</select>
 <input type="submit" class="button" value="Filter" />
 </form>
+{$events_manage_link}
 </div>
 </td></tr>
 <tr>

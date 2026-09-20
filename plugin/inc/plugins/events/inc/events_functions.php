@@ -23,6 +23,213 @@ function events_get_setting($name)
 }
 
 /**
+ * The timezone every date the plugin stores is written and read in.
+ *
+ * Nothing the plugin stores carries an offset: an event's start, its signup cutoff, the
+ * day rows under it and the stamps on a troop report are all wall clocks, and a wall
+ * clock only means something once a zone is named for it. The board names one, so a
+ * garrison whose events happen in Sydney types 18:00 and gets 18:00 in Sydney - whether
+ * the forum is hosted there, in Frankfurt, or on a host that moved between the two. The
+ * server's own timezone deliberately does not enter into it.
+ *
+ * A board starts on UTC and names its own zone in Admin CP -> Event Management ->
+ * Settings. UTC is also where an unset or unrecognised setting lands: it is the one zone
+ * every PHP build can resolve, so a board still renders its dates when the setting names
+ * a zone this host has never heard of.
+ */
+define('EVENTS_DEFAULT_TIMEZONE', 'UTC');
+
+/**
+ * The configured timezone's identifier, or UTC when there is not a usable one.
+ *
+ * @return string
+ */
+function events_timezone_name()
+{
+    // Keyed by the raw setting rather than resolved once, so a request that changes the
+    // setting (the Admin CP settings page) does not go on answering with the old zone.
+    static $resolved = array();
+
+    $setting = trim((string)events_get_setting('timezone'));
+
+    if(!isset($resolved[$setting]))
+    {
+        $resolved[$setting] = EVENTS_DEFAULT_TIMEZONE;
+
+        if($setting !== '')
+        {
+            try
+            {
+                new DateTimeZone($setting);
+                $resolved[$setting] = $setting;
+            }
+            catch(Exception $e)
+            {
+                // A zone this build of PHP has never heard of. Falling back is better
+                // than fataling on every page that shows a date.
+            }
+        }
+    }
+
+    return $resolved[$setting];
+}
+
+/**
+ * @return DateTimeZone
+ */
+function events_timezone()
+{
+    static $zones = array();
+
+    $name = events_timezone_name();
+
+    if(!isset($zones[$name]))
+    {
+        $zones[$name] = new DateTimeZone($name);
+    }
+
+    return $zones[$name];
+}
+
+/**
+ * Format an instant as a wall clock in the event timezone.
+ *
+ * The plugin's replacement for date()/my_date(): every date it renders, and every date
+ * it writes to a DATETIME column, goes through here so the board reads back exactly the
+ * wall clock that was entered.
+ *
+ * my_date() rather than gmdate() so the board's own date handling still runs, and the
+ * offset is worked out for this particular instant so a date either side of a daylight
+ * saving change is rendered under the offset that was actually in force then.
+ *
+ * @param string $format
+ * @param int|false|null $timestamp Defaults to now; false (an unparseable date) yields ''
+ * @return string
+ */
+function events_date($format, $timestamp = null)
+{
+    if($timestamp === null)
+    {
+        $timestamp = TIME_NOW;
+    }
+
+    if($timestamp === false || $timestamp === '')
+    {
+        return '';
+    }
+
+    $timestamp = (int)$timestamp;
+
+    return my_date($format, $timestamp, events_timezone_offset($timestamp) / 3600, 0);
+}
+
+/**
+ * The event timezone's offset from UTC, in seconds, at a given instant.
+ *
+ * @param int|null $timestamp
+ * @return int
+ */
+function events_timezone_offset($timestamp = null)
+{
+    if($timestamp === null)
+    {
+        $timestamp = TIME_NOW;
+    }
+
+    return events_timezone()->getOffset(new DateTime('@' . (int)$timestamp));
+}
+
+/**
+ * Read a stored or submitted date as a wall clock in the event timezone.
+ *
+ * The plugin's replacement for strtotime(). PHP would read the same string against the
+ * server's zone, which is what made a cutoff of "17:00" close at 17:00 wherever the
+ * forum happened to be hosted rather than at 17:00 where the event is.
+ *
+ * @param string $value A date, a time, or a relative expression ('+1 day')
+ * @param int|null $base Instant a relative expression is measured from; now by default
+ * @return int|false false when the value is not a date at all
+ */
+function events_strtotime($value, $base = null)
+{
+    $value = trim((string)$value);
+
+    // MySQL's zero date is how a nullable DATETIME reads on a non-strict server. It is
+    // not a moment, and PHP reading it as one (the year zero) put events a long way in
+    // the past rather than reporting them as undated.
+    if($value === '' || substr($value, 0, 10) === '0000-00-00')
+    {
+        return false;
+    }
+
+    try
+    {
+        if($base === null)
+        {
+            $date = new DateTime($value, events_timezone());
+        }
+        else
+        {
+            // A timestamp carries no zone of its own, so it is moved into the event's
+            // before the expression is applied: "-1 month" from the 1st of a month has
+            // to step by that month in the zone the calendar is drawn in.
+            $date = new DateTime('@' . (int)$base);
+            $date->setTimezone(events_timezone());
+
+            if($date->modify($value) === false)
+            {
+                return false;
+            }
+        }
+    }
+    catch(Exception $e)
+    {
+        return false;
+    }
+
+    return $date->getTimestamp();
+}
+
+/**
+ * Every timezone the admin can choose from, as identifier => label.
+ *
+ * The label carries the offset the zone is on *now*, which is what makes a list of 400
+ * identifiers pickable; a zone that observes daylight saving will read an hour out for
+ * half the year, and that is honest - the plugin follows the zone, not the label.
+ *
+ * @return array
+ */
+function events_timezone_choices()
+{
+    // Four hundred zones, built twice on a settings save (once to check what was posted,
+    // once to draw the box) and never changing within a request.
+    static $choices = null;
+
+    if($choices !== null)
+    {
+        return $choices;
+    }
+
+    $now = new DateTime('now', new DateTimeZone('UTC'));
+    $choices = array();
+
+    foreach(DateTimeZone::listIdentifiers(DateTimeZone::ALL) as $identifier)
+    {
+        $zone = new DateTimeZone($identifier);
+        $minutes = (int)round(abs($zone->getOffset($now)) / 60);
+
+        $choices[$identifier] = $identifier . ' (UTC' . sprintf(
+            '%s%02d:%02d',
+            $zone->getOffset($now) < 0 ? '-' : '+',
+            intdiv($minutes, 60),
+            $minutes % 60
+        ) . ')';
+    }
+
+    return $choices;
+}
+
+/**
  * Load a user row, defaulting to the logged in user.
  *
  * @param int|null $user_id
@@ -248,6 +455,85 @@ function events_get_event_days($event_id)
 }
 
 /**
+ * The two ways the events index can be shown.
+ *
+ * @return array of string
+ */
+function events_views()
+{
+    return array('list', 'calendar');
+}
+
+/**
+ * The view the toggle switches to from the one being shown.
+ *
+ * @param string $view
+ * @return string
+ */
+function events_other_view($view)
+{
+    return $view === 'calendar' ? 'list' : 'calendar';
+}
+
+/**
+ * The view this member last looked at the events index in.
+ *
+ * Members who have never touched the toggle have no row, and get the list - it is the
+ * denser of the two and the one every link into the plugin has always landed on.
+ *
+ * @param int|null $user_id
+ * @return string 'list' or 'calendar'
+ */
+function events_view_preference($user_id = null)
+{
+    global $mybb, $db;
+
+    $user_id = $user_id === null ? (int)$mybb->user['uid'] : (int)$user_id;
+    if($user_id <= 0)
+    {
+        return 'list';
+    }
+
+    $row = $db->fetch_array($db->simple_select("event_plugin_user_prefs", "events_view", "user_id = " . $user_id));
+
+    return (!empty($row) && in_array($row['events_view'], events_views(), true)) ? $row['events_view'] : 'list';
+}
+
+/**
+ * Remember the view this member is looking at, for their next visit.
+ *
+ * Written on every request that names a view rather than only on the toggle itself, so
+ * that paging the calendar or filtering a list - both of which carry the view along -
+ * keeps the preference current. The read guards the write because that makes the common
+ * case, revisiting the view you already prefer, a select on a primary key instead of a
+ * write to a MyISAM table that locks for every other reader of the page.
+ *
+ * @param string $view
+ * @param int|null $user_id
+ * @return void
+ */
+function events_save_view_preference($view, $user_id = null)
+{
+    global $mybb, $db;
+
+    $user_id = $user_id === null ? (int)$mybb->user['uid'] : (int)$user_id;
+    if($user_id <= 0 || !in_array($view, events_views(), true))
+    {
+        return;
+    }
+
+    if(events_view_preference($user_id) === $view)
+    {
+        return;
+    }
+
+    $db->replace_query("event_plugin_user_prefs", array(
+        'user_id'     => $user_id,
+        'events_view' => $db->escape_string($view)
+    ), 'user_id');
+}
+
+/**
  * May this user open the events pages at all?
  *
  * The events index is members-only. The navigation link is gated on the same check, so
@@ -344,12 +630,12 @@ function events_signup_lock_reason($event, $user_id = null)
 
     if(!empty($event['signup_cutoff']) && $event['signup_cutoff'] !== '0000-00-00 00:00:00')
     {
-        if(strtotime($event['signup_cutoff']) <= TIME_NOW)
+        if(events_strtotime($event['signup_cutoff']) <= TIME_NOW)
         {
             return 'cutoff_passed';
         }
     }
-    elseif(strtotime($event['end_date']) <= TIME_NOW)
+    elseif(events_strtotime($event['end_date']) <= TIME_NOW)
     {
         return 'event_ended';
     }
@@ -543,7 +829,7 @@ function events_save_signup($event_id, $user_id, array $role_days, array $costum
                 'event_id'  => $event_id,
                 'user_id'   => $user_id,
                 'role'      => $db->escape_string($role),
-                'rsvp_date' => $db->escape_string(date('Y-m-d H:i:s', TIME_NOW)),
+                'rsvp_date' => $db->escape_string(events_date('Y-m-d H:i:s')),
                 'status'    => 'attending',
             ));
         }
@@ -732,7 +1018,7 @@ function events_save_user_fields($user_id, array $values)
 function events_prerequisite_labels()
 {
     return array(
-        'tk_id'             => array('label' => 'Legion ID', 'hint' => 'Your 501st legion ID, e.g. TK-12345.'),
+        'tk_id'             => array('label' => 'Legion ID', 'hint' => 'Your 501st legion ID, e.g. if you are TK-12345 then type "12345" here.'),
         'wwcc'              => array('label' => 'WWCC Number', 'hint' => 'This event requires a Working With Children Check.'),
         'mobile'            => array('label' => 'Mobile Number', 'hint' => 'So the coordinator can reach you on the day.'),
         'emergency_contact' => array('label' => 'Emergency Contact', 'hint' => 'Name and number of someone to call in an emergency.'),
@@ -842,7 +1128,42 @@ function events_format_date($date, $format = null)
         $format = $mybb->settings['dateformat'] . " " . $mybb->settings['timeformat'];
     }
 
-    return my_date($format, strtotime($date), 0, 0);
+    return events_date($format, events_strtotime($date));
+}
+
+/**
+ * Format an event start for the listing column.
+ *
+ * "Sep 8 - 9AM" or "Sep 12 - 9:30AM" within the current year, with the year
+ * added ("Sep 8 2027 - 9AM") once the event falls outside it.
+ *
+ * @param string $date
+ * @return string
+ */
+function events_format_list_date($date)
+{
+    if(empty($date) || $date === '0000-00-00 00:00:00')
+    {
+        return '';
+    }
+
+    $timestamp = events_strtotime($date);
+
+    if($timestamp === false)
+    {
+        return '';
+    }
+
+    $day = events_date('M j', $timestamp);
+
+    if(events_date('Y', $timestamp) !== events_date('Y', TIME_NOW))
+    {
+        $day .= ' ' . events_date('Y', $timestamp);
+    }
+
+    $time = events_date((int)events_date('i', $timestamp) === 0 ? 'gA' : 'g:iA', $timestamp);
+
+    return $day . ' - ' . $time;
 }
 
 /**
@@ -853,7 +1174,7 @@ function events_format_date($date, $format = null)
  */
 function events_has_ended($event)
 {
-    return !empty($event) && strtotime($event['end_date']) < TIME_NOW;
+    return !empty($event) && events_strtotime($event['end_date']) < TIME_NOW;
 }
 
 /**

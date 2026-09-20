@@ -45,6 +45,8 @@ printf '%s' '<?php echo date("Y-m-d H:i:s");' > "$FORUM_DIR/_clockprobe.php"
 
 "$REPO_ROOT/scripts/install-theme.sh"
 
+"$REPO_ROOT/scripts/install-smartlink.sh"
+
 log "Provisioning fixtures and activating the plugin"
 dc exec -T web php /dev/stdin < "$REPO_ROOT/scripts/provision.php"
 

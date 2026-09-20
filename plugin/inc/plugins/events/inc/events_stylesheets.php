@@ -22,7 +22,7 @@ define('EVENTS_STYLESHEET', 'events.css');
 // The pages the stylesheet is loaded on, matched by MyBB against THIS_SCRIPT. The
 // attendance sheet and the coordinator RSVP list are actions on event.php, so they are
 // covered by it; ical.php renders no HTML.
-define('EVENTS_STYLESHEET_ATTACHEDTO', 'events.php|event.php|rsvp.php|troop_report.php');
+define('EVENTS_STYLESHEET_ATTACHEDTO', 'events.php|event.php|manage_event.php|rsvp.php|troop_report.php');
 
 /** The theme every other theme inherits from. */
 define('EVENTS_MASTER_THEME', 1);

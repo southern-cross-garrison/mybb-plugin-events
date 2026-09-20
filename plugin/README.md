@@ -4,37 +4,44 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 
 ## Features
 
-- **Event Management**: Create, edit, and manage events with status (pending/live/archived)
+- **Event Management**: Create, edit, and manage events with status (pending/live/archived),
+  from the Admin CP or from the front end by a coordinator with no Admin CP access
 - **Multi-day Events**: Support for events spanning multiple days
 - **Signup System**: One "Sign Up to Attend" flow with prerequisite validation
 - **Per-day Roles**: Troop some days and wrangle others in a single signup
 - **Wrangler Signups**: Non-costumed helpers can sign up without being full members
 - **Prerequisites**: TK ID, WWCC, mobile number, and emergency contact validation
 - **Costume Selection**: Select from user's profile costumes during signup
-- **Region Filtering**: Filter events by region (Sydney, Hunter, Canberra, Other)
-- **Calendar & List Views**: View events in calendar or list format
+- **Region Filtering**: Filter events by region. The region list is the board's own -
+  add, rename and delete regions in the Admin CP
+- **Calendar & List Views**: View events in calendar or list format, switched with one
+  button, and the board opens each member's index in whichever view they last used
 - **Attendance Sheets**: Generate print-friendly attendance sheets
 - **Troop Reports**: Automated troop report generation and posting
 - **Automated Reminders**: PM reminders for incomplete troop reports
 - **Print Layouts**: Every page prints as a document - no board chrome, a compact masthead,
   and an attendance sheet built for a clipboard
 - **iCal Export**: Export events to calendar applications
-- **Thread Integration**: Link events to forum threads
+- **Forum Announcements**: Every live event gets a generated thread in the forums, in the
+  forum configured for its region, rewritten whenever the event changes
 - **Board Navigation**: Takes over MyBB's Calendar menu item, and only shows the Events
   link to members who can open the events page
 
 ## Installation
 
 1. Upload all files to your MyBB installation maintaining the directory structure shown
-   under *File Structure* below (the front-end pages go at the web root)
+   under _File Structure_ below (the front-end pages go at the web root)
 2. Go to Admin CP → Plugins
 3. Find "Event Management" and click "Activate"
 4. Go to Admin CP → Event Management → Settings
 5. Configure the plugin settings:
+   - Set the event timezone (see _Event Timezone_ below)
    - Map custom profile fields (costume, TK ID, WWCC, mobile, emergency contact)
    - Set GEC user groups
-   - Set SCG Members and 501st Members group IDs
+   - Set Garrison Members and 501st Members group IDs
    - Set troop report forum ID
+   - Edit the regions, and set the forum each one's events are announced in. A default
+     forum covers the regions that have none of their own
    - Set the print logo (optional - defaults to the theme's own logo)
 
 ## Requirements
@@ -56,25 +63,146 @@ Before using the plugin, create the following custom profile fields in MyBB:
 
 The mobile and emergency contact fields should be configured as hidden fields (visible only to admins/GECs).
 
+## Event Timezone
+
+Every date the plugin holds - an event's start and end, the hours of each day, the signup
+cutoff, when a signup was made, when a troop report was posted - is a plain wall clock. It
+carries no offset, so **Event Timezone** (Admin CP → Event Management → Settings) is what
+gives those clocks their meaning, and the plugin uses it everywhere: entering a date,
+storing it, showing it back, deciding that a cutoff has passed, deciding that an event has
+finished and a troop report is due, and chasing that report with the weekly reminder PM.
+
+The server's own timezone is deliberately not used. A garrison's events happen where the
+garrison is, whatever timezone the forum happens to be hosted in, and a move between hosts
+must not walk every cutoff on the board an hour sideways. Set this to the zone the garrison
+runs in and it no longer matters what the host is set to.
+
+Daylight saving is handled by the zone rather than by an offset: pick `Australia/Sydney`,
+not "UTC+10". The offsets shown beside each zone in the dropdown are the ones in force
+right now, and a zone that observes daylight saving will read an hour out for half the
+year - the plugin follows the zone, not the label.
+
+A board starts on UTC and names its own zone here. A setting naming a zone this PHP build
+has never heard of falls back to UTC too, which is the one zone every build can resolve.
+
+The one place an absolute instant is written rather than a wall clock is the iCal feed
+(`ical.php`), which converts out of the event timezone into UTC so a member's calendar app
+shows the event at the right local time wherever they are.
+
+Changing the setting reinterprets the dates already stored rather than converting them: an
+event entered as 18:00 stays 18:00, now meaning 18:00 in the new zone. On a board that has
+been running in the wrong zone that is usually what is wanted, but a board whose events
+genuinely happened in the old one should expect the change to move them.
+
 ## Usage
 
 ### Creating Events
 
+Coordinators run events but are not board administrators, so an event can be built from
+either end. Both forms ask the same questions, validate the same way and write the same
+rows - `events_form.php` holds the reading, validating and saving, and the two pages only
+render it.
+
+**From the front end** (GECs and admins):
+
+1. Go to Events and click "Create Event"
+2. Fill in the event details (below)
+3. Click "Create Event" - it lands on the new event's page
+
+**From the Admin CP** (admins):
+
 1. Go to Admin CP → Event Management → Events
 2. Click "Add New Event"
-3. Fill in event details:
-   - Title, description, region
-   - Start and end dates
-   - Signup cutoff (optional)
-   - WWCC requirement
-   - GEC assignment
-   - Event days (for multi-day events)
-   - Excluded users (optional)
+3. Fill in the event details (below)
 4. Save event
+
+Either way the details are:
+
+- Title, description, region
+- Address (optional) - where the event happens. Wherever it is shown - the event page, the
+  events listing, the calendar and the announcement thread - it is a link to a Google Maps
+  search for it, opened in a new tab, and it is the `LOCATION` an attendee's downloaded
+  calendar entry carries. An event with no address simply shows none, and its calendar
+  entry falls back to naming the region
+- Start and end dates
+- Signup cutoff (optional - with none, signups stay open until the event ends)
+- WWCC requirement
+- GEC assignment - see below
+- Event days - the hours the event runs on each of its days. The rows follow the start
+  and end dates rather than being typed, and a single-day event has none at all
+- Excluded users (optional) - a tag field: type part of a username, pick the member from
+  the list it filters down, and they appear as a lozenge with an X to take them off again.
+  Only a member who exists can be added, and excluded members can see the event but cannot
+  sign up
+
+A new event starts as **Pending**, which is visible to coordinators only. Set it to Live
+when it is ready to take signups.
+
+### Regions
+
+A region is the label an event is filed under: the events listing filters by it, and an
+event's announcement thread goes to that region's forum. The list lives in Admin CP →
+Event Management → Settings, one row per region, and ships as Sydney, Hunter, Canberra
+and Other for a board that does not change it.
+
+- **Renaming** one is a matter of editing its box and saving the page. Every event filed
+  under it comes with it, and so does its announcement forum.
+- **Adding** one is the Add Region button. It can be used on an event the moment it
+  exists; its announcement forum is set on its row afterwards.
+- **Deleting** one is the × at the end of its row. If any events are filed under it, the
+  confirmation asks which region they should move to and moves them - the plugin will not
+  leave an event filed under a region that no longer exists, because such an event is
+  invisible to the region filter and cannot be saved from the event form. The board
+  always keeps at least one region.
+
+A region name cannot contain a comma or an equals sign, and is at most 64 characters.
+
+### Who Can Be Assigned as Coordinator
+
+The Coordinator dropdown is not the whole membership. It is drawn from the groups named in
+**Event Coordinator User Groups** (Admin CP → Event Management → Settings), matching either
+a member's primary group or any of their additional ones, and listed alphabetically. The
+same setting is what grants the right to coordinate in the first place, so the list and the
+permission cannot drift apart.
+
+Two people are always on the list whether or not they are in those groups: whoever is
+filling the form in, who can take the event on themselves, and the event's existing
+coordinator - editing an event is not the place to be told its coordinator is no longer
+valid. Neither shortcut widens the list for anybody else, and an event handed to somebody
+outside the groups is rejected as a forged post rather than saved.
+
+With no groups configured, the only choice offered is the person creating the event.
+
+### Announcement Threads
+
+Going live posts the event to the forums. The thread is generated from the event - dates,
+region, address, coordinator, signup cutoff, WWCC requirement, the day-by-day schedule,
+the description and a link back to the event page - so there is nothing to write and
+nothing to keep in step by hand. Members discuss the event in the replies.
+
+Which forum it lands in follows the event's region: Admin CP → Event Management → Settings
+holds one forum per region plus a **Default Event Forum** for the regions that have none
+of their own. A region with neither is not announced, and the coordinator is told so when
+they save.
+
+Editing an event rewrites the opening post rather than posting a second thread, and
+correcting a region moves the thread to that region's forum - unless a moderator has
+already filed it somewhere else, in which case it is left where they put it. Deleting the
+thread makes the next save write a fresh one. Pending events are not announced, and an
+archived event keeps its thread.
+
+### Editing an Event
+
+The same form edits. From the front end it is "Edit Event" under Coordinator Controls on
+the event page (`manage_event.php?id=N`); from the Admin CP it is the Edit action on the
+event list. A coordinator can change anything about an event including its status, so
+taking an event live, correcting a date or adding a day never needs Admin CP access.
+
+Deleting an event stays in the Admin CP.
 
 ### Signup Process
 
-There is one way in. Members sign up to *attend*, and choose how they are attending as part
+There is one way in. Members sign up to _attend_, and choose how they are attending as part
 of the same flow.
 
 1. Users browse events on the Events page
@@ -100,11 +228,11 @@ ends, so a late signup can still be recorded.
 A multi-day event's attendance sheet carries a **Days** column saying when each person
 intends to turn up. It reads the way a coordinator would say it out loud:
 
-| Signup | Days column |
-|---|---|
-| One day of three | Saturday |
-| Two days of three | Saturday, Sunday (as bullets) |
-| Every day, one role | All Days |
+| Signup                              | Days column                             |
+| ----------------------------------- | --------------------------------------- |
+| One day of three                    | Saturday                                |
+| Two days of three                   | Saturday, Sunday (as bullets)           |
+| Every day, one role                 | All Days                                |
 | Trooping Saturday, wrangling Sunday | Saturday (Trooping), Sunday (Wrangling) |
 
 Filtering the sheet to one day answers with that day rather than reciting the rest of the
@@ -136,8 +264,13 @@ on the Sunday. That is stored as two rows in the signup table - one per role, ea
 own days - which is why the table is keyed on `(event_id, user_id, role)`. A member holding
 both roles counts once in each of the trooper and wrangler totals.
 
-Two sessions on the same date (a morning and an afternoon) are two event days, so a member
-who can only make the morning drops the afternoon the same way they would drop a whole day.
+The days are a calendar of the event: one per date between its start and end. The event
+form derives them rather than asking for them, so a day cannot name a date the event does
+not cover, and an event inside a single date has no days at all - which is what the signup
+wizard reads as a one-day event and asks one question about instead of one per day.
+
+That does mean two sessions on the same date - a morning and an afternoon - are one event
+day rather than two, and a member who can only make the morning signs up for the day.
 
 Wranglers appear in their own section of the troop report, in the coordinator RSVP list and
 on the attendance sheet, and are counted separately from troopers everywhere a signup count
@@ -184,7 +317,7 @@ is both exact and safe to say. It leans on CSS `:has()` for the ancestor half; a
 without it throws the rule out and prints what it always printed.
 
 The masthead itself is markup - `{$events_print_header}`, built by `events_print_header()`
-and hidden on screen - because it has to live *inside* that wrapper to survive.
+and hidden on screen - because it has to live _inside_ that wrapper to survive.
 
 The logo comes from the **Print Logo** setting, which takes a URL or a path relative to the
 board root. It falls back to `$theme['logo']`, MyBB's own place for a theme's logo, so a
@@ -203,8 +336,8 @@ only a printout ever shows.
 GECs can manage events and RSVPs directly from the event page (no Admin CP access required):
 
 1. **Viewing RSVPs**:
-   - Navigate to an event you're managing
-   - Click "View RSVPs" in the Coordinator Controls section
+   - Navigate to an event - the signup list sits on the event page itself, under the
+     description, and is visible to everybody who can see the event
    - Filter by costume or day as needed
 
 2. **Attendance Sheets**:
@@ -213,8 +346,10 @@ GECs can manage events and RSVPs directly from the event page (no Admin CP acces
    - Use browser print function (Ctrl+P / Cmd+P) to print or save as PDF
 
 3. **Event Management**:
-   - Admins can create/edit events in Admin CP → Event Management → Events
-   - GECs assigned to events can view and manage RSVPs from the event page
+   - Create an event from the "Create Event" button on the events listing
+   - Edit one, including its status, from "Edit Event" in the Coordinator Controls
+   - Admins can do the same in Admin CP → Event Management → Events, which additionally
+     deletes events
 
 ### Troop Reports
 
@@ -222,13 +357,14 @@ GECs can manage events and RSVPs directly from the event page (no Admin CP acces
 2. Go to the event page and click "Create Troop Report"
 3. Edit the draft report
 4. Post to the designated forum
-5. The plugin automatically comments on the event thread and archives the event
+5. The plugin automatically comments on the event's announcement thread and archives the event
 
 ## File Structure
 
 ```
 /events.php                       # Events index (list and calendar views)
-/event.php                        # Single event, coordinator RSVP list, attendance sheet
+/event.php                        # Single event with its signup list, attendance sheet
+/manage_event.php                 # Event create / edit form for coordinators
 /rsvp.php                         # Signup wizard (also the edit form)
 /troop_report.php                 # Troop report drafting and posting
 /ical.php                         # iCal export
@@ -241,7 +377,9 @@ GECs can manage events and RSVPs directly from the event page (no Admin CP acces
   /events/
     /inc/
       events_functions.php        # Core helper functions
+      events_form.php             # Reading, validating and saving an event
       events_render.php           # Shared HTML building helpers
+      events_thread.php           # Generating and maintaining event announcement threads
       events_hooks.php            # Hook callbacks and the reminder job
       events_install.php          # Database installation
       events_templates.php        # Template installation
@@ -252,15 +390,23 @@ GECs can manage events and RSVPs directly from the event page (no Admin CP acces
       events_admin_events.php     # Event CRUD
       events_admin_rsvps.php      # RSVP review
       events_admin_settings.php   # Plugin settings
+      events_admin_regions.php    # The region list: renames, additions and deletions
     /templates/                   # Synced into MyBB's templates table on activate
       events_list.html
       events_calendar.html
       events_event.html
+      events_event_form.html
       events_rsvp_form.html
       events_rsvp_success.html
       events_rsvp_list.html
       events_attendance.html
       events_troop_report.html
+
+/jscripts/events/                 # Assets the Admin CP and the front end share
+  events-datepicker.css
+  events-tags.css
+  events-admin.css                # The Admin CP's own controls, which load no theme
+  jquery-ui-datepicker.js
 
 /admin/modules/events/
   module_meta.php                 # Admin CP menu registration
@@ -287,16 +433,19 @@ A theme retints all of it by declaring the accent custom properties once:
 
 ```css
 :root {
-    --events-accent: #1090d0;
-    --events-accent-border: #1090d0;
-    --events-accent-soft: rgba(16, 144, 208, 0.18);  /* the focus ring */
+  --events-accent: #1090d0;
+  --events-accent-border: #1090d0;
+  --events-accent-soft: rgba(16, 144, 208, 0.18); /* the focus ring */
 }
 ```
 
 and restyles individual controls with rules written under `.events_page_wrap`:
 
 ```css
-.events_page_wrap .events_input { border-radius: 3px; border-color: #ccc; }
+.events_page_wrap .events_input {
+  border-radius: 3px;
+  border-color: #ccc;
+}
 ```
 
 The wrapper is needed because this stylesheet is installed last in the display order, so an
@@ -327,11 +476,18 @@ All tables use the `mybb_event_plugin_` prefix:
 - `event_plugin_rsvp_days` - Which days user is attending
 - `event_plugin_rsvp_costumes` - Costumes per RSVP
 - `event_plugin_troop_reports` - Troop report tracking
+- `event_plugin_user_prefs` - Per-member preferences; currently which view the events
+  index opens in. A member with no row gets the default, so it only holds people who have
+  actually used the toggle
 
 ## Permissions
 
-- **GEC (Garrison Event Coordinator)**: Can view and manage RSVPs for assigned events from the event page, generate attendance sheets (no Admin CP access required)
-- **Admin**: Full access to all features including Admin CP event management
+- **GEC (Garrison Event Coordinator)**: Can create and edit events, view and manage RSVPs
+  for assigned events from the event page, and generate attendance sheets - all without
+  Admin CP access. Editing covers an event's status, so a coordinator takes their own
+  event live
+- **Admin**: Full access to all features, including the Admin CP event module, which is
+  additionally the only place an event can be deleted
 - **Users**: Can view live events, sign up to attend (trooping and/or wrangling), update
   their own signup while signups are open, create troop reports
 - **Wranglers**: No membership or TK ID required; may sign up to any event they can see, but
@@ -348,4 +504,4 @@ For issues or questions, please contact the plugin maintainer.
 
 ## License
 
-This plugin is developed for the 501st SCG garrison.
+This plugin is developed for use by 501st Legion garrisons and outposts. If you have a different use case in mind, please open an issue and we'll be happy to discuss!

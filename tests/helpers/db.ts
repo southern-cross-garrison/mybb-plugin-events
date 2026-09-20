@@ -45,8 +45,8 @@ export interface Fixtures {
   password: string;
   profileFields: Record<string, number>;
   costumeOptions: string[];
-  groups: { gec: number; scg: number; legion: number };
-  forums: { general: number; troop_reports: number };
+  groups: { gec: number; garrison: number; legion: number };
+  forums: { general: number; troop_reports: number; events: number; events_hunter: number };
   users: Record<string, number>;
 }
 
@@ -83,6 +83,7 @@ const PLUGIN_TABLES = [
   'event_plugin_event_exclusions',
   'event_plugin_troop_reports',
   'event_plugin_events',
+  'event_plugin_user_prefs',
 ];
 
 const USERFIELDS_BACKUP = `${TABLE_PREFIX}userfields_e2e_backup`;
@@ -121,7 +122,11 @@ export interface EventInput {
   title: string;
   description?: string;
   status?: 'pending' | 'live' | 'archived';
-  region?: 'Sydney' | 'Hunter' | 'Canberra' | 'Other';
+  // A plain string rather than a union of the four the plugin ships with: the region
+  // list is editable from the Admin CP, so a test is free to invent one.
+  region?: string;
+  /** Where the event happens; rendered as a Google Maps link wherever it is shown. */
+  address?: string;
   /** MySQL datetime, or an offset from TEST_NOW. */
   start?: string | { days?: number; hours?: number };
   end?: string | { days?: number; hours?: number };
@@ -154,14 +159,15 @@ export async function createEvent(input: EventInput): Promise<number> {
 
   const result = await execute(
     `INSERT INTO ${T('event_plugin_events')}
-       (title, description, status, region, start_date, end_date, signup_cutoff,
+       (title, description, status, region, address, start_date, end_date, signup_cutoff,
         requires_wwcc, gec_user_id, created_by, thread_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.title,
       input.description ?? `${input.title} description`,
       input.status ?? 'live',
       input.region ?? 'Sydney',
+      input.address ?? '',
       start,
       end,
       cutoff,
@@ -308,6 +314,25 @@ export async function setUserField(username: string, field: string, value: strin
   }
 }
 
+/**
+ * Put a user in a set of additional usergroups, and hand back a function that restores
+ * the groups they had before.
+ *
+ * Group membership is provisioned board state rather than plugin data, so it survives
+ * resetPluginData() between tests - a test that moves somebody has to move them back.
+ */
+export async function setAdditionalGroups(username: string, gids: number[]): Promise<() => Promise<void>> {
+  const userId = uid(username);
+  const before = await queryOne<RowDataPacket>(`SELECT additionalgroups FROM ${T('users')} WHERE uid = ?`, [userId]);
+  const original = String(before?.additionalgroups ?? '');
+
+  await execute(`UPDATE ${T('users')} SET additionalgroups = ? WHERE uid = ?`, [gids.join(','), userId]);
+
+  return async () => {
+    await execute(`UPDATE ${T('users')} SET additionalgroups = ? WHERE uid = ?`, [original, userId]);
+  };
+}
+
 export async function getUserField(username: string, field: string): Promise<string> {
   const fid = fixtures().profileFields[field];
   const row = await queryOne<RowDataPacket>(`SELECT fid${fid} AS value FROM ${T('userfields')} WHERE ufid = ?`, [
@@ -340,6 +365,36 @@ export async function createThread(subject: string, forumId: number, authorUsern
     [forumId, subject, uid(authorUsername), authorUsername, authorUsername, uid(authorUsername)],
   );
   return result.insertId;
+}
+
+export async function getThread(threadId: number): Promise<RowDataPacket> {
+  const row = await queryOne<RowDataPacket>(`SELECT * FROM ${T('threads')} WHERE tid = ?`, [threadId]);
+  if (!row) throw new Error(`Thread ${threadId} not found`);
+  return row;
+}
+
+/** The body of a thread's opening post - what the plugin writes when it announces an event. */
+export async function getThreadFirstPost(threadId: number): Promise<RowDataPacket> {
+  const row = await queryOne<RowDataPacket>(
+    `SELECT p.* FROM ${T('posts')} p
+     INNER JOIN ${T('threads')} t ON t.firstpost = p.pid
+     WHERE t.tid = ?`,
+    [threadId],
+  );
+  if (!row) throw new Error(`Thread ${threadId} has no first post`);
+  return row;
+}
+
+/**
+ * The newest thread id on the board.
+ *
+ * Threads outlive a test - resetPluginData() only truncates what the plugin owns - so
+ * "nothing was posted" is asserted as "no thread appeared after this point" rather than
+ * by counting subjects, which a leftover from an earlier run would answer wrongly.
+ */
+export async function maxThreadId(): Promise<number> {
+  const row = await queryOne<RowDataPacket>(`SELECT COALESCE(MAX(tid), 0) AS tid FROM ${T('threads')}`);
+  return Number(row?.tid ?? 0);
 }
 
 export async function countPostsInThread(threadId: number): Promise<number> {

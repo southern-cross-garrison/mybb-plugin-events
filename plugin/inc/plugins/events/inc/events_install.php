@@ -20,7 +20,8 @@ function events_install_database()
         `title` varchar(255) NOT NULL,
         `description` text,
         `status` enum('pending','live','archived') NOT NULL DEFAULT 'pending',
-        `region` enum('Sydney','Hunter','Canberra','Other') NOT NULL,
+        `region` varchar(64) NOT NULL,
+        `address` varchar(255) NOT NULL DEFAULT '',
         `start_date` datetime NOT NULL,
         `end_date` datetime NOT NULL,
         `signup_cutoff` datetime DEFAULT NULL,
@@ -105,6 +106,32 @@ function events_install_database()
         UNIQUE KEY `event_id` (`event_id`),
         KEY `thread_id` (`thread_id`)
     ) ENGINE=MyISAM DEFAULT CHARSET=utf8;");
+
+    // Per-member preferences table
+    events_create_user_prefs_table();
+}
+
+/**
+ * Per-member preferences for the events pages.
+ *
+ * Its own table rather than a column on `users`: the plugin drops what it owns on
+ * uninstall, and a board that removes it should not be left carrying a stray column on
+ * the busiest table MyBB has. One row per member, written only once they have actually
+ * expressed a preference - the absent row is the default, so the table stays empty for
+ * everybody who never touches the view toggle.
+ *
+ * Shared by install and upgrade, because a board that already has the plugin only ever
+ * runs the latter.
+ */
+function events_create_user_prefs_table()
+{
+    global $db;
+
+    $db->write_query("CREATE TABLE IF NOT EXISTS `" . TABLE_PREFIX . "event_plugin_user_prefs` (
+        `user_id` int(11) NOT NULL,
+        `events_view` enum('list','calendar') NOT NULL DEFAULT 'list',
+        PRIMARY KEY (`user_id`)
+    ) ENGINE=MyISAM DEFAULT CHARSET=utf8;");
 }
 
 /**
@@ -150,5 +177,32 @@ function events_upgrade_database()
     {
         $db->write_query("ALTER TABLE `" . TABLE_PREFIX . "event_plugin_rsvps`
             ADD UNIQUE KEY `event_user_role` (`event_id`, `user_id`, `role`)");
+    }
+
+    // The events page opens in whichever view the member last used.
+    events_create_user_prefs_table();
+
+    // 1.4 - regions are the board's to configure, so the column can no longer be an
+    // enum of the four the plugin shipped with: MySQL silently coerces a value outside
+    // an enum to '' under a non-strict mode and rejects it under a strict one, so a
+    // board that added a region would either lose it or fail to save the event at all.
+    // Guarded on the current type rather than on a version number, because MyBB gives a
+    // plugin nowhere to record which migrations it has run.
+    $column = $db->fetch_array($db->write_query(
+        "SHOW COLUMNS FROM `" . TABLE_PREFIX . "event_plugin_events` LIKE 'region'"
+    ));
+    if($column && stripos($column['Type'], 'enum') === 0)
+    {
+        $db->write_query("ALTER TABLE `" . TABLE_PREFIX . "event_plugin_events`
+            MODIFY `region` varchar(64) NOT NULL");
+    }
+
+    // 1.3 - an event carries the address it happens at, which the pages and the
+    // announcement thread turn into a map link. Empty string rather than NULL: it is only
+    // ever read as text, and a nullable column would mean every reader guarding for it.
+    if(!$db->field_exists('address', 'event_plugin_events'))
+    {
+        $db->write_query("ALTER TABLE `" . TABLE_PREFIX . "event_plugin_events`
+            ADD `address` varchar(255) NOT NULL DEFAULT '' AFTER `region`");
     }
 }

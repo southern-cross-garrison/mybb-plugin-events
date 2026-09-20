@@ -12,14 +12,62 @@ if(!defined("IN_MYBB"))
     die("Direct initialization of this file is not allowed.");
 }
 
-define('EVENTS_REGIONS', 'Sydney,Hunter,Canberra,Other');
+// events_regions() reads a setting, and this file is included on pages that have not
+// necessarily pulled the core helpers in themselves.
+require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 
 /**
- * @return array
+ * The region list a board starts with, and what it falls back to if the setting is
+ * ever emptied. A region is only a label the board sorts its events by, so the list is
+ * configurable (Admin CP -> Event Management -> Settings) rather than the plugin's to
+ * decide - a garrison in one state wants one entry, not four states it does not run.
+ */
+define('EVENTS_DEFAULT_REGIONS', 'Sydney,Hunter,Canberra,Other');
+
+/**
+ * The board's regions, in the order the Admin CP has them.
+ *
+ * @return array of string
  */
 function events_regions()
 {
-    return explode(',', EVENTS_REGIONS);
+    return events_parse_regions(events_get_setting('regions'));
+}
+
+/**
+ * Split the stored region list into names.
+ *
+ * Stored as one comma separated setting rather than a table of its own: it is a handful
+ * of labels that only ever get read as a list, and a table would mean an id on every
+ * event and a join on every page that shows one.
+ *
+ * An empty list falls back to the default rather than leaving the board with no regions
+ * at all, which would fail validation on every event form and make the plugin unusable
+ * until somebody noticed the setting.
+ *
+ * @param string $stored
+ * @return array of string
+ */
+function events_parse_regions($stored)
+{
+    $regions = array();
+
+    foreach(explode(',', (string)$stored) as $region)
+    {
+        $region = trim($region);
+
+        if($region !== '' && !in_array($region, $regions, true))
+        {
+            $regions[] = $region;
+        }
+    }
+
+    if(!$regions)
+    {
+        $regions = explode(',', EVENTS_DEFAULT_REGIONS);
+    }
+
+    return $regions;
 }
 
 /**
@@ -38,6 +86,89 @@ function events_region_options($selected)
     }
 
     return $html;
+}
+
+/**
+ * The control that swaps the events index between its list and its calendar.
+ *
+ * One button naming where it goes, rather than a pair of links naming both views and
+ * marking one as current: which view you are looking at is obvious from the page itself,
+ * so the second link only ever said "you are already here".
+ *
+ * A submit button in a one-line GET form rather than an anchor, for the same reason the
+ * Create Event control beside it is - see the note on it in events.php.
+ *
+ * The region filter travels across the toggle; the month deliberately does not, because
+ * the list has nothing to do with it and the calendar opens on the current month.
+ *
+ * @param string $view The view being shown
+ * @param string $region_filter Current region filter, or '' for all regions
+ * @return string
+ */
+function events_view_toggle($view, $region_filter = '')
+{
+    $target = events_other_view($view);
+    $label = $target === 'calendar' ? 'Calendar' : 'List';
+
+    $html = '<form method="get" action="events.php" class="events_filter_form">'
+          . '<input type="hidden" name="view" value="' . $target . '" />';
+
+    if($region_filter !== '')
+    {
+        $html .= '<input type="hidden" name="region" value="' . htmlspecialchars_uni($region_filter) . '" />';
+    }
+
+    return $html . '<input type="submit" class="button events_view_toggle" id="events_view_' . $target . '" value="' . $label . '" />'
+         . '</form>';
+}
+
+/**
+ * A Google Maps search for an event's address.
+ *
+ * A search rather than a pin: the address is typed by a coordinator, not picked off a map,
+ * so there is no place id or pair of coordinates to point at - and a search copes with
+ * "Sydney Showground, Olympic Park" in a way that a lookup demanding a full postal address
+ * would not. The Maps URL API is the documented, key-free entry point for exactly that.
+ *
+ * @param string $address
+ * @return string empty when the event has no address
+ */
+function events_map_url($address)
+{
+    $address = trim((string)$address);
+
+    if($address === '')
+    {
+        return '';
+    }
+
+    // rawurlencode, so a space becomes %20 rather than a '+' that Maps would show as part
+    // of the search text.
+    return 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($address);
+}
+
+/**
+ * An event's address as a link to the map, for the plugin's HTML pages.
+ *
+ * Opened in a new tab: the board is where the member is signing up, and sending them off
+ * to Maps in the same one loses the event page they were reading. rel goes with it - a
+ * target="_blank" link hands the opened page a window.opener on older browsers.
+ *
+ * @param string $address
+ * @param string $class Class on the anchor
+ * @return string empty when the event has no address
+ */
+function events_address_link($address, $class = 'events_address_link')
+{
+    $url = events_map_url($address);
+
+    if($url === '')
+    {
+        return '';
+    }
+
+    return '<a class="' . $class . '" href="' . htmlspecialchars_uni($url) . '"'
+         . ' target="_blank" rel="noopener noreferrer">' . htmlspecialchars_uni(trim((string)$address)) . '</a>';
 }
 
 /**
@@ -166,12 +297,12 @@ function events_print_header($title, array $meta = array(), $kind = '')
  */
 function events_day_label($day)
 {
-    $label = my_date('D j M Y', strtotime($day['date']), 0, 0);
+    $label = events_date('D j M Y', events_strtotime($day['date']));
 
     if(!empty($day['start_time']) && !empty($day['end_time']))
     {
-        $label .= ' (' . my_date('H:i', strtotime($day['date'] . ' ' . $day['start_time']), 0, 0)
-                . ' - ' . my_date('H:i', strtotime($day['date'] . ' ' . $day['end_time']), 0, 0) . ')';
+        $label .= ' (' . events_date('H:i', events_strtotime($day['date'] . ' ' . $day['start_time']))
+                . ' - ' . events_date('H:i', events_strtotime($day['date'] . ' ' . $day['end_time'])) . ')';
     }
 
     return $label;
@@ -185,7 +316,7 @@ function events_day_label($day)
  */
 function events_day_short_label($day)
 {
-    return my_date('j M', strtotime($day['date']), 0, 0);
+    return events_date('j M', events_strtotime($day['date']));
 }
 
 /**
@@ -198,26 +329,31 @@ function events_day_short_label($day)
  */
 function events_calendar_grid($month_start, array $events, array $user_rsvps)
 {
-    $month = (int)my_date('n', $month_start, 0, 0);
-    $year = (int)my_date('Y', $month_start, 0, 0);
-    $days_in_month = (int)date('t', $month_start);
+    $month = (int)events_date('n', $month_start);
+    $year = (int)events_date('Y', $month_start);
+    $days_in_month = (int)events_date('t', $month_start);
 
     // Bucket events by every date they span so multi-day events appear on each day.
+    //
+    // The cursor walks dates rather than timestamps, in UTC: a date has no hours to be
+    // moved by a daylight saving change, and stepping a midnight in a zone that has one
+    // skips or repeats a day of the calendar.
+    $utc = new DateTimeZone('UTC');
     $by_date = array();
     foreach($events as $event)
     {
-        $cursor = strtotime(my_date('Y-m-d', strtotime($event['start_date']), 0, 0));
-        $last = strtotime(my_date('Y-m-d', strtotime($event['end_date']), 0, 0));
+        $cursor = new DateTime(events_date('Y-m-d', events_strtotime($event['start_date'])), $utc);
+        $last = new DateTime(events_date('Y-m-d', events_strtotime($event['end_date'])), $utc);
         $guard = 0;
         while($cursor <= $last && $guard++ < 400)
         {
-            $by_date[date('Y-m-d', $cursor)][] = $event;
-            $cursor = strtotime('+1 day', $cursor);
+            $by_date[$cursor->format('Y-m-d')][] = $event;
+            $cursor->modify('+1 day');
         }
     }
 
     // Monday-first grid.
-    $lead = ((int)date('N', $month_start)) - 1;
+    $lead = ((int)events_date('N', $month_start)) - 1;
     $cells = array();
     for($i = 0; $i < $lead; $i++)
     {
@@ -236,6 +372,14 @@ function events_calendar_grid($month_start, array $events, array $user_rsvps)
                 $class = in_array($event['id'], $user_rsvps) ? 'calendar_event rsvped' : 'calendar_event';
                 $content .= '<a class="' . $class . '" data-event-id="' . (int)$event['id'] . '" href="event.php?id=' . (int)$event['id'] . '">'
                           . htmlspecialchars_uni($event['title']) . '</a>';
+
+                // The address sits under the event rather than inside its link, because a
+                // cell is small and one anchor cannot go to two places: tapping the event
+                // has to open the event, and tapping the address has to open the map.
+                if(isset($event['address']))
+                {
+                    $content .= events_address_link($event['address'], 'calendar_event_address');
+                }
             }
         }
 
@@ -374,12 +518,12 @@ function events_day_labels(array $event_days, array $day_ids, $style = 'full')
         }
 
         $label = ($style === 'weekday')
-            ? my_date('l', strtotime($day['date']), 0, 0)
+            ? events_date('l', events_strtotime($day['date']))
             : events_day_short_label($day);
 
         if($per_date[$day['date']] > 1 && !empty($day['start_time']))
         {
-            $label .= ' ' . my_date('H:i', strtotime($day['date'] . ' ' . $day['start_time']), 0, 0);
+            $label .= ' ' . events_date('H:i', events_strtotime($day['date'] . ' ' . $day['start_time']));
         }
 
         $labels[] = $label;
@@ -448,6 +592,146 @@ function events_attendance_day_items(array $event_days, array $role_days)
 }
 
 /**
+ * The script that keeps the attendance step's two questions from contradicting each other.
+ *
+ * "How are you attending?" and the per-day grid are two views of one answer, so the page
+ * moves them together: answering above sets every day, setting the days apart clears the
+ * answer above because no single chip describes them any more, and putting the days back
+ * into agreement re-selects the one they agree on. That is the same state the server
+ * renders from a POST, so the page and the next render always say the same thing.
+ *
+ * It is an enhancement rather than a requirement. With no script the leading answer still
+ * governs while the grid is closed, and the grid still speaks for itself while it is open
+ * - the two just stop updating each other as they are touched.
+ *
+ * Inline for the same reason the day grid's script is: the plugin deploys PHP, templates
+ * and a stylesheet, and a file would be a fourth thing to get onto the board.
+ *
+ * @return string
+ */
+function events_signup_days_script()
+{
+    return <<<'SCRIPT'
+<script type="text/javascript">
+(function() {
+	var days = document.getElementById('signup_days');
+	var toggle = document.getElementById('signup_per_day');
+	if(!days || !toggle) { return; }
+
+	var primary = document.querySelectorAll('input.signup_role_radio');
+	var rows = days.querySelectorAll('.signup_day');
+	if(!primary.length || !rows.length) { return; }
+
+	function selected(radios) {
+		for(var i = 0; i < radios.length; i++) {
+			if(radios[i].checked) { return radios[i].value; }
+		}
+		return '';
+	}
+
+	function rowRadios(row) {
+		return row.querySelectorAll('input.day_role_radio');
+	}
+
+	// The last answer the leading question held, so that closing the grid has something to
+	// fall back on: closing it says "the same thing every day", which needs an answer, and
+	// the member may well have cleared it by setting the days apart before changing their
+	// mind. Empty only when the page was opened on a signup that was already mixed.
+	var remembered = selected(primary);
+
+	function apply(value) {
+		for(var i = 0; i < rows.length; i++) {
+			var radios = rowRadios(rows[i]);
+			for(var j = 0; j < radios.length; j++) {
+				radios[j].checked = (radios[j].value === value);
+			}
+		}
+	}
+
+	function selectPrimary(value) {
+		for(var i = 0; i < primary.length; i++) {
+			primary[i].checked = (value !== '' && primary[i].value === value);
+		}
+	}
+
+	// Days that agree are that agreement stated twice, so it is shown above as well. Days
+	// that disagree have no answer above: "Not attending on Sunday" is not trooping the
+	// event, and leaving the chip lit would say it was.
+	function syncFromDays() {
+		var agreed = selected(rowRadios(rows[0]));
+		for(var i = 1; i < rows.length; i++) {
+			if(selected(rowRadios(rows[i])) !== agreed) { agreed = ''; break; }
+		}
+
+		// 'none' agreed on every day is not an answer to the question above either - it is
+		// a signup to nothing, which the server turns away.
+		selectPrimary(agreed);
+		if(selected(primary) !== '') { remembered = agreed; }
+	}
+
+	for(var i = 0; i < primary.length; i++) {
+		primary[i].addEventListener('change', function() {
+			if(!this.checked) { return; }
+			remembered = this.value;
+			apply(this.value);
+		});
+	}
+
+	days.addEventListener('change', function(event) {
+		var target = event.target;
+		if(target && target.classList && target.classList.contains('day_role_radio')) {
+			syncFromDays();
+		}
+	});
+
+	toggle.addEventListener('change', function() {
+		// Closing the grid hands the whole event back to the answer above, so the days are
+		// put back on it rather than left holding what they were last set to - the member
+		// is signed up to what the page is showing them.
+		if(this.checked || remembered === '') { return; }
+		selectPrimary(remembered);
+		apply(remembered);
+	});
+})();
+</script>
+SCRIPT;
+}
+
+/**
+ * One row of radio chips - the attendance step's way of asking a single question.
+ *
+ * The radio itself is left in the document at full size and painted out by the
+ * stylesheet rather than hidden, so the whole chip is the hit target while the control
+ * keeps its place in the tab order, its arrow-key behaviour and its accessible name.
+ * Hiding it would cost all three.
+ *
+ * @param string $name Input name, e.g. "day_role[7]"
+ * @param array $choices value => label, in display order; labels are plain text
+ * @param string $current The value to pre-select
+ * @param string $id_prefix Each chip's id is "$id_prefix_$value"
+ * @param string $class Class on each input, for the tests to select on
+ * @return string
+ */
+function events_signup_choices($name, array $choices, $current, $id_prefix, $class)
+{
+    $html = '<span class="signup_choices">';
+
+    foreach($choices as $value => $label)
+    {
+        $id = $id_prefix . '_' . $value;
+        $checked = ((string)$current === (string)$value) ? ' checked="checked"' : '';
+
+        $html .= '<label class="signup_choice">'
+               . '<input type="radio" id="' . $id . '" name="' . htmlspecialchars_uni($name) . '"'
+               . ' value="' . $value . '" class="' . $class . '"' . $checked . ' />'
+               . '<span class="signup_choice_text">' . htmlspecialchars_uni($label) . '</span>'
+               . '</label>';
+    }
+
+    return $html . '</span>';
+}
+
+/**
  * The "what you are signing up to" block shared by the confirmation step, the success
  * page and the coordinator-facing summaries.
  *
@@ -486,4 +770,117 @@ function events_signup_summary_html(array $event_days, array $role_days, $id_pre
     }
 
     return $html;
+}
+
+/**
+ * One field of a front-end form: its label, its control, and the hint under it.
+ *
+ * The plugin's forms are stacks rather than MyBB's .form_row, which lays the label, the
+ * control and the hint out on one line and leaves the control unstyled. The hint is wired
+ * to the control with aria-describedby so a screen reader reads it as part of the field
+ * rather than as loose text after it.
+ *
+ * @param string $id The control's id; the hint gets "hint_" + this
+ * @param string $label Plain text
+ * @param string $control Markup for the control itself
+ * @param string $hint Plain text, or empty for no hint
+ * @param bool $required Marks the label, for the eye only - the control carries its own
+ * @return string
+ */
+function events_form_field($id, $label, $control, $hint = '', $required = false)
+{
+    $html = '<div class="events_field">'
+          . '<label class="events_label" for="' . $id . '">' . htmlspecialchars_uni($label);
+
+    if($required)
+    {
+        $html .= '<span class="events_required">*</span>';
+    }
+
+    $html .= '</label>' . $control;
+
+    if($hint !== '')
+    {
+        $html .= '<span class="events_hint" id="hint_' . $id . '">' . htmlspecialchars_uni($hint) . '</span>';
+    }
+
+    return $html . '</div>';
+}
+
+/**
+ * A text input for a front-end form.
+ *
+ * @param string $name
+ * @param string $id
+ * @param string $value Raw; escaped here
+ * @param array $attributes Extra HTML attributes, e.g. array('required' => 'required')
+ * @param bool $described Whether a hint with the matching id exists to point at
+ * @return string
+ */
+function events_form_text($name, $id, $value, array $attributes = array(), $described = false)
+{
+    $html = '<input type="text" class="events_input" name="' . $name . '" id="' . $id . '"'
+          . ' value="' . htmlspecialchars_uni((string)$value) . '"';
+
+    if($described)
+    {
+        $html .= ' aria-describedby="hint_' . $id . '"';
+    }
+
+    foreach($attributes as $attribute => $attribute_value)
+    {
+        $html .= ' ' . $attribute . '="' . htmlspecialchars_uni((string)$attribute_value) . '"';
+    }
+
+    return $html . ' />';
+}
+
+/**
+ * A select box for a front-end form.
+ *
+ * @param string $name
+ * @param string $id
+ * @param array $options value => label
+ * @param string|int $selected
+ * @param bool $described
+ * @return string
+ */
+function events_form_select($name, $id, array $options, $selected, $described = false)
+{
+    $html = '<select class="events_select" name="' . $name . '" id="' . $id . '"'
+          . ($described ? ' aria-describedby="hint_' . $id . '"' : '') . '>';
+
+    foreach($options as $value => $label)
+    {
+        // Compared as strings: option keys arrive from the database as strings and are
+        // matched against ints as often as not, and PHP 8 no longer makes '' == 0 true.
+        $is_selected = ((string)$value === (string)$selected) ? ' selected="selected"' : '';
+        $html .= '<option value="' . htmlspecialchars_uni((string)$value) . '"' . $is_selected . '>'
+               . htmlspecialchars_uni((string)$label) . '</option>';
+    }
+
+    return $html . '</select>';
+}
+
+/**
+ * The error box a front-end form shows above itself after a failed submit.
+ *
+ * @param array $errors Plain-text messages
+ * @param string $id
+ * @return string empty when there is nothing to report
+ */
+function events_form_errors(array $errors, $id)
+{
+    if(empty($errors))
+    {
+        return '';
+    }
+
+    $html = '<div class="error" id="' . $id . '"><ul>';
+    foreach($errors as $error)
+    {
+        $html .= '<li>' . htmlspecialchars_uni($error) . '</li>';
+    }
+
+    return $html . '</ul></div>';
 }

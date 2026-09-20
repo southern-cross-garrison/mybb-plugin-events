@@ -1,0 +1,148 @@
+/**
+ * The event form's tag input - the excluded members field.
+ *
+ * Styled here rather than in events.css for the same reason the calendar is: the control
+ * is built by events_tag_field_script(), which runs on the front-end form and the Admin CP
+ * one alike, and the Admin CP loads no theme stylesheet - so a field styled only in
+ * events.css would be a row of unstyled spans there. One sheet, both roots.
+ *
+ * Colours come from the same custom properties the plugin's other controls use, so a theme
+ * that sets --events-accent retints the lozenges with everything else and does not have to
+ * know this field exists. The fallbacks are what an unthemed board gets, and the borders
+ * match .events_input so the box reads as the text field it replaces.
+ *
+ * Nothing here styles the field as the server renders it: with no script the box is a
+ * plain text input wearing whichever form's class it was given, and none of these classes
+ * are on the page at all.
+ */
+.events_tag_field {
+	/* The menu is absolutely positioned against this, so it opens under the box rather
+	   than wherever the nearest positioned ancestor of the theme happens to be. */
+	position: relative;
+}
+
+/* The box itself: a text field that happens to be full of lozenges. It is sized and
+   bordered like .events_input, because to anyone filling the form in it is that field. */
+.events_tags {
+	font: inherit;
+	font-weight: normal;
+	line-height: 1.4;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	box-sizing: border-box;
+	width: 100%;
+	padding: 6px 8px;
+	color: #333;
+	background-color: #fff;
+	border: 1px solid #bcbcbc;
+	border-radius: 4px;
+	cursor: text;
+}
+.events_tags:focus-within {
+	border-color: var(--events-accent, #2f6f9f);
+	box-shadow: 0 0 0 3px var(--events-accent-soft, rgba(47, 111, 159, 0.18));
+}
+
+.events_tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	max-width: 100%;
+	padding: 3px 4px 3px 10px;
+	font-size: 0.9em;
+	color: #fff;
+	background: var(--events-accent, #2f6f9f);
+	border-radius: 999px;
+}
+/* A username long enough to fill the box is cut rather than allowed to widen it, since a
+   lozenge that wraps mid-name reads as two members. */
+.events_tag_name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.events_tag_remove {
+	font: inherit;
+	line-height: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	margin: 0;
+	color: inherit;
+	background: rgba(255, 255, 255, 0.2);
+	border: 0;
+	border-radius: 50%;
+	cursor: pointer;
+}
+.events_tag_remove:hover,
+.events_tag_remove:focus {
+	background: rgba(255, 255, 255, 0.4);
+	outline: none;
+}
+
+/* The part that is typed in. It has no furniture of its own - the box around it is the
+   control - and it grows to fill whatever room the lozenges have left on the line. */
+.events_tag_entry {
+	font: inherit;
+	font-weight: normal;
+	flex: 1 1 8em;
+	min-width: 8em;
+	padding: 4px 2px;
+	color: inherit;
+	background: transparent;
+	border: 0;
+	outline: none;
+	box-shadow: none;
+}
+
+.events_tag_menu {
+	position: absolute;
+	top: 100%;
+	left: 0;
+	right: 0;
+	/* Above MyBB's own furniture, for the same reason the calendar is: the Admin CP's
+	   sticky panels and the board's header both sit in the low hundreds, and a list of
+	   members hidden behind one reads as a field that does not search. */
+	z-index: 9999;
+	max-height: 15em;
+	margin: 4px 0 0;
+	padding: 4px;
+	overflow-y: auto;
+	list-style: none;
+	color: #333;
+	background: #fff;
+	border: 1px solid #bcbcbc;
+	border-radius: 6px;
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16);
+}
+/* The menu is closed with the hidden attribute, which display: block above would
+   otherwise quietly override. */
+.events_tag_menu[hidden] { display: none; }
+
+.events_tag_option {
+	padding: 7px 10px;
+	border-radius: 4px;
+	cursor: pointer;
+}
+/* One highlight for both the keyboard and the mouse: hovering an option moves the
+   highlight to it, so there is never a second one to keep track of. */
+.events_tag_option_active {
+	color: #fff;
+	background: var(--events-accent, #2f6f9f);
+}
+
+/* Why nothing was added - a name that matched nobody, or one already on the list. It sits
+   where a hint would and reads as one. */
+.events_tag_note {
+	margin: 7px 0 0;
+	font-size: 0.9em;
+	line-height: 1.4;
+	opacity: 0.8;
+}
+.events_tag_note[hidden] { display: none; }

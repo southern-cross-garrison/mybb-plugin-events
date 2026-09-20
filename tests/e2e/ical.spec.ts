@@ -32,6 +32,24 @@ test.describe('iCal export', () => {
     expect(body).toContain(`URL:http://localhost:8080/event.php?id=${eventId}`);
   });
 
+  test('exports the address as the location, and the region when there is none', async ({ page }) => {
+    // LOCATION is what a calendar app's maps button reads, so the address wins where the
+    // event has one. The test above covers the other half: an addressless event still
+    // exports its region rather than nothing at all.
+    const eventId = await createEvent({
+      title: 'Located Export Troop',
+      region: 'Hunter',
+      address: '1 Showground Rd, Sydney Olympic Park NSW 2127',
+    });
+
+    await loginAs(page, 'trooper1');
+    const body = await (await page.request.get(`/ical.php?id=${eventId}`)).text();
+
+    // Commas are escaped, because an unescaped one would split the property value.
+    expect(body).toContain(String.raw`LOCATION:1 Showground Rd\, Sydney Olympic Park NSW 2127`);
+    expect(body).not.toContain('LOCATION:Hunter');
+  });
+
   test('emits one VEVENT per configured day', async ({ page }) => {
     const eventId = await createEvent({
       title: 'Weekend Export Troop',
