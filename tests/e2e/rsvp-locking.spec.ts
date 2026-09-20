@@ -177,7 +177,7 @@ test.describe('RSVP locking as the clock moves', () => {
 
     await loginAs(page, 'excluded');
     expect(await lockReasonOnEventPage(page, eventId)).toBe('excluded');
-    await expect(page.locator('#event_title')).toContainText('Exclusive Troop');
+    await expect(page).toHaveTitle(/^Exclusive Troop - /);
 
     await page.goto(`/rsvp.php?id=${eventId}`);
     await expect(page.locator('body')).toContainText('You have been excluded');

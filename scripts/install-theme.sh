@@ -15,6 +15,19 @@ if [ -d "$THEME_DIR/images" ]; then
     cp -R "$THEME_DIR/images/." "$FORUM_DIR/images/"
 fi
 
+# Bootstrap and Font Awesome are vendored in the theme rather than linked from a CDN, and
+# its templates reference them under the board's own document root. The XML import does not
+# carry them: a board with the templates but not these files loses Bootstrap's JavaScript
+# entirely, and every data-bs-* control on it - the username dropdown, the mobile navbar
+# toggle, the search collapse - goes quietly dead. The tree is wholly theme-owned, so it is
+# replaced rather than merged, and a version bump leaves nothing behind.
+if [ -d "$THEME_DIR/vendor" ]; then
+    rm -rf "$FORUM_DIR/vendor"
+    mkdir -p "$FORUM_DIR/vendor"
+    cp -R "$THEME_DIR/vendor/." "$FORUM_DIR/vendor/"
+    rm -f "$FORUM_DIR/vendor/README.md"
+fi
+
 # Only test-forum/ is mounted into the web container, and the PHP importer is piped in on
 # stdin, so the XML has to be handed over through the document root.
 STAGED="$FORUM_DIR/_theme-import.xml"

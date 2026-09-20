@@ -40,8 +40,10 @@ npx playwright test --headed --debug -g "cutoff"
 
 `plugin/` is the source of truth. Nothing is edited directly inside `test-forum/`.
 
-Changing a template, or anything in `events_install()` / `events_activate()`, needs the
-plugin re-activated and the baseline snapshot refreshed:
+Changing a template, the stylesheet, or anything in `events_install()` /
+`events_activate()`, needs the plugin re-activated and the baseline snapshot refreshed.
+Templates and CSS are files in the repo but live in the database at runtime, so a plain
+`deploy.sh` is not enough on its own:
 
 ```bash
 ./scripts/deploy.sh
@@ -83,6 +85,37 @@ presumably sit on the production server un-committed - worth adding to the theme
 
 The plugin's own templates are unaffected by any of this: they live in the master template
 set (`sid = -2`), which every theme falls back to, so the theme import never touches them.
+
+## How the plugin gets skinned
+
+The plugin's pages are built from MyBB's own table vocabulary - `.tborder`, `.thead`,
+`.tcat`, `.trow1`, `.trow2`, with `.button` on submit inputs - which is what MyBB's stock
+templates use and what every theme is expected to style. Nothing about the markup is
+plugin-specific, so a theme skins the plugin by skinning MyBB.
+
+Its component styles - the signup dots, the action buttons and the status pills - live in
+[events.css](plugin/inc/plugins/events/stylesheets/events.css), installed on the master
+theme (`tid = 1`) as a genuine theme stylesheet attached to the plugin's four pages. Every
+theme inherits it and can override it by editing its own copy under ACP > Templates &
+Style, exactly like the board's other plugin stylesheets. Nothing is inlined into the
+templates, so a theme never has to fight a `<style>` block to restyle the plugin.
+
+Accent colours are the one thing a theme usually wants to change, so they are read as
+`var(--events-accent, ...)` with the fallback written at each use site. A theme retints
+every button, pill and signup dot with one declaration:
+
+```css
+:root { --events-accent: #1090d0; --events-accent-border: #1090d0; }
+```
+
+The fallbacks are deliberately *not* defaults in a `:root` block inside `events.css`. That
+stylesheet is installed last in the display order, so a `:root` block there would
+out-order the theme's own and the override would silently never apply.
+
+The garrison's theme had dropped MyBB's table classes on the way to Bootstrap, which is
+why the plugin's pages first rendered as bare text on it.
+[mybb-custom-theme PR #2](https://github.com/southern-cross-garrison/mybb-custom-theme/pull/2)
+puts them back and sets the accent; `THEME_REF` points at that branch until it merges.
 
 [theme]: https://github.com/southern-cross-garrison/mybb-custom-theme
 

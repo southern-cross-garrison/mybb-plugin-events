@@ -20,8 +20,11 @@ BASE_URL="${BASE_URL:-http://localhost:${WEB_PORT}}"
 
 # The forum's custom theme, imported by scripts/install-theme.sh. Pinned to a commit so
 # the provisioned database snapshot is reproducible; override in .env to track a branch.
+#
+# Currently pinned to the branch behind mybb-custom-theme PR #2, which gives the theme the
+# MyBB table classes the plugin's pages are built from. Repoint at main once it merges.
 THEME_REPO="${THEME_REPO:-https://github.com/southern-cross-garrison/mybb-custom-theme.git}"
-THEME_REF="${THEME_REF:-4314a0233192125183664abac5ab05dfbb9f97e7}"
+THEME_REF="${THEME_REF:-3d3e9694be1cadadf424a8c7937f0cbd69beb8d6}"
 THEME_XML="${THEME_XML:-SCG-Responsive.xml}"
 
 FORUM_DIR="$REPO_ROOT/test-forum"

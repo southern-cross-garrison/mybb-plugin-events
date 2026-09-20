@@ -134,7 +134,7 @@ test.describe('events listing', () => {
     await page.goto('/events.php');
     await page.locator(`tr[data-event-id="${eventId}"] .event_link`).click();
 
-    await expect(page.locator('#event_title')).toHaveText('Clickable Troop');
+    await expect(page).toHaveTitle(/^Clickable Troop - /);
     await expect(page.locator('#event_page')).toHaveAttribute('data-event-id', String(eventId));
   });
 });

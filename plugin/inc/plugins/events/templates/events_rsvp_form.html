@@ -5,7 +5,7 @@
 </head>
 <body>
 {$header}
-<div id="rsvp_page" data-event-id="{$event_id}" data-rsvp-step="{$rsvp_step}" data-rsvp-role="{$role}">
+<div id="rsvp_page" class="events_page_wrap" data-event-id="{$event_id}" data-rsvp-step="{$rsvp_step}" data-rsvp-role="{$role}">
 <form method="post" action="rsvp.php" id="rsvp_form">
 <input type="hidden" name="my_post_key" value="{$mybb->post_code}" />
 <input type="hidden" name="id" value="{$event_id}" />

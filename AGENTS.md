@@ -26,8 +26,8 @@ npx playwright test             # run the suite
 npx playwright test --ui        # run it interactively
 ```
 
-After changing anything under `plugin/`, run `./scripts/deploy.sh`. After changing a template or
-anything in `events_install()`/`events_activate()`, also re-run
+After changing anything under `plugin/`, run `./scripts/deploy.sh`. After changing a template,
+the stylesheet, or anything in `events_install()`/`events_activate()`, also re-run
 `docker compose exec -T web php /dev/stdin < scripts/provision.php` so the plugin is
 re-activated and the templates are re-synced, then `./scripts/db-snapshot.sh` so the suite's
 baseline picks the change up.
@@ -47,6 +47,13 @@ baseline picks the change up.
   template as one variable.
 - Front-end hooks are registered at the top of `inc/plugins/events.php` (MyBB includes active
   plugin files on every request). Registering them in `_activate()` only ever runs once.
+- Front-end styling goes in `plugin/inc/plugins/events/stylesheets/events.css`, never in a
+  `<style>` block in a template. It is installed as a real theme stylesheet on the master
+  theme so themes inherit and can override it; an inline block would out-specify them.
+- Test helpers must not probe the page with `count()` or `all()` straight after a click
+  that navigates - neither auto-waits, so they read the outgoing page. `tests/helpers/rsvp.ts`
+  has `settleOnStep()` for this. The race only loses on slower-loading themes, so it passes
+  locally and fails where it matters.
 - The test forum runs the garrison's live theme (see README), not MyBB's default. Anything
   that reaches into rendered board markup - `events_nav_menu()`, which swaps the board's
   Calendar menu item for an Events one on `pre_output_page` - has to cope with a theme that

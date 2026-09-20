@@ -1,10 +1,10 @@
 <table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder" id="rsvp_list">
 <tr><td class="thead" colspan="6"><strong>RSVPs for this Event</strong></td></tr>
 <tr><td class="trow1" colspan="6">
-<form method="get" action="event.php" id="rsvp_filter_form">
+<form method="get" action="event.php" id="rsvp_filter_form" class="events_filter_form">
 <input type="hidden" name="id" value="{$event_id}" />
 <input type="hidden" name="action" value="rsvps" />
-<label>Costume: <input type="text" name="filter_costume" id="filter_costume" value="{$filter_costume}" /></label>
+<label>Costume: <input type="text" class="textbox" name="filter_costume" id="filter_costume" value="{$filter_costume}" /></label>
 {$filter_day_select}
 <input type="submit" class="button" value="Filter" />
 <a href="event.php?id={$event_id}&amp;action=rsvps" id="rsvp_filter_reset">Reset</a>

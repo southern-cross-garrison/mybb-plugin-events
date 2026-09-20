@@ -166,6 +166,9 @@ test.describe('RSVP wizard', () => {
     await page.locator(`input.costume_checkbox[value="${TK}"]`).check();
     await page.locator('#rsvp_submit').click();
 
+    // all() does not auto-wait, so the days step has to have landed before it is read -
+    // otherwise this enumerates the costumes page and unchecks nothing.
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'days');
     for (const checkbox of await page.locator('input.day_checkbox').all()) {
       await checkbox.uncheck();
     }

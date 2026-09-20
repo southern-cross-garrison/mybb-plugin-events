@@ -1,6 +1,22 @@
 import { Page, expect } from '@playwright/test';
 
 /**
+ * Wait for a submitted step to land before the step probes below read the page.
+ *
+ * Those probes use count() and all(), neither of which auto-waits, so without this they
+ * race the form POST and enumerate the page being navigated away from: the days step is
+ * read as absent, its checkboxes are never touched, and the wizard carries every day
+ * forward instead. Whether the race is lost comes down to how long the page takes to
+ * load, so it hides completely on a light theme and is deterministic on a heavy one.
+ */
+async function settleOnStep(page: Page, ...steps: string[]): Promise<void> {
+  await expect(page.locator('#rsvp_page')).toHaveAttribute(
+    'data-rsvp-step',
+    new RegExp(`^(${steps.join('|')})$`),
+  );
+}
+
+/**
  * Drive the RSVP wizard end to end.
  *
  * The wizard is prerequisites -> costumes -> days (multi-day events only) -> confirm,
@@ -30,6 +46,7 @@ export async function rsvpThroughWizard(
     await page.locator(`input.costume_checkbox[value="${costume}"]`).check();
   }
   await page.locator('#rsvp_submit').click();
+  await settleOnStep(page, 'days', 'confirm');
 
   if ((await page.locator('#rsvp_page[data-rsvp-step="days"]').count()) > 0) {
     if (options.dayIds) {
@@ -83,6 +100,7 @@ export async function wrangleThroughWizard(
       await page.locator(`#prereq_${field}`).fill(value);
     }
     await page.locator('#rsvp_submit').click();
+    await settleOnStep(page, 'days', 'confirm');
   }
 
   // The costumes step must never appear for a wrangler.

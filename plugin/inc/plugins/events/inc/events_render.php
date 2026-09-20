@@ -162,28 +162,30 @@ function events_calendar_grid($month_start, array $events, array $user_rsvps)
 }
 
 /**
- * The wizard steps that apply to this role and event, in order.
+ * The wizard steps that still apply, in order, given what has been chosen so far.
  *
- * Wranglers are not costumed, so the costumes step does not exist for them at all -
- * which also means a wrangler with nothing missing on a single-day event goes straight
- * to 'confirm'.
+ * The sequence is recomputed on every request rather than fixed up front, because the
+ * attendance step is what decides the rest of it: a signup with no trooping day never
+ * shows the costumes step, and the TK ID only becomes a prerequisite once one day is
+ * being trooped. Attendance therefore always comes first and is always shown - it is
+ * where the member chooses what they are signing up to.
  *
- * @param string $role
- * @param bool $has_days
+ * @param array $roles The roles the signup currently holds
+ * @param array $missing Prerequisite fields still missing for those roles
  * @return array
  */
-function events_rsvp_steps($role, $has_days)
+function events_signup_steps(array $roles, array $missing)
 {
-    $steps = array('prerequisites');
+    $steps = array('attendance');
 
-    if($role === 'trooper')
+    if(!empty($missing))
     {
-        $steps[] = 'costumes';
+        $steps[] = 'prerequisites';
     }
 
-    if($has_days)
+    if(in_array('trooper', $roles, true))
     {
-        $steps[] = 'days';
+        $steps[] = 'costumes';
     }
 
     $steps[] = 'confirm';
@@ -198,9 +200,85 @@ function events_rsvp_steps($role, $has_days)
  * @param array $steps
  * @return string
  */
-function events_rsvp_step_after($step, array $steps)
+function events_signup_step_after($step, array $steps)
 {
     $index = array_search($step, $steps, true);
 
     return ($index === false || !isset($steps[$index + 1])) ? 'confirm' : $steps[$index + 1];
+}
+
+/**
+ * How a role reads as an activity rather than as a job title.
+ *
+ * @param string $role
+ * @return string
+ */
+function events_role_verb($role)
+{
+    return $role === 'wrangler' ? 'Wrangling' : 'Trooping';
+}
+
+/**
+ * Labels for the subset of an event's days a signup covers, in the event's own order.
+ *
+ * @param array $event_days
+ * @param array $day_ids
+ * @param bool $short
+ * @return array
+ */
+function events_day_labels(array $event_days, array $day_ids, $short = false)
+{
+    $day_ids = array_map('intval', $day_ids);
+
+    $labels = array();
+    foreach($event_days as $day)
+    {
+        if(in_array((int)$day['id'], $day_ids, true))
+        {
+            $labels[] = $short ? events_day_short_label($day) : events_day_label($day);
+        }
+    }
+
+    return $labels;
+}
+
+/**
+ * The "what you are signing up to" block shared by the confirmation step, the success
+ * page and the coordinator-facing summaries.
+ *
+ * An event with no configured days has nothing to list per role, so it collapses to the
+ * single "Attending as" line.
+ *
+ * @param array $event_days
+ * @param array $role_days role => array of event_day_id
+ * @param string $id_prefix Element id prefix, so the confirm and success pages stay distinguishable
+ * @return string
+ */
+function events_signup_summary_html(array $event_days, array $role_days, $id_prefix)
+{
+    $roles = array();
+    foreach(events_rsvp_roles() as $role)
+    {
+        if(isset($role_days[$role]))
+        {
+            $roles[] = $role;
+        }
+    }
+
+    $html = '<p><strong>Attending as:</strong> <span id="' . $id_prefix . '_roles">'
+          . htmlspecialchars_uni(implode(', ', array_map('events_role_label', $roles))) . '</span></p>';
+
+    if(empty($event_days))
+    {
+        return $html;
+    }
+
+    foreach($roles as $role)
+    {
+        $labels = events_day_labels($event_days, $role_days[$role]);
+        $html .= '<p class="signup_summary_days"><strong>' . events_role_verb($role) . ':</strong> '
+               . '<span id="' . $id_prefix . '_days_' . $role . '">' . htmlspecialchars_uni(implode(', ', $labels)) . '</span></p>';
+    }
+
+    return $html;
 }

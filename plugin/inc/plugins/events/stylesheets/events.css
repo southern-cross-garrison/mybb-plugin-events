@@ -12,17 +12,110 @@
  */
 
 /* ---------------------------------------------------------------------------
+ * Theming seam
+ *
+ * The accent colours below are read as custom properties with an inline fallback, so a
+ * theme retints every button, pill and dot on these pages by declaring them once:
+ *
+ *     :root { --events-accent: #1090d0; --events-accent-border: #1090d0; }
+ *
+ * The fallbacks are deliberately written at each use site rather than as defaults in a
+ * :root block here. This stylesheet is installed last in the display order, so a :root
+ * block would out-order the theme's own and the override would silently never apply.
+ * ------------------------------------------------------------------------ */
+
+/* ---------------------------------------------------------------------------
+ * Page frame
+ *
+ * The plugin's pages are top-level MyBB pages, so the only thing around them is whatever
+ * the theme's header and footer leave open. MyBB's default theme centres its content in
+ * an #container that the footer closes, but a theme that rewrites the header wholesale
+ * (the garrison's does) closes every wrapper of its own before {$header} ends, and the
+ * plugin page then runs edge to edge while the breadcrumb above it stays inset. Every
+ * full-page template opens this wrapper so the content lines up under the breadcrumb
+ * either way.
+ *
+ * The tiers below track the content column of the garrison's theme - a Bootstrap
+ * .container-md, with its >=1200px width overridden to 1275px in the theme's global.css.
+ * A theme with a column of its own replaces all of them at once:
+ *
+ *     :root { --events-page-width: 960px; }
+ *
+ * which wins because every max-width here reads it first and only falls back to the tier.
+ * ------------------------------------------------------------------------ */
+.events_page_wrap {
+	box-sizing: border-box;
+	width: 100%;
+	margin: 0 auto 12px;
+	padding: 0 12px;
+	max-width: var(--events-page-width, 100%);
+}
+@media (min-width: 768px) { .events_page_wrap { max-width: var(--events-page-width, 720px); } }
+@media (min-width: 992px) { .events_page_wrap { max-width: var(--events-page-width, 960px); } }
+@media (min-width: 1200px) { .events_page_wrap { max-width: var(--events-page-width, 1275px); } }
+
+/* ---------------------------------------------------------------------------
+ * Filter toolbars
+ *
+ * The rows of links, dropdowns and submit buttons that sit above the list, the calendar
+ * and the RSVP tables. Laid out as a wrapping flex row so the groups keep an even gap
+ * on a phone instead of the inline margins they used to carry in the templates.
+ *
+ * MyBB has no conventional class for a <select> the way it has input.textbox, so a bare
+ * one falls through to the browser's native control - 14px text in a 23px box, next to
+ * form controls a theme has sized to its own body text. .events_select gives it a flat
+ * neutral look instead, sized off the surrounding text rather than a fixed size of its
+ * own, so it follows whatever font the theme sets.
+ *
+ * A theme with a form-control look of its own restyles it in one rule, but that rule has
+ * to be written under .events_page_wrap rather than on .events_select alone:
+ *
+ *     .events_page_wrap .events_select { border-radius: 3px; ... }
+ *
+ * This stylesheet is installed last in the display order, so an equally specific rule in
+ * the theme's own sheet would lose the tie and silently do nothing.
+ * ------------------------------------------------------------------------ */
+.events_toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; }
+.events_filter_form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
+.events_filter_form label { display: inline-flex; align-items: center; gap: 6px; }
+
+.events_select {
+	/* inherit, so the control follows the theme's body font - but not a label's weight:
+	   these selects sit inside <label>Day: ...</label>, which themes commonly embolden. */
+	font: inherit;
+	font-weight: normal;
+	line-height: 1.4;
+	color: #333;
+	background-color: #fff;
+	border: 1px solid #bcbcbc;
+	border-radius: 4px;
+	padding: 5px 30px 5px 10px;
+	max-width: 100%;
+	-webkit-appearance: none;
+	-moz-appearance: none;
+	appearance: none;
+	/* The native arrow goes with appearance: none, so the control draws its own. Inline
+	   rather than an image file: the stylesheet is installed from the plugin's source on
+	   activation, and a url() would need a second asset deployed to a path it can guess. */
+	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%23555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' d='m3 6 5 5 5-5'/%3E%3C/svg%3E");
+	background-repeat: no-repeat;
+	background-position: right 10px center;
+	background-size: 11px 11px;
+}
+.events_select:focus { border-color: var(--events-accent, #2f6f9f); outline: none; }
+
+/* ---------------------------------------------------------------------------
  * Events list - signup counts, action buttons, status pills
  * ------------------------------------------------------------------------ */
 .event_count { display: inline-block; margin-right: 10px; white-space: nowrap; }
 .event_count_dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: baseline; }
-.event_count_trooper .event_count_dot { background: #2f6f9f; }
-.event_count_wrangler .event_count_dot { background: #c77700; }
+.event_count_trooper .event_count_dot { background: var(--events-accent, #2f6f9f); }
+.event_count_wrangler .event_count_dot { background: var(--events-wrangle, #c77700); }
 .event_count_key { font-size: 0.85em; opacity: 0.7; margin-left: 2px; }
 
 .event_btn {
 	display: inline-block; padding: 5px 12px; border-radius: 4px; line-height: 1.2;
-	background: #2f6f9f; border: 1px solid #2a6390; color: #fff;
+	background: var(--events-accent, #2f6f9f); border: 1px solid var(--events-accent-border, #2a6390); color: #fff;
 	font-weight: 600; font-size: 0.9em; text-decoration: none;
 }
 .event_btn:hover { text-decoration: none; filter: brightness(1.08); }
@@ -49,8 +142,8 @@
 	font-weight: 600; font-size: 0.95em; text-decoration: none; border: 1px solid transparent;
 }
 a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
-.event_action_primary { background: #2f6f9f; border-color: #2a6390; color: #fff; }
-.event_action_wrangle { background: #c77700; border-color: #b36c00; color: #fff; }
+.event_action_primary { background: var(--events-accent, #2f6f9f); border-color: var(--events-accent-border, #2a6390); color: #fff; }
+.event_action_wrangle { background: var(--events-wrangle, #c77700); border-color: var(--events-wrangle-border, #b36c00); color: #fff; }
 .event_action_secondary { background: #fdfdfd; border-color: #bcbcbc; color: #333; }
 .event_action_secondary:hover { background: #f3f3f3; }
 .event_action_locked { background: #f2f2f2; border-color: #dedede; color: #767676; font-weight: normal; }
@@ -81,4 +174,5 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 @media print {
 	.no-print { display: none; }
 	body { margin: 0; padding: 20px; }
+	.events_page_wrap { max-width: none; margin: 0; padding: 0; }
 }

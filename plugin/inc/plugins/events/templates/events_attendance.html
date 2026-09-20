@@ -5,9 +5,8 @@
 </head>
 <body>
 {$header}
-<div id="attendance_sheet" data-event-id="{$event_id}">
+<div id="attendance_sheet" class="events_page_wrap" data-event-id="{$event_id}">
 <div class="no-print">
-<h2>Attendance Sheet</h2>
 <p><a href="javascript:window.print();" id="attendance_print">Print</a> |
 <a href="event.php?id={$event_id}" id="attendance_back">Back to Event</a></p>
 {$attendance_day_filter}

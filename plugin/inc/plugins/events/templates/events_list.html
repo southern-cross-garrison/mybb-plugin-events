@@ -5,17 +5,20 @@
 </head>
 <body>
 {$header}
-<div id="events_page">
+<div id="events_page" class="events_page_wrap">
 <table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
-<tr><td class="thead" colspan="6"><strong>Events</strong></td></tr>
 <tr><td class="trow1" colspan="6">
+<div class="events_toolbar">
+<span class="events_toolbar_group">
 <a href="events.php?view=list" id="events_view_list">List View</a> |
 <a href="events.php?view=calendar" id="events_view_calendar">Calendar View</a>
-<form method="get" action="events.php" style="display:inline-block; margin-left:20px;">
+</span>
+<form method="get" action="events.php" class="events_filter_form">
 <input type="hidden" name="view" value="list" />
-<select name="region" id="events_region_filter">{$region_options}</select>
+<select name="region" id="events_region_filter" class="events_select">{$region_options}</select>
 <input type="submit" class="button" value="Filter" />
 </form>
+</div>
 </td></tr>
 <tr>
 <td class="tcat"><strong>Event</strong></td>

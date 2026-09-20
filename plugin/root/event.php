@@ -77,10 +77,10 @@ if($action === 'attendance')
             }
         }
 
-        $attendance_day_filter = '<form method="get" action="event.php" id="attendance_day_form">'
+        $attendance_day_filter = '<form method="get" action="event.php" id="attendance_day_form" class="events_filter_form">'
             . '<input type="hidden" name="id" value="' . $event_id . '" />'
             . '<input type="hidden" name="action" value="attendance" />'
-            . '<label>Day: <select name="filter_day" id="attendance_filter_day">' . $options . '</select></label> '
+            . '<label>Day: <select name="filter_day" id="attendance_filter_day" class="events_select">' . $options . '</select></label> '
             . '<input type="submit" class="button" value="Show" />'
             . '</form>';
     }
@@ -243,7 +243,7 @@ if($is_gec)
                 $selected = ($filter_day === (int)$day['id']) ? ' selected="selected"' : '';
                 $options .= '<option value="' . (int)$day['id'] . '"' . $selected . '>' . events_day_label($day) . '</option>';
             }
-            $filter_day_select = '<label>Day: <select name="filter_day" id="filter_day">' . $options . '</select></label> ';
+            $filter_day_select = '<label>Day: <select name="filter_day" id="filter_day" class="events_select">' . $options . '</select></label> ';
         }
 
         $rsvp_rows = '';
