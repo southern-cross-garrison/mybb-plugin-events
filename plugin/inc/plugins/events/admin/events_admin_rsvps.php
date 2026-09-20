@@ -74,7 +74,7 @@ function events_admin_rsvps()
     $table = new Table;
     $table->construct_header("User", array("width" => "16%"));
     $table->construct_header("Role", array("width" => "8%"));
-    $table->construct_header("TK ID", array("width" => "12%"));
+    $table->construct_header("Legion ID", array("width" => "12%"));
     $table->construct_header("Costumes", array("width" => "26%"));
     $table->construct_header("Days Attending", array("width" => "18%"));
     $table->construct_header("Mobile", array("width" => "12%"));
@@ -82,11 +82,12 @@ function events_admin_rsvps()
 
     foreach($attendees as $attendee)
     {
-        $days = array();
+        $attended_day_ids = array();
         foreach($attendee['days'] as $day)
         {
-            $days[] = events_day_short_label($day);
+            $attended_day_ids[] = (int)$day['id'];
         }
+        $days = events_day_labels($event_days, $attended_day_ids, 'short');
 
         $table->construct_cell("<a href=\"index.php?module=user-users&amp;action=edit&amp;uid=" . $attendee['uid'] . "\">" . htmlspecialchars_uni($attendee['username']) . "</a>");
         $table->construct_cell(events_role_label($attendee['role']));

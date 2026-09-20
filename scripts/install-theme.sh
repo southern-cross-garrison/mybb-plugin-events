@@ -28,6 +28,16 @@ if [ -d "$THEME_DIR/vendor" ]; then
     rm -f "$FORUM_DIR/vendor/README.md"
 fi
 
+# The theme names its own SCEditor style in the `editortheme` property (`modern-2.css`),
+# which is not one of the seven MyBB ships. Both halves of that name are referenced by the
+# `codebuttons` template - `jscripts/sceditor/themes/` styles the toolbar, and
+# `jscripts/sceditor/styles/` styles the WYSIWYG iframe - so a board with the XML but not
+# these files serves two 404s and renders the editor toolbar as a bare list of links.
+# Unlike vendor/, this tree is MyBB's, not the theme's: it is merged over, never replaced.
+if [ -d "$THEME_DIR/jscripts" ]; then
+    cp -R "$THEME_DIR/jscripts/." "$FORUM_DIR/jscripts/"
+fi
+
 # Only test-forum/ is mounted into the web container, and the PHP importer is piped in on
 # stdin, so the XML has to be handed over through the document root.
 STAGED="$FORUM_DIR/_theme-import.xml"

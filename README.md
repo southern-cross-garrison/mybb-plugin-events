@@ -1,6 +1,6 @@
 # MyBB Event Management plugin
 
-Event management for MyBB 1.8: events with RSVPs and wrangler signups, prerequisite checks, multi-day support,
+Event management for MyBB 1.8: events with per-day trooper and wrangler signups, prerequisite checks, multi-day support,
 attendance sheets, troop reports and iCal export. See [plugin/README.md](plugin/README.md)
 for what the plugin does; this file covers the development environment and the test suite.
 
@@ -33,7 +33,7 @@ Ports come from `.env` (copy `.env.example`) if the defaults clash.
 ```bash
 ./scripts/deploy.sh                 # copy plugin/ into test-forum/
 npx playwright test         # whole suite, about 40 seconds
-npx playwright test rsvp    # one spec
+npx playwright test signup  # one spec
 npx playwright test --ui    # interactive
 npx playwright test --headed --debug -g "cutoff"
 ```
@@ -148,10 +148,11 @@ users are shaped around the scenarios:
 |---|---|
 | `admin` | Admin CP access |
 | `gec` | Event coordinator: manages events from the front end, no Admin CP rights |
-| `trooper1` | SCG member with a complete profile - RSVPs without prerequisites |
+| `trooper1` | SCG member with a complete profile - signs up without prerequisites |
 | `trooper2` | 501st member with a complete profile |
 | `newbie` | No profile details at all - drives the prerequisites step |
 | `nowwcc` | Everything except a WWCC - drives the WWCC-required branch |
+| `wrangler` | Contact details but no TK ID and no costumes - the wrangling-only path |
 | `excluded` | Used for per-event exclusions |
 
 All of them use the password `testpass123`.
@@ -163,12 +164,14 @@ All of them use the password `testpass123`.
 | `plugin-setup` | Templates installed, task registered, settings mapped, nav link, guest access, Admin CP module |
 | `admin-events` | Event create/edit/delete, validation, multi-day, exclusions, publish and archive, coordinator has no Admin CP access |
 | `events-listing` | List and calendar views, region filter, attendance markers, pending visibility, multi-day spanning, month paging |
-| `rsvp-flow` | The whole wizard: prerequisites, costumes, days, confirmation; validation; state carried between steps; duplicate RSVPs; multiselect costume parsing |
-| `rsvp-locking` | **Clock travel:** cutoffs, event end, late signups during an event, pending/archived status, exclusions, guests, and that an existing RSVP survives the lock |
+| `signup-flow` | The whole wizard: attendance, prerequisites, costumes, confirmation; validation; state carried between steps; editing an existing signup; multiselect costume parsing |
+| `signup-locking` | **Clock travel:** cutoffs, event end, late signups during an event, pending/archived status, exclusions, guests, and that an existing signup survives the lock |
+| `signup-roles` | Choosing trooping or wrangling, mixing the two across days, what each role is asked for, the event page and listing, and how both roles reach the coordinator surfaces |
 | `coordinator` | RSVP list and filters, attendance sheet and its day filter, permissions |
 | `troop-report` | Availability after the event ends, draft segmentation by club, posting, archiving, duplicate prevention, linked-thread comment |
 | `reminders` | The scheduled task under a moved clock: who gets PMed, the weekly cadence, and when reminders stop |
 | `ical` | Feed contents, one VEVENT per day, escaping, permissions |
+| `print` | Print media: the board chrome is gone, the branded ribbon is there and will actually print, and the attendance sheet paginates with a repeating header |
 | `health` | Every page renders with no PHP warning or SQL error logged |
 
 ## Continuous integration

@@ -19,6 +19,12 @@
  *
  *     :root { --events-accent: #1090d0; --events-accent-border: #1090d0; }
  *
+ * --events-accent-soft is the focus ring behind a form control, and wants to be the
+ * accent at roughly 18% alpha. The form controls themselves are .events_input,
+ * .events_select and .events_option, which a theme restyles the same way it restyles
+ * its own - see the note on .events_select below for why those rules need to be written
+ * under .events_page_wrap.
+ *
  * The fallbacks are deliberately written at each use site rather than as defaults in a
  * :root block here. This stylesheet is installed last in the display order, so a :root
  * block would out-order the theme's own and the override would silently never apply.
@@ -105,6 +111,56 @@
 .events_select:focus { border-color: var(--events-accent, #2f6f9f); outline: none; }
 
 /* ---------------------------------------------------------------------------
+ * Form controls
+ *
+ * The plugin's forms are built from its own classes rather than MyBB's .form_row, which
+ * lays a label, its control and its hint out on one line and leaves the control entirely
+ * unstyled - a browser-default box next to a theme's own form fields. Here each field is
+ * a stack: label, control, hint, with room to breathe between them.
+ * ------------------------------------------------------------------------ */
+.events_field { margin: 0 0 20px; max-width: 32em; }
+.events_field:last-child { margin-bottom: 0; }
+
+.events_label { display: block; font-weight: 600; margin: 0 0 6px; }
+.events_required { color: #c0392b; margin-left: 3px; }
+.events_hint { display: block; margin: 7px 0 0; font-size: 0.9em; line-height: 1.4; opacity: 0.75; }
+
+.events_input {
+	/* inherit, so the control follows the theme's body font rather than the browser's
+	   default 13px - but not the weight, since .events_label above it is emboldened. */
+	font: inherit;
+	font-weight: normal;
+	line-height: 1.4;
+	display: block;
+	box-sizing: border-box;
+	width: 100%;
+	color: #333;
+	background-color: #fff;
+	border: 1px solid #bcbcbc;
+	border-radius: 4px;
+	padding: 9px 12px;
+}
+.events_input:focus {
+	border-color: var(--events-accent, #2f6f9f);
+	outline: none;
+	box-shadow: 0 0 0 3px var(--events-accent-soft, rgba(47, 111, 159, 0.18));
+}
+
+.events_textarea { min-height: 22em; resize: vertical; }
+
+/* A list of tickable rows - costumes to wear, ways to attend a day. The whole row is the
+   label, so the hit target is the row rather than the box and its few characters. */
+.events_options { display: flex; flex-direction: column; gap: 6px; max-width: 32em; }
+.events_option {
+	display: flex; align-items: center; gap: 10px;
+	padding: 9px 12px;
+	border: 1px solid #dedede; border-radius: 4px;
+	cursor: pointer;
+}
+.events_option:hover { border-color: #bcbcbc; }
+.events_option input { margin: 0; flex: none; }
+
+/* ---------------------------------------------------------------------------
  * Events list - signup counts, action buttons, status pills
  * ------------------------------------------------------------------------ */
 .event_count { display: inline-block; margin-right: 10px; white-space: nowrap; }
@@ -129,7 +185,7 @@
 .event_pill_locked { background: #f2f2f2; border-color: #dedede; color: #767676; font-weight: normal; }
 
 /* ---------------------------------------------------------------------------
- * Event page - the RSVP / wrangle / coordinator action row
+ * Event page - the signup / coordinator action row
  * ------------------------------------------------------------------------ */
 #event_actions, #gec_controls .gec_actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 #event_actions { margin: 2px 0; }
@@ -143,7 +199,6 @@
 }
 a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 .event_action_primary { background: var(--events-accent, #2f6f9f); border-color: var(--events-accent-border, #2a6390); color: #fff; }
-.event_action_wrangle { background: var(--events-wrangle, #c77700); border-color: var(--events-wrangle-border, #b36c00); color: #fff; }
 .event_action_secondary { background: #fdfdfd; border-color: #bcbcbc; color: #333; }
 .event_action_secondary:hover { background: #f3f3f3; }
 .event_action_locked { background: #f2f2f2; border-color: #dedede; color: #767676; font-weight: normal; }
@@ -154,6 +209,33 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 }
 .event_action_status_trooper { background: #eaf2f8; border-color: #b8d4e8; color: #1f4e6e; }
 .event_action_status_wrangler { background: #fdf3e3; border-color: #f0d5a8; color: #8a5300; }
+
+/* The wizard's submit row: the button is the theme's, the link beside it needs the gap. */
+#rsvp_cancel, #troop_report_cancel { margin-left: 12px; }
+/* The tick's glyph carries almost no side bearing, so the gap is set here rather
+   than left to a space in the markup. */
+.event_signup_tick { margin-right: 4px; }
+
+/* ---------------------------------------------------------------------------
+ * Signup wizard - the attendance step
+ *
+ * One fieldset per day (or one for the whole event, when no days are configured), with
+ * the day as the legend and the three ways to answer it as radios. A fieldset rather
+ * than a table row because the legend is what associates the day with its radio group
+ * for a screen reader, and because it wraps onto a phone without a horizontal scroll.
+ * ------------------------------------------------------------------------ */
+.signup_day {
+	display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 16px;
+	border: 1px solid #dedede; border-radius: 4px; margin: 0 0 8px; padding: 8px 12px;
+}
+/* Fixed basis rather than natural width, so the answers line up down the list however
+   long an individual day's label runs. It collapses to its own line on a phone. */
+.signup_day_label { font-weight: 600; flex: 0 0 16em; max-width: 100%; }
+.signup_choices { display: flex; flex-wrap: wrap; gap: 2px 18px; }
+.signup_choice { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.signup_choice input { margin: 0; }
+.signup_role_help { font-size: 0.9em; opacity: 0.85; }
+.signup_summary_days { margin: 2px 0; }
 
 /* ---------------------------------------------------------------------------
  * Calendar view
@@ -167,12 +249,184 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 /* ---------------------------------------------------------------------------
  * Attendance sheet - built to be printed, so it keeps its own plain table rules
  * ------------------------------------------------------------------------ */
-#attendance_table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-#attendance_table th, #attendance_table td { border: 1px solid #999; padding: 8px; text-align: left; }
+#attendance_table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+#attendance_table th, #attendance_table td { border: 1px solid #999; padding: 8px; text-align: left; vertical-align: top; }
 #attendance_table th { background: #f0f0f0; font-weight: bold; }
+#attendance_table tbody tr:nth-child(even) { background: #f7f7f7; }
+
+/* Fixed proportions rather than letting the content size the columns, so the sheet keeps
+   the same shape whoever is on it - and so the tick column stays wide enough to aim a pen
+   at even when nobody has a long costume list to push it open. Percentages of the
+   printable width, adding to 100.
+   Keyed on the cells' classes rather than nth-child, because the Days column only exists
+   for an event that has days and every position after it would otherwise shift. */
+#attendance_table { table-layout: fixed; }
+#attendance_table .attendee_num { width: 4%; }
+#attendance_table .attendee_username { width: 13%; }
+#attendance_table .attendee_role { width: 11%; }
+#attendance_table .attendee_tkid { width: 11%; }
+#attendance_table .attendee_costumes { width: 18%; }
+#attendance_table .attendee_mobile { width: 13%; }
+#attendance_table .attendee_emergency { width: 20%; }
+#attendance_table .attendee_attended { width: 10%; }
+
+/* Nine columns instead of eight: everything gives a little back to make room for Days. */
+#attendance_table.has_days .attendee_num { width: 3%; }
+#attendance_table.has_days .attendee_username { width: 11%; }
+#attendance_table.has_days .attendee_role { width: 11%; }
+#attendance_table.has_days .attendee_tkid { width: 11%; }
+#attendance_table.has_days .attendee_costumes { width: 13%; }
+#attendance_table.has_days .attendee_days { width: 15%; }
+#attendance_table.has_days .attendee_mobile { width: 11%; }
+#attendance_table.has_days .attendee_emergency { width: 15%; }
+#attendance_table.has_days .attendee_attended { width: 10%; }
+
+/* Bullets pulled back inside the cell - a default <ul> indents its markers into the
+   neighbouring column's border. */
+#attendance_table .attendee_days_list { margin: 0; padding-left: 1.1em; }
+#attendance_table .attendee_days_list li { margin: 0; }
+
+/* The tick box is the point of the last column, so centre it and give it something to
+   aim at with a pen as well as with a mouse. */
+#attendance_table .attendee_attended { text-align: center; vertical-align: middle; }
+#attendance_table .attendee_tick { width: 17px; height: 17px; margin: 0; cursor: pointer; }
+/* Nothing is held on one line by force: table-layout: fixed does not widen a column to
+   fit, so a value told not to wrap - "Trooper / Wrangler" on a mixed signup, say - runs
+   out over the cell beside it instead. Wrapping is the lesser of the two. */
+#attendance_table th, #attendance_table td { overflow-wrap: break-word; }
+/* The Legion ID is the one exception: a short value in a known format, whose column is
+   sized to hold it, and which reads badly broken over two lines. */
+#attendance_table .attendee_tkid { white-space: nowrap; }
+
+/* ---------------------------------------------------------------------------
+ * Print
+ *
+ * The masthead only exists on paper: printing strips the board's own header, so
+ * without it the sheet comes off the printer with nothing on it saying which board or
+ * which event it belongs to. It is built by events_print_header() and sits inside
+ * .events_page_wrap, because that wrapper is the only thing the print rules keep.
+ * ------------------------------------------------------------------------ */
+.events_print_header { display: none; }
 
 @media print {
-	.no-print { display: none; }
-	body { margin: 0; padding: 20px; }
-	.events_page_wrap { max-width: none; margin: 0; padding: 0; }
+	/* Hide everything that is neither the plugin's page nor an ancestor holding it in
+	 * the document. Naming a theme's own header, navigation and footer would not
+	 * survive the next theme - and this stylesheet is attached to the plugin's pages
+	 * only, so "everything except our page" is both exact and safe to say.
+	 *
+	 * :has() is what makes the ancestor half of that expressible. A browser without it
+	 * throws the whole rule out as invalid and prints what it has always printed, so
+	 * the fallback is the old behaviour rather than a blank sheet.
+	 */
+	body *:not(:has(.events_page_wrap)):not(.events_page_wrap, .events_page_wrap *) {
+		display: none !important;
+	}
+
+	/* The ancestors that survive are the theme's layout containers - a centred column,
+	   its padding, its background. Flattened, so the sheet starts at the paper's own
+	   margin instead of inside a 1275px column. */
+	body :has(.events_page_wrap) {
+		display: block !important;
+		width: auto !important; max-width: none !important;
+		margin: 0 !important; padding: 0 !important;
+		border: 0 !important; background: none !important; box-shadow: none !important;
+	}
+
+	html, body { margin: 0; padding: 0; background: #fff; font-size: 10pt; }
+	.events_page_wrap { width: auto; max-width: none; margin: 0; padding: 0; }
+
+	/* Ink, not screen colour. !important because a theme's own sheet can load after this
+	   one, and every colour here exists to be overridden on screen but not on paper. */
+	.events_page_wrap, .events_page_wrap * { color: #000 !important; }
+	.events_page_wrap a { text-decoration: none; }
+
+	/* The trooper/wrangler dots are background colour, which a browser leaves out of a
+	   print unless the reader asks for background graphics. Drawn as outlines they keep
+	   working; the T and W beside them carry the meaning either way. */
+	.event_count_dot { background: none !important; border: 0.5pt solid #000; }
+
+	/* Controls that can only do something in a browser. The status pills are not
+	   controls, so a printed event page still says what the reader signed up for. */
+	.no-print,
+	.events_toolbar,
+	.events_filter_form,
+	.event_action,
+	.event_btn,
+	#gec_controls,
+	#rsvp_filter_form { display: none !important; }
+
+	.events_print_header { display: block; margin: 0 0 12pt; }
+
+	/* A slim coloured ribbon, logo on the left, board and document kind beside it. The
+	   colour is the plugin's accent, so a theme that sets --events-accent brands the
+	   printout the same way it brands the buttons.
+	   print-color-adjust is what makes it print at all: a browser drops backgrounds and
+	   white text from a print unless the reader turns background graphics on, and a
+	   ribbon that silently prints as white-on-white would be worse than none. */
+	.events_print_ribbon {
+		display: flex; align-items: center; gap: 8pt;
+		padding: 4pt 8pt;
+		background: var(--events-accent, #2f6f9f);
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+	}
+	.events_page_wrap .events_print_ribbon, .events_page_wrap .events_print_ribbon * { color: #fff !important; }
+	/* Painted from the URL the page hands over in --events-print-logo. Declaring the
+	   background here rather than on an <img> in the markup is what keeps the file off
+	   the wire for the readers who never print. */
+	.events_print_logo {
+		display: block;
+		width: 26pt; height: 26pt;
+		background-image: var(--events-print-logo);
+		background-repeat: no-repeat;
+		background-position: center;
+		background-size: contain;
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+	}
+	.events_print_board { font-size: 8.5pt; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+
+	.events_print_title { display: block; font-size: 17pt; font-weight: 700; line-height: 1.15; margin: 8pt 0 0; }
+	.events_print_meta { display: block; font-size: 9pt; margin-top: 2pt; }
+	.events_print_title, .events_print_meta { padding-bottom: 5pt; }
+	.events_print_meta, .events_print_header > .events_print_title:last-child { border-bottom: 1pt solid #000; }
+
+	/* The event name is in the masthead; the on-screen heading under it would repeat it. */
+	#attendance_event_title { display: none; }
+	#attendance_day { font-size: 11pt; margin: 0 0 8pt; }
+
+	#attendance_table { margin: 0; font-size: 9pt; }
+	/* 0.75pt is one device pixel at 96dpi. Below that the grid is sub-pixel, and the
+	   rasteriser drops whichever lines round to nothing - which showed up as the table's
+	   top edge going missing in the print preview while the rest of the grid survived. */
+	#attendance_table th, #attendance_table td { border: 1.5pt solid #000; padding: 4pt; }
+	/* Browsers print no backgrounds unless the reader opts into background graphics, so
+	   the header row and the banding are weighted with rules instead of fills. */
+	#attendance_table th { background: none; border-top-width: 2.25pt; border-bottom-width: 2.25pt; }
+	#attendance_table tbody tr:nth-child(even) { background: none; }
+	/* Repeat the header on every sheet, and never split a person across two of them. */
+	#attendance_table thead { display: table-header-group; }
+	#attendance_table tr { break-inside: avoid; page-break-inside: avoid; }
+	/* Room to run a pen down the column without the rows crowding each other. */
+	#attendance_table tbody td { height: 24pt; }
+
+	/* Whatever was ticked on screen is ticked on paper - the print is taken from the live
+	   page, so the box only has to survive being printed. A browser draws the control but
+	   drops its fill along with every other background unless told otherwise, which would
+	   turn a ticked box back into an empty one; accent-color puts the tick in ink rather
+	   than in the browser's blue. */
+	#attendance_table .attendee_tick {
+		width: 11pt; height: 11pt;
+		accent-color: #000;
+		-webkit-print-color-adjust: exact;
+		print-color-adjust: exact;
+	}
+
+	/* The plugin's other pages are built on MyBB's table classes, which carry the
+	   theme's panel colours. On paper they are just content. */
+	.tborder, .thead, .tcat, .trow1, .trow2 {
+		background: none !important; color: #000 !important;
+		border-color: #000 !important;
+	}
+	table.tborder { border-collapse: collapse; width: 100%; }
 }

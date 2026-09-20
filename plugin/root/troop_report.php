@@ -214,5 +214,7 @@ if(!empty($wranglers))
 // decode back to "[" as the textarea's value and undo events_escape_bbcode() above.
 $draft_content = htmlspecialchars($draft_content, ENT_QUOTES, 'UTF-8');
 
+$events_print_header = events_print_header('Troop Report', array($event['title']));
+
 eval("\$page = \"" . $templates->get("events_troop_report") . "\";");
 output_page($page);

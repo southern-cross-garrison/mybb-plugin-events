@@ -1,4 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
+import { assertNoRunInFlight } from './tests/helpers/suite-lock';
+
+// Bail out before Playwright empties outputDir, which would take the trace files of a
+// run already in flight with it. The lock itself is claimed in global setup.
+assertNoRunInFlight();
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:8080';
 

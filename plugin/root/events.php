@@ -33,26 +33,18 @@ if($region_filter !== '')
     $where .= " AND region = '" . $db->escape_string($region_filter) . "'";
 }
 
-// Tracked per role: somebody who has only signed up to wrangle must still be offered
-// the RSVP link, or they could never troop the event.
-$user_trooper_rsvps = array();
-$user_wrangler_rsvps = array();
+// Tracked per role, because the listing shows which way round the viewer is signed up -
+// a mixed signup holds both, and reads as "Trooping" and "Wrangling" side by side.
+$user_roles = array();
 $rsvp_query = $db->simple_select("event_plugin_rsvps", "event_id, role",
     "user_id = " . (int)$mybb->user['uid'] . " AND status = 'attending'");
 while($row = $db->fetch_array($rsvp_query))
 {
-    if($row['role'] === 'wrangler')
-    {
-        $user_wrangler_rsvps[] = (int)$row['event_id'];
-    }
-    else
-    {
-        $user_trooper_rsvps[] = (int)$row['event_id'];
-    }
+    $user_roles[(int)$row['event_id']][] = events_rsvp_role($row['role']);
 }
 
 // The calendar only highlights "you are involved in this", so either role counts.
-$user_rsvps = array_values(array_unique(array_merge($user_trooper_rsvps, $user_wrangler_rsvps)));
+$user_rsvps = array_keys($user_roles);
 
 $query = $db->query("
     SELECT e.*,
@@ -86,6 +78,8 @@ if($view === 'calendar')
     $calendar_next = date('Y-m', strtotime('+1 month', $month_start));
     $calendar_content = events_calendar_grid($month_start, $events, $user_rsvps);
 
+    $events_print_header = events_print_header('Events Calendar', array($calendar_month_name, $region_filter));
+
     eval("\$page = \"" . $templates->get("events_calendar") . "\";");
     output_page($page);
     exit;
@@ -94,29 +88,31 @@ if($view === 'calendar')
 $events_rows = '';
 foreach($events as $event)
 {
-    $rsvped = in_array((int)$event['id'], $user_trooper_rsvps, true);
-    $wrangling = in_array((int)$event['id'], $user_wrangler_rsvps, true);
-    $lock_reason = events_rsvp_lock_reason($event, null, 'trooper');
+    $signed_up_as = isset($user_roles[(int)$event['id']]) ? $user_roles[(int)$event['id']] : array();
+    $lock_reason = events_signup_lock_reason($event);
 
-    // Note the pill text stays exactly "Attending"/"Wrangling": the styling lives on the
+    // Note the pill text stays exactly "Trooping"/"Wrangling": the styling lives on the
     // class, so the labels remain the whole text content of those elements.
-    if($rsvped)
+    if(!empty($signed_up_as))
     {
-        $you = '<span class="event_pill event_pill_trooper event_rsvped">Attending</span>';
+        $you = '';
+        foreach(events_rsvp_roles() as $role)
+        {
+            if(in_array($role, $signed_up_as, true))
+            {
+                $you .= '<span class="event_pill event_pill_' . $role . ' event_signed_up event_' . strtolower(events_role_verb($role)) . '">'
+                      . events_role_verb($role) . '</span> ';
+            }
+        }
     }
     elseif($lock_reason === null)
     {
-        $you = '<a class="event_btn event_rsvp_link" href="rsvp.php?id=' . (int)$event['id'] . '">RSVP</a>';
+        $you = '<a class="event_btn event_signup_link" href="rsvp.php?id=' . (int)$event['id'] . '">Sign Up</a>';
     }
     else
     {
         $you = '<span class="event_pill event_pill_locked event_locked" data-lock-reason="' . htmlspecialchars_uni($lock_reason) . '">'
-             . htmlspecialchars_uni(events_rsvp_lock_message($lock_reason)) . '</span>';
-    }
-
-    if($wrangling)
-    {
-        $you .= ' <span class="event_pill event_pill_wrangler event_wrangling">Wrangling</span>';
+             . htmlspecialchars_uni(events_signup_lock_message($lock_reason)) . '</span>';
     }
 
     $events_rows .= '<tr class="event_row" data-event-id="' . (int)$event['id'] . '" data-event-status="' . htmlspecialchars_uni($event['status']) . '">';
@@ -143,6 +139,8 @@ if($events_rows === '')
 {
     $events_rows = '<tr id="events_empty"><td class="trow1" colspan="6">There are no events to show.</td></tr>';
 }
+
+$events_print_header = events_print_header('Events', array($region_filter));
 
 eval("\$page = \"" . $templates->get("events_list") . "\";");
 output_page($page);

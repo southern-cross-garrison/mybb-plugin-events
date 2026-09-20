@@ -6,6 +6,7 @@
 <body>
 {$header}
 <div id="attendance_sheet" class="events_page_wrap" data-event-id="{$event_id}">
+{$events_print_header}
 <div class="no-print">
 <p><a href="javascript:window.print();" id="attendance_print">Print</a> |
 <a href="event.php?id={$event_id}" id="attendance_back">Back to Event</a></p>
@@ -13,18 +14,9 @@
 </div>
 <h3 id="attendance_event_title">{$event_title}</h3>
 {$attendance_day_heading}
-<table id="attendance_table">
+<table id="attendance_table" class="{$attendance_table_class}">
 <thead>
-<tr>
-<th>#</th>
-<th>Username</th>
-<th>Role</th>
-<th>TK ID</th>
-<th>Costumes</th>
-<th>Mobile</th>
-<th>Emergency Contact</th>
-<th>Signature</th>
-</tr>
+{$attendance_headers}
 </thead>
 <tbody>
 {$attendees_rows}

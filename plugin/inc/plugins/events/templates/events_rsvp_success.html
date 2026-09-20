@@ -1,11 +1,12 @@
 <html>
   <head>
-    <title>RSVP Confirmed - {$mybb->settings['bbname']}</title>
+    <title>{$rsvp_success_title} - {$mybb->settings['bbname']}</title>
     {$headerinclude}
   </head>
   <body>
     {$header}
-    <div id="rsvp_success" class="events_page_wrap" data-event-id="{$event_id}" data-rsvp-role="{$role}">
+    <div id="rsvp_success" class="events_page_wrap" data-event-id="{$event_id}" data-signup-mode="{$signup_mode}">
+      {$events_print_header}
       <table
         border="0"
         cellspacing="{$theme['borderwidth']}"

@@ -732,7 +732,7 @@ function events_save_user_fields($user_id, array $values)
 function events_prerequisite_labels()
 {
     return array(
-        'tk_id'             => array('label' => 'TK ID', 'hint' => 'Your 501st legion ID.'),
+        'tk_id'             => array('label' => 'Legion ID', 'hint' => 'Your 501st legion ID, e.g. TK-12345.'),
         'wwcc'              => array('label' => 'WWCC Number', 'hint' => 'This event requires a Working With Children Check.'),
         'mobile'            => array('label' => 'Mobile Number', 'hint' => 'So the coordinator can reach you on the day.'),
         'emergency_contact' => array('label' => 'Emergency Contact', 'hint' => 'Name and number of someone to call in an emergency.'),

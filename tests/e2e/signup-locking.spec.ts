@@ -1,6 +1,6 @@
 import { test, expect } from '../helpers/fixtures';
 import { loginAs, logout } from '../helpers/auth';
-import { lockReasonOnEventPage, rsvpThroughWizard } from '../helpers/rsvp';
+import { lockReasonOnEventPage, signUpThroughWizard } from '../helpers/rsvp';
 import { setClock, relativeToTestNow, readContainerClock } from '../helpers/clock';
 import { createEvent, createRsvp, countRsvps, fixtures, execute, T } from '../helpers/db';
 
@@ -10,7 +10,7 @@ const TK = fixtures().costumeOptions[0];
  * These tests move the container's clock rather than the data, so the plugin's own
  * time comparisons are what is under test.
  */
-test.describe('RSVP locking as the clock moves', () => {
+test.describe('signup locking as the clock moves', () => {
   test('an event with a signup cutoff locks the moment the cutoff passes', async ({ page }) => {
     const cutoff = relativeToTestNow({ days: 3 });
     const eventId = await createEvent({
@@ -24,7 +24,7 @@ test.describe('RSVP locking as the clock moves', () => {
 
     // Before the cutoff: open.
     expect(await lockReasonOnEventPage(page, eventId)).toBeNull();
-    await expect(page.locator('#event_rsvp')).toBeVisible();
+    await expect(page.locator('#event_signup')).toBeVisible();
 
     // One minute before the cutoff: still open.
     await setClock(relativeToTestNow({ days: 3, minutes: -5 }));
@@ -33,11 +33,11 @@ test.describe('RSVP locking as the clock moves', () => {
     // Just after the cutoff: locked.
     await setClock(relativeToTestNow({ days: 3, minutes: 5 }));
     expect(await lockReasonOnEventPage(page, eventId)).toBe('cutoff_passed');
-    await expect(page.locator('#event_rsvp')).toHaveCount(0);
+    await expect(page.locator('#event_signup')).toHaveCount(0);
 
-    // And the RSVP page itself refuses, not just the button that links to it.
+    // And the signup page itself refuses, not just the button that links to it.
     await page.goto(`/rsvp.php?id=${eventId}`);
-    await expect(page.locator('body')).toContainText('RSVPs for this event have closed');
+    await expect(page.locator('body')).toContainText('Signups for this event have closed');
     expect(await countRsvps(eventId)).toBe(0);
   });
 
@@ -64,7 +64,7 @@ test.describe('RSVP locking as the clock moves', () => {
     await expect(page.locator('body')).toContainText('This event has finished');
   });
 
-  test('a late signup can still RSVP while the event is running', async ({ page }) => {
+  test('a late signup can still be recorded while the event is running', async ({ page }) => {
     const eventId = await createEvent({
       title: 'Late Signup Troop',
       start: relativeToTestNow({ days: 1 }),
@@ -76,7 +76,7 @@ test.describe('RSVP locking as the clock moves', () => {
     await setClock(relativeToTestNow({ days: 1, hours: 4 }));
 
     await loginAs(page, 'trooper1');
-    await rsvpThroughWizard(page, eventId, { costumes: [TK] });
+    await signUpThroughWizard(page, eventId, { costumes: [TK] });
 
     expect(await countRsvps(eventId)).toBe(1);
   });
@@ -96,7 +96,7 @@ test.describe('RSVP locking as the clock moves', () => {
     expect(await lockReasonOnEventPage(page, eventId)).toBe('cutoff_passed');
   });
 
-  test('an RSVP made before the cutoff survives the cutoff passing', async ({ page }) => {
+  test('a signup made before the cutoff survives the cutoff passing', async ({ page }) => {
     const eventId = await createEvent({
       title: 'Locked In Troop',
       start: relativeToTestNow({ days: 5 }),
@@ -105,13 +105,13 @@ test.describe('RSVP locking as the clock moves', () => {
     });
 
     await loginAs(page, 'trooper1');
-    await rsvpThroughWizard(page, eventId, { costumes: [TK] });
+    await signUpThroughWizard(page, eventId, { costumes: [TK] });
     expect(await countRsvps(eventId)).toBe(1);
 
     await setClock(relativeToTestNow({ days: 4 }));
     await page.goto(`/event.php?id=${eventId}`);
 
-    await expect(page.locator('#event_rsvp_status')).toContainText('You have RSVPed');
+    await expect(page.locator('#event_signup_status_trooper')).toContainText('Trooping');
     expect(await countRsvps(eventId)).toBe(1);
   });
 
@@ -169,10 +169,10 @@ test.describe('RSVP locking as the clock moves', () => {
     expect(await lockReasonOnEventPage(page, eventId)).toBe('not_live');
 
     await page.goto(`/rsvp.php?id=${eventId}`);
-    await expect(page.locator('body')).toContainText('This event is not open for RSVPs');
+    await expect(page.locator('body')).toContainText('This event is not open for signups');
   });
 
-  test('an excluded member can see the event but cannot RSVP', async ({ page }) => {
+  test('an excluded member can see the event but cannot sign up', async ({ page }) => {
     const eventId = await createEvent({ title: 'Exclusive Troop', excluded: ['excluded'] });
 
     await loginAs(page, 'excluded');
@@ -188,7 +188,7 @@ test.describe('RSVP locking as the clock moves', () => {
     expect(await lockReasonOnEventPage(page, eventId)).toBeNull();
   });
 
-  test('guests are sent to log in rather than shown the RSVP form', async ({ page }) => {
+  test('guests are sent to log in rather than shown the signup form', async ({ page }) => {
     const eventId = await createEvent({ title: 'Guest Troop' });
 
     await logout(page);
@@ -208,7 +208,7 @@ test.describe('RSVP locking as the clock moves', () => {
     await loginAs(page, 'trooper1');
     await page.goto('/events.php');
 
-    await expect(page.locator(`tr[data-event-id="${open}"] .event_rsvp_link`)).toBeVisible();
+    await expect(page.locator(`tr[data-event-id="${open}"] .event_signup_link`)).toBeVisible();
     await expect(page.locator(`tr[data-event-id="${closed}"] .event_locked`)).toHaveAttribute(
       'data-lock-reason',
       'cutoff_passed',

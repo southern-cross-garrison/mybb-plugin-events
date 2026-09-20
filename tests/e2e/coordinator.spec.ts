@@ -1,3 +1,4 @@
+import { Page } from '@playwright/test';
 import { test, expect } from '../helpers/fixtures';
 import { loginAs, loginToAdminCp, gotoEventsAdmin } from '../helpers/auth';
 import { createEvent, createRsvp, getEventDays, fixtures, setUserField } from '../helpers/db';
@@ -77,6 +78,78 @@ test.describe('coordinator controls on the event page', () => {
 
     await expect(page.locator('tr.rsvp_row')).toHaveCount(1);
     await expect(page.locator('tr.rsvp_row')).toContainText('trooper2');
+  });
+});
+
+test.describe('attendance sheet days', () => {
+  /** Friday, Saturday and Sunday of one event. */
+  async function weekend() {
+    const eventId = await createEvent({
+      title: 'Weekend Attendance Troop',
+      start: '2026-10-16 09:00:00',
+      end: '2026-10-18 17:00:00',
+      days: [{ date: '2026-10-16' }, { date: '2026-10-17' }, { date: '2026-10-18' }],
+    });
+    const [friday, saturday, sunday] = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+    return { eventId, friday, saturday, sunday };
+  }
+
+  const daysFor = (page: Page, username: string) =>
+    page.locator('tr.attendee_row').filter({ hasText: username }).locator('.attendee_days');
+
+  test('names one day, lists several, and collapses the whole event to All Days', async ({ page }) => {
+    const { eventId, friday, saturday, sunday } = await weekend();
+    await createRsvp(eventId, 'trooper1', { dayIds: [saturday] });
+    await createRsvp(eventId, 'trooper2', { dayIds: [saturday, sunday] });
+    await createRsvp(eventId, 'nowwcc', { dayIds: [friday, saturday, sunday] });
+
+    await loginAs(page, 'gec');
+    await page.goto(`/event.php?id=${eventId}&action=attendance`);
+
+    await expect(daysFor(page, 'trooper1')).toHaveText('Saturday');
+    // More than one answer is a bullet list.
+    await expect(daysFor(page, 'trooper2').locator('li')).toHaveText(['Saturday', 'Sunday']);
+    await expect(daysFor(page, 'nowwcc')).toHaveText('All Days');
+  });
+
+  test('says which hat a mixed signup is wearing on each day, on one row', async ({ page }) => {
+    const { eventId, saturday, sunday } = await weekend();
+    await createRsvp(eventId, 'trooper1', { dayIds: [saturday] });
+    await createRsvp(eventId, 'trooper1', { role: 'wrangler', dayIds: [sunday] });
+
+    await loginAs(page, 'gec');
+    await page.goto(`/event.php?id=${eventId}&action=attendance`);
+
+    // One person, one line, one box to tick - not one row per role.
+    await expect(page.locator('tr.attendee_row')).toHaveCount(1);
+    await expect(page.locator('tr.attendee_row .attendee_role')).toHaveText('Trooper / Wrangler');
+    await expect(daysFor(page, 'trooper1').locator('li')).toHaveText([
+      'Saturday (Trooping)',
+      'Sunday (Wrangling)',
+    ]);
+  });
+
+  test('answers the day filter with that day, not the rest of the signup', async ({ page }) => {
+    const { eventId, saturday, sunday } = await weekend();
+    await createRsvp(eventId, 'trooper1', { dayIds: [saturday, sunday] });
+
+    await loginAs(page, 'gec');
+    await page.goto(`/event.php?id=${eventId}&action=attendance&filter_day=${sunday}`);
+
+    await expect(daysFor(page, 'trooper1')).toHaveText('Sunday');
+  });
+
+  test('has no Days column at all on an event with no configured days', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Dayless Attendance Troop' });
+    await createRsvp(eventId, 'trooper1', {});
+
+    await loginAs(page, 'gec');
+    await page.goto(`/event.php?id=${eventId}&action=attendance`);
+
+    await expect(page.locator('#attendance_table .attendee_days')).toHaveCount(0);
+    await expect(page.locator('#attendance_table thead th')).toHaveCount(8);
+    // The Legion ID column is named for the Legion, not for one costume's prefix.
+    await expect(page.locator('#attendance_table thead th.attendee_tkid')).toHaveText('Legion ID');
   });
 });
 

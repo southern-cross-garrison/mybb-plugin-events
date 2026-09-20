@@ -48,7 +48,7 @@ test.describe('events listing', () => {
     await expect(page.locator('#events_region_filter')).toHaveValue('Hunter');
   });
 
-  test('marks the events the viewer is attending', async ({ page }) => {
+  test('marks the events the viewer is signed up to', async ({ page }) => {
     const attending = await createEvent({ title: 'Attending Troop' });
     const notAttending = await createEvent({ title: 'Other Troop' });
     await createRsvp(attending, 'trooper1', { costumes: [TK] });
@@ -56,8 +56,8 @@ test.describe('events listing', () => {
     await loginAs(page, 'trooper1');
     await page.goto('/events.php');
 
-    await expect(page.locator(`tr[data-event-id="${attending}"] .event_rsvped`)).toHaveText('Attending');
-    await expect(page.locator(`tr[data-event-id="${notAttending}"] .event_rsvp_link`)).toBeVisible();
+    await expect(page.locator(`tr[data-event-id="${attending}"] .event_trooping`)).toHaveText('Trooping');
+    await expect(page.locator(`tr[data-event-id="${notAttending}"] .event_signup_link`)).toBeVisible();
   });
 
   test('shows pending events to coordinators only', async ({ page }) => {

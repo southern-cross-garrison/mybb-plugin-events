@@ -1,5 +1,6 @@
 import { resetClock, readContainerClock } from './helpers/clock';
 import { alignUserActivityToClock, closeDb } from './helpers/db';
+import { releaseSuiteLock } from './helpers/suite-lock';
 
 /**
  * Hand the dev environment back in a state a human can browse.
@@ -21,5 +22,6 @@ export default async function globalTeardown(): Promise<void> {
     await alignUserActivityToClock(await readContainerClock());
   } finally {
     await closeDb();
+    releaseSuiteLock();
   }
 }

@@ -89,6 +89,21 @@ function events_install()
     events_install_templates();
     events_install_stylesheet();
 
+    events_install_settings();
+}
+
+/**
+ * Create any of the plugin's settings the board does not have yet.
+ *
+ * Called from both install and activate. MyBB gives plugins no upgrade hook, so a
+ * setting added in a later version would otherwise never reach a board that already has
+ * the plugin installed - the same reason events_upgrade_database() runs on activation.
+ * Existing settings are left alone, values and all.
+ */
+function events_install_settings()
+{
+    global $db;
+
     $query = $db->simple_select("settinggroups", "gid", "name = 'events'");
     if($db->num_rows($query) == 0)
     {
@@ -117,6 +132,7 @@ function events_install()
         array("name" => "events_scg_members_group", "title" => "SCG Members Group", "description" => "Used to segment attendees on the troop report", "optionscode" => "groupselectsingle", "disporder" => 7),
         array("name" => "events_501st_members_group", "title" => "501st Members Group", "description" => "Used to segment attendees on the troop report", "optionscode" => "groupselectsingle", "disporder" => 8),
         array("name" => "events_troop_report_forum", "title" => "Troop Report Forum", "description" => "The forum troop reports are posted to", "optionscode" => "forumselectsingle", "disporder" => 9),
+        array("name" => "events_print_logo", "title" => "Print Logo", "description" => "Shown in the ribbon at the top of printed pages. A URL, or a path relative to the board root (e.g. images/logo.png). Leave blank to fall back to the theme's own logo.", "optionscode" => "text", "disporder" => 10),
     );
 
     foreach($settings as $setting)
@@ -184,6 +200,7 @@ function events_activate()
     // Re-sync templates so editing a .html file and re-activating picks up the change.
     events_install_templates();
     events_install_stylesheet();
+    events_install_settings();
     events_register_task();
 
     $optionscode = events_build_profile_field_optionscode();

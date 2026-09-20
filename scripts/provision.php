@@ -360,6 +360,10 @@ $plugin_settings = array(
     'events_scg_members_group' => (string)$groups['scg'],
     'events_501st_members_group' => (string)$groups['legion'],
     'events_troop_report_forum' => (string)$forums['troop_reports'],
+    // The garrison theme hardcodes its logo into the header template rather than filling
+    // in MyBB's theme logo property, so the print ribbon is pointed at the file that
+    // scripts/install-theme.sh copies in.
+    'events_print_logo' => 'images/scg-logo.svg',
 );
 foreach ($plugin_settings as $name => $value) {
     $db->update_query('settings', array('value' => $db->escape_string((string)$value)), "name = '" . $db->escape_string($name) . "'");

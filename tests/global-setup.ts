@@ -6,10 +6,15 @@ import { ALL_USERS, captureLoginState } from './helpers/auth';
 import { BASE_URL, DEVENV_DIR, FORUM_DIR, REPO_ROOT } from './helpers/config';
 import { resetClock, readContainerClock } from './helpers/clock';
 import { snapshotUserFields, closeDb } from './helpers/db';
+import { acquireSuiteLock } from './helpers/suite-lock';
 
 const run = promisify(execFile);
 
 export default async function globalSetup(): Promise<void> {
+  // Before anything is restored or wiped, so a second run bounces off rather than
+  // trampling the one already going.
+  acquireSuiteLock();
+
   await assertEnvironmentIsUp();
 
   // Start every run from the provisioned snapshot so leftovers from a previous run

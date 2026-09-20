@@ -55,10 +55,44 @@ if($action === 'attendance')
 
     // Fetched a role at a time rather than sorted in SQL: MySQL orders ENUMs by their
     // declaration ordinal, which only matches alphabetical order here by coincidence.
-    $attendees = array_merge(
+    // Troopers first, then the people who are only wrangling.
+    $signups = array_merge(
         events_get_attendees($event_id, array('day' => $filter_day, 'role' => 'trooper')),
         events_get_attendees($event_id, array('day' => $filter_day, 'role' => 'wrangler'))
     );
+
+    // One line per person rather than per role. Somebody trooping the Saturday and
+    // wrangling the Sunday is one human to tick off on the day, and it is their day list
+    // that says which way round - two rows would mean two ticks for one person.
+    $attendees = array();
+    foreach($signups as $signup_row)
+    {
+        $uid = (int)$signup_row['uid'];
+
+        if(!isset($attendees[$uid]))
+        {
+            $attendees[$uid] = $signup_row;
+            $attendees[$uid]['roles'] = array();
+            $attendees[$uid]['role_days'] = array();
+            $attendees[$uid]['costumes'] = array();
+        }
+
+        $attendees[$uid]['roles'][] = $signup_row['role'];
+
+        $day_ids = array();
+        foreach($signup_row['days'] as $day)
+        {
+            $day_ids[] = (int)$day['id'];
+        }
+        $attendees[$uid]['role_days'][$signup_row['role']] = $day_ids;
+
+        // Only the trooper half of a signup carries costumes.
+        if($signup_row['role'] === 'trooper')
+        {
+            $attendees[$uid]['costumes'] = $signup_row['costumes'];
+        }
+    }
+    $attendees = array_values($attendees);
 
     $attendance_day_heading = '';
     $attendance_day_filter = '';
@@ -85,27 +119,105 @@ if($action === 'attendance')
             . '</form>';
     }
 
+    // The Days column only exists for an event that has days to list, so the header is
+    // built here rather than sitting static in the template.
+    $attendance_columns = array(
+        'attendee_num'       => '#',
+        'attendee_username'  => 'Username',
+        'attendee_role'      => 'Role',
+        'attendee_tkid'      => 'Legion ID',
+        'attendee_costumes'  => 'Costumes',
+    );
+
+    if(!empty($event_days))
+    {
+        $attendance_columns['attendee_days'] = 'Days';
+    }
+
+    $attendance_columns['attendee_mobile'] = 'Mobile';
+    $attendance_columns['attendee_emergency'] = 'Emergency Contact';
+    $attendance_columns['attendee_attended'] = 'Attended';
+
+    $attendance_headers = '<tr>';
+    foreach($attendance_columns as $class => $label)
+    {
+        $attendance_headers .= '<th class="' . $class . '">' . $label . '</th>';
+    }
+    $attendance_headers .= '</tr>';
+
+    $attendance_colspan = count($attendance_columns);
+    // Drives the column widths, which differ by one column between the two layouts.
+    $attendance_table_class = !empty($event_days) ? 'has_days' : '';
+
     $attendees_rows = '';
     $position = 0;
     foreach($attendees as $attendee)
     {
         $position++;
         $attendees_rows .= '<tr class="attendee_row" data-uid="' . $attendee['uid'] . '">';
-        $attendees_rows .= '<td>' . $position . '</td>';
+        $attendees_rows .= '<td class="attendee_num">' . $position . '</td>';
         $attendees_rows .= '<td class="attendee_username">' . htmlspecialchars_uni($attendee['username']) . '</td>';
-        $attendees_rows .= '<td class="attendee_role">' . events_role_label($attendee['role']) . '</td>';
+        $attendees_rows .= '<td class="attendee_role">'
+            . htmlspecialchars_uni(implode(' / ', array_map('events_role_label', array_unique($attendee['roles'])))) . '</td>';
         $attendees_rows .= '<td class="attendee_tkid">' . htmlspecialchars_uni($attendee['tk_id']) . '</td>';
         $attendees_rows .= '<td class="attendee_costumes">' . htmlspecialchars_uni(implode(', ', $attendee['costumes'])) . '</td>';
+
+        if(!empty($event_days))
+        {
+            // Filtering to one day is a question about that day, so the answer names it
+            // rather than reciting the rest of the signup around it.
+            $role_days = $attendee['role_days'];
+            if($filter_day)
+            {
+                foreach($role_days as $role => $day_ids)
+                {
+                    $role_days[$role] = array_values(array_intersect($day_ids, array($filter_day)));
+                    if(empty($role_days[$role]))
+                    {
+                        unset($role_days[$role]);
+                    }
+                }
+            }
+
+            $day_items = events_attendance_day_items($event_days, $role_days);
+            $day_items = array_map('htmlspecialchars_uni', $day_items);
+
+            // A single answer is a sentence, not a list; more than one gets bullets.
+            $days_cell = (count($day_items) > 1)
+                ? '<ul class="attendee_days_list"><li>' . implode('</li><li>', $day_items) . '</li></ul>'
+                : implode('', $day_items);
+
+            $attendees_rows .= '<td class="attendee_days">' . $days_cell . '</td>';
+        }
+
         $attendees_rows .= '<td class="attendee_mobile">' . htmlspecialchars_uni($attendee['mobile']) . '</td>';
         $attendees_rows .= '<td class="attendee_emergency">' . htmlspecialchars_uni($attendee['emergency_contact']) . '</td>';
-        $attendees_rows .= '<td class="attendee_signature">&nbsp;</td>';
+        // A real checkbox rather than a drawn box, so a coordinator can tick people off on
+        // screen and print the sheet with those ticks already on it - the print comes off
+        // the live page, so its state goes with it.
+        $attendees_rows .= '<td class="attendee_attended">'
+            . '<input type="checkbox" class="attendee_tick" aria-label="Attended: '
+            . htmlspecialchars_uni($attendee['username']) . '" /></td>';
         $attendees_rows .= '</tr>';
     }
 
     if($attendees_rows === '')
     {
-        $attendees_rows = '<tr id="attendance_empty"><td colspan="8">No attendees yet.</td></tr>';
+        $attendees_rows = '<tr id="attendance_empty"><td colspan="' . $attendance_colspan . '">No attendees yet.</td></tr>';
     }
+
+    // The printed sheet leaves the board behind, so the facts a coordinator needs on the
+    // clipboard - which event, where, when, and how many people to tick off - ride along
+    // in the masthead rather than being left on the screen behind them.
+    $events_print_header = events_print_header(
+        $event['title'],
+        array(
+            $event['region'],
+            events_format_date($event['start_date']),
+            count($attendees) . ' ' . (count($attendees) === 1 ? 'attendee' : 'attendees'),
+        ),
+        'Attendance Sheet'
+    );
 
     eval("\$page = \"" . $templates->get("events_attendance") . "\";");
     output_page($page);
@@ -148,47 +260,55 @@ if(!empty($event_days))
     $event_days_block = '<div id="event_days"><h3>Event Days</h3><ul>' . $items . '</ul></div>';
 }
 
-$has_trooper_rsvp = events_has_rsvped($event_id, null, 'trooper');
-$has_wrangler_rsvp = events_has_rsvped($event_id, null, 'wrangler');
-$lock_reason = events_rsvp_lock_reason($event, null, 'trooper');
-$wrangler_lock_reason = events_rsvp_lock_reason($event, null, 'wrangler');
+$signup = events_get_user_signup($event_id);
+$has_signup = !empty($signup);
+$lock_reason = events_signup_lock_reason($event);
 
-// The signup calls to action are styled as buttons (see the events_event template), with
-// the primary colour matching the role's dot on the events listing. Everything that is not
-// a signup is a secondary button, so the two signup actions stay the obvious thing to do.
+// The signup call to action is styled as a button (see the events_event template) with
+// the primary colour matching the trooper dot on the events listing. Everything that is
+// not the signup is a secondary button, so signing up stays the obvious thing to do.
 $event_actions = '';
-if($has_trooper_rsvp)
+if($has_signup)
 {
-    $event_actions .= '<span class="event_action_status event_action_status_trooper" id="event_rsvp_status">&#10003; You have RSVPed to this event</span>';
+    // One pill per role held, each naming the days it covers, so a mixed signup reads
+    // back as what it is rather than as a single "you are attending".
+    foreach(events_rsvp_roles() as $role)
+    {
+        if(!isset($signup[$role]))
+        {
+            continue;
+        }
+
+        // Days are only spelled out when the role covers some of them. "Trooping" says
+        // everything there is to say about a signup that covers the whole event.
+        $label = events_role_verb($role);
+        $day_labels = events_day_labels($event_days, $signup[$role]['days'], 'short');
+        if(!empty($day_labels) && count($day_labels) < count($event_days))
+        {
+            $label .= ': ' . implode(', ', $day_labels);
+        }
+
+        $event_actions .= '<span class="event_action_status event_signup_status event_action_status_' . $role . '" id="event_signup_status_' . $role . '">'
+                        . '<span class="event_signup_tick">&#10003;</span> ' . htmlspecialchars_uni($label) . '</span>';
+    }
+
+    if($lock_reason === null)
+    {
+        $event_actions .= '<a class="event_action event_action_secondary" href="rsvp.php?id=' . $event_id . '" id="event_signup_update">Update Your Signup</a>';
+    }
 }
 elseif($lock_reason === null)
 {
-    $event_actions .= '<a class="event_action event_action_primary" href="rsvp.php?id=' . $event_id . '" id="event_rsvp">RSVP to Event</a>';
+    $event_actions .= '<a class="event_action event_action_primary" href="rsvp.php?id=' . $event_id . '" id="event_signup">Sign Up to Attend</a>';
 }
 else
 {
-    $event_actions .= '<span class="event_action event_action_locked" id="event_rsvp_locked" data-lock-reason="' . htmlspecialchars_uni($lock_reason) . '">'
-                    . htmlspecialchars_uni(events_rsvp_lock_message($lock_reason)) . '</span>';
+    $event_actions .= '<span class="event_action event_action_locked" id="event_signup_locked" data-lock-reason="' . htmlspecialchars_uni($lock_reason) . '">'
+                    . htmlspecialchars_uni(events_signup_lock_message($lock_reason)) . '</span>';
 }
 
-// The wrangler affordance is a link or a status, never a second lock message - an
-// excluded member should not be told they are excluded twice.
-if($has_wrangler_rsvp)
-{
-    $event_actions .= '<span class="event_action_status event_action_status_wrangler" id="event_wrangle_status">&#10003; You are wrangling this event</span>';
-}
-elseif($wrangler_lock_reason === null)
-{
-    $event_actions .= '<a class="event_action event_action_wrangle" href="rsvp.php?id=' . $event_id . '&amp;role=wrangler" id="event_wrangle">Sign Up to Wrangle</a>';
-}
-elseif($wrangler_lock_reason === 'already_wrangling')
-{
-    $event_actions .= '<span class="event_action event_action_locked" id="event_wrangle_locked" data-lock-reason="already_wrangling">'
-                    . htmlspecialchars_uni(events_rsvp_lock_message('already_wrangling')) . '</span>';
-}
-
-// A wrangler is attending, so they get the calendar file too.
-if($has_trooper_rsvp || $has_wrangler_rsvp)
+// A wrangler is attending too, so any signup gets the calendar file.
+if($has_signup)
 {
     $event_actions .= '<a class="event_action event_action_secondary" href="ical.php?id=' . $event_id . '" id="event_ical">Add to Calendar</a>';
 }
@@ -249,11 +369,12 @@ if($is_gec)
         $rsvp_rows = '';
         foreach($attendees as $attendee)
         {
-            $day_labels = array();
+            $attended_day_ids = array();
             foreach($attendee['days'] as $day)
             {
-                $day_labels[] = events_day_short_label($day);
+                $attended_day_ids[] = (int)$day['id'];
             }
+            $day_labels = events_day_labels($event_days, $attended_day_ids, 'short');
 
             $rsvp_rows .= '<tr class="rsvp_row" data-uid="' . $attendee['uid'] . '">';
             $rsvp_rows .= '<td class="trow1 rsvp_username">' . htmlspecialchars_uni($attendee['username']) . '</td>';
@@ -276,6 +397,11 @@ if($is_gec)
         $gec_block .= $rsvp_list;
     }
 }
+
+$events_print_header = events_print_header($event['title'], array(
+    $event['region'],
+    events_format_date($event['start_date']),
+));
 
 eval("\$page = \"" . $templates->get("events_event") . "\";");
 output_page($page);

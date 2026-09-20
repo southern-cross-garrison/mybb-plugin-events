@@ -64,6 +64,101 @@ function events_escape_bbcode($value)
 }
 
 /**
+ * The <img> for the print ribbon, or nothing when the board has no logo to use.
+ *
+ * The Print Logo setting comes first so a board can put something on paper that is not
+ * what it puts on screen - a mono mark, or a logo with the garrison's name in it, since
+ * the ribbon has no room for a wordmark. It falls back to $theme['logo'], which is where
+ * MyBB keeps a theme's own logo, so a theme that fills that in needs no configuration at
+ * all. A theme that hardcodes its logo into the header template (as the garrison's does)
+ * leaves it empty, which is what the setting is for.
+ *
+ * @return string
+ */
+function events_print_logo()
+{
+    global $mybb, $theme;
+
+    $logo = trim(events_get_setting('print_logo'));
+    if($logo === '' && !empty($theme['logo']))
+    {
+        $logo = trim($theme['logo']);
+    }
+
+    if($logo === '')
+    {
+        return '';
+    }
+
+    // Theme logos are conventionally stored relative to the board root.
+    if(!preg_match('#^(?:https?:)?//#', $logo))
+    {
+        $logo = $mybb->settings['bburl'] . '/' . ltrim($logo, '/');
+    }
+
+    // Anything that could close the url() and start a new declaration. The value is
+    // admin-set rather than member-set, but it is interpolated into CSS and an
+    // htmlspecialchars() does nothing about that.
+    $logo = str_replace(array('"', "'", '(', ')', '\\', ';', '{', '}'), '', $logo);
+    if(trim($logo) === '')
+    {
+        return '';
+    }
+
+    // An empty element carrying the URL as a custom property, not an <img>.
+    //
+    // The ribbon is display:none on screen, but a browser fetches an <img> in a hidden
+    // element anyway - loading="lazy" included - so every visit to every page of the
+    // plugin would pay for a garrison logo that only a printout ever shows. A background
+    // image declared inside @media print is only fetched when the print styles apply,
+    // which is exactly the behaviour wanted. The mark is decorative: the board's name is
+    // spelled out beside it, so nothing is lost by it being absent.
+    return '<span class="events_print_logo" style="--events-print-logo:url(&quot;'
+         . htmlspecialchars_uni(trim($logo)) . '&quot;)" aria-hidden="true"></span>';
+}
+
+/**
+ * The masthead the plugin's pages carry into print.
+ *
+ * Printing a plugin page strips the board's own header, navigation and footer (see the
+ * @media print block in events.css), so the sheet would otherwise come off the printer
+ * with nothing on it saying which board or which event it belongs to. This block is
+ * hidden on screen and shown in print, and lives inside .events_page_wrap because that
+ * wrapper is the only thing print keeps.
+ *
+ * @param string $title The subject of the sheet, e.g. the event's name
+ * @param array $meta Plain-text facts to run along one line under the title
+ * @param string $kind What kind of document this is, appended to the board line
+ * @return string
+ */
+function events_print_header($title, array $meta = array(), $kind = '')
+{
+    global $mybb;
+
+    $board = $mybb->settings['bbname'];
+    if($kind !== '')
+    {
+        $board .= ' - ' . $kind;
+    }
+
+    $html = '<div class="events_print_header">'
+          . '<div class="events_print_ribbon">' . events_print_logo()
+          . '<span class="events_print_board">' . htmlspecialchars_uni($board) . '</span></div>'
+          . '<span class="events_print_title">' . htmlspecialchars_uni($title) . '</span>';
+
+    $meta = array_filter($meta, 'strlen');
+    if(!empty($meta))
+    {
+        // Escaped a value at a time so the separator stays markup rather than becoming
+        // a literal "&middot;" in the middle of the line.
+        $html .= '<span class="events_print_meta">'
+               . implode(' &middot; ', array_map('htmlspecialchars_uni', $meta)) . '</span>';
+    }
+
+    return $html . '</div>';
+}
+
+/**
  * Human label for a single event day.
  *
  * @param array $day
@@ -194,17 +289,38 @@ function events_signup_steps(array $roles, array $missing)
 }
 
 /**
- * The step that follows $step, or 'confirm' at the end of the sequence.
+ * The next step that applies after $step.
+ *
+ * Walking the canonical order rather than the applicable list is what lets a step drop
+ * out from under the caller: saving the prerequisites is the act that removes the
+ * prerequisites step from the sequence, so "the step after prerequisites" has to stay
+ * answerable once prerequisites is no longer in it.
  *
  * @param string $step
- * @param array $steps
+ * @param array $roles
+ * @param array $missing
  * @return string
  */
-function events_signup_step_after($step, array $steps)
+function events_signup_next_step($step, array $roles, array $missing)
 {
-    $index = array_search($step, $steps, true);
+    $order = array('attendance', 'prerequisites', 'costumes', 'confirm');
+    $applicable = events_signup_steps($roles, $missing);
 
-    return ($index === false || !isset($steps[$index + 1])) ? 'confirm' : $steps[$index + 1];
+    $index = array_search($step, $order, true);
+    if($index === false)
+    {
+        return 'confirm';
+    }
+
+    for($next = $index + 1; $next < count($order); $next++)
+    {
+        if(in_array($order[$next], $applicable, true))
+        {
+            return $order[$next];
+        }
+    }
+
+    return 'confirm';
 }
 
 /**
@@ -221,25 +337,114 @@ function events_role_verb($role)
 /**
  * Labels for the subset of an event's days a signup covers, in the event's own order.
  *
+ * Three styles: 'full' spells the day out with its times, 'short' is the date alone for
+ * dense tables, and 'weekday' is the day's name - which is how people talk about the days
+ * of a weekend event, and what the attendance sheet reads best in.
+ *
  * @param array $event_days
  * @param array $day_ids
- * @param bool $short
+ * @param string $style full|short|weekday
  * @return array
  */
-function events_day_labels(array $event_days, array $day_ids, $short = false)
+function events_day_labels(array $event_days, array $day_ids, $style = 'full')
 {
     $day_ids = array_map('intval', $day_ids);
+
+    // A date can carry more than one session - a morning and an afternoon - and neither
+    // the short nor the weekday label mentions the time, so two of them would read as the
+    // same day twice. Count the dates first and qualify the ones that repeat.
+    $per_date = array();
+    foreach($event_days as $day)
+    {
+        $per_date[$day['date']] = isset($per_date[$day['date']]) ? $per_date[$day['date']] + 1 : 1;
+    }
 
     $labels = array();
     foreach($event_days as $day)
     {
-        if(in_array((int)$day['id'], $day_ids, true))
+        if(!in_array((int)$day['id'], $day_ids, true))
         {
-            $labels[] = $short ? events_day_short_label($day) : events_day_label($day);
+            continue;
         }
+
+        if($style === 'full')
+        {
+            $labels[] = events_day_label($day);
+            continue;
+        }
+
+        $label = ($style === 'weekday')
+            ? my_date('l', strtotime($day['date']), 0, 0)
+            : events_day_short_label($day);
+
+        if($per_date[$day['date']] > 1 && !empty($day['start_time']))
+        {
+            $label .= ' ' . my_date('H:i', strtotime($day['date'] . ' ' . $day['start_time']), 0, 0);
+        }
+
+        $labels[] = $label;
     }
 
     return $labels;
+}
+
+/**
+ * What the attendance sheet says about when somebody is turning up.
+ *
+ * Reads the way a coordinator would say it out loud: the whole event is "All Days", part
+ * of it names the days, and a signup that troops one day and wrangles another names the
+ * role against each so the sheet says which hat they are wearing when.
+ *
+ * @param array $event_days Every day the event has
+ * @param array $role_days role => array of event_day_id the person holds in that role
+ * @return array display strings, one per line
+ */
+function events_attendance_day_items(array $event_days, array $role_days)
+{
+    $attending = array();
+    foreach($role_days as $role => $day_ids)
+    {
+        foreach($day_ids as $day_id)
+        {
+            $attending[(int)$day_id] = $role;
+        }
+    }
+
+    if(empty($attending))
+    {
+        return array();
+    }
+
+    $mixed = count($role_days) > 1;
+
+    // Only worth collapsing when there is more than one day to collapse, and when the
+    // whole event is being attended the same way round.
+    if(!$mixed && count($event_days) > 1 && count($attending) === count($event_days))
+    {
+        return array('All Days');
+    }
+
+    $items = array();
+    foreach($event_days as $day)
+    {
+        $day_id = (int)$day['id'];
+        if(!isset($attending[$day_id]))
+        {
+            continue;
+        }
+
+        $label = events_day_labels($event_days, array($day_id), 'weekday');
+        $label = isset($label[0]) ? $label[0] : '';
+
+        if($mixed)
+        {
+            $label .= ' (' . events_role_verb($attending[$day_id]) . ')';
+        }
+
+        $items[] = $label;
+    }
+
+    return $items;
 }
 
 /**
