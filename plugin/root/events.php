@@ -12,7 +12,7 @@ require_once "./global.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
 
-if(!$mybb->user['uid'])
+if(!events_can_view_events_page())
 {
     error_no_permission();
 }
@@ -98,23 +98,25 @@ foreach($events as $event)
     $wrangling = in_array((int)$event['id'], $user_wrangler_rsvps, true);
     $lock_reason = events_rsvp_lock_reason($event, null, 'trooper');
 
+    // Note the pill text stays exactly "Attending"/"Wrangling": the styling lives on the
+    // class, so the labels remain the whole text content of those elements.
     if($rsvped)
     {
-        $you = '<span class="event_rsvped">Attending</span>';
+        $you = '<span class="event_pill event_pill_trooper event_rsvped">Attending</span>';
     }
     elseif($lock_reason === null)
     {
-        $you = '<a class="event_rsvp_link" href="rsvp.php?id=' . (int)$event['id'] . '">RSVP</a>';
+        $you = '<a class="event_btn event_rsvp_link" href="rsvp.php?id=' . (int)$event['id'] . '">RSVP</a>';
     }
     else
     {
-        $you = '<span class="event_locked" data-lock-reason="' . htmlspecialchars_uni($lock_reason) . '">'
+        $you = '<span class="event_pill event_pill_locked event_locked" data-lock-reason="' . htmlspecialchars_uni($lock_reason) . '">'
              . htmlspecialchars_uni(events_rsvp_lock_message($lock_reason)) . '</span>';
     }
 
     if($wrangling)
     {
-        $you .= ' <span class="event_wrangling">Wrangling</span>';
+        $you .= ' <span class="event_pill event_pill_wrangler event_wrangling">Wrangling</span>';
     }
 
     $events_rows .= '<tr class="event_row" data-event-id="' . (int)$event['id'] . '" data-event-status="' . htmlspecialchars_uni($event['status']) . '">';

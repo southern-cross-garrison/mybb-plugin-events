@@ -19,6 +19,25 @@ test.describe('plugin installation', () => {
     ]);
   });
 
+  test('ships its stylesheet as an inheritable theme stylesheet, scoped to its own pages', async ({ page }) => {
+    // Installed on the master theme (tid 1) so every theme inherits it and can override it
+    // by editing its own copy - the same way the board's other plugin stylesheets work.
+    const [sheet] = await query(
+      `SELECT tid, attachedto FROM ${T('themestylesheets')} WHERE name = 'events.css'`,
+    );
+    expect(sheet?.tid).toBe(1);
+    expect(sheet?.attachedto).toBe('events.php|event.php|rsvp.php|troop_report.php');
+
+    // A stylesheet missing from a theme's display order is silently never output, so
+    // assert on the rendered page rather than just the row.
+    await loginAs(page, 'trooper1');
+    await page.goto('/events.php');
+    await expect(page.locator('link[href*="events.css"]')).toHaveCount(1);
+
+    await page.goto('/index.php');
+    await expect(page.locator('link[href*="events.css"]')).toHaveCount(0);
+  });
+
   test('carries the signup role column and a role-aware unique key', async () => {
     // The schema migration runs from events_activate(), so a stale snapshot is the one
     // thing that silently breaks every wrangler test. Assert it directly.
@@ -51,14 +70,26 @@ test.describe('plugin installation', () => {
     expect(await getSetting('events_troop_report_forum')).toBe(String(f.forums.troop_reports));
   });
 
-  test('adds an Events link to the board navigation', async ({ page }) => {
+  test('replaces the board Calendar link with an Events one', async ({ page }) => {
     await loginAs(page, 'trooper1');
     await page.goto('/index.php');
 
     const link = page.locator('#nav_events');
     await expect(link).toHaveText('Events');
+    await expect(page.locator('a[href*="calendar.php"]')).toHaveCount(0);
+
     await link.click();
     await expect(page).toHaveTitle(/^Events - /);
+  });
+
+  test('offers the Events link only to users who can open the page', async ({ page }) => {
+    await logout(page);
+    await page.goto('/index.php');
+
+    // A guest gets neither: the events page would only turn them away, and the board
+    // calendar the link replaced is gone for everybody.
+    await expect(page.locator('#nav_events')).toHaveCount(0);
+    await expect(page.locator('a[href*="calendar.php"]')).toHaveCount(0);
   });
 
   test('keeps the events pages behind a login', async ({ page }) => {

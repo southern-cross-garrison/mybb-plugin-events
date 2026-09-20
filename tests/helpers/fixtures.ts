@@ -11,8 +11,7 @@ export const test = base.extend<{ cleanBoard: void }>({
     async ({}, use) => {
       await resetPluginData();
       await deletePrivateMessages();
-      await resetToTestNow();
-      await alignUserActivityToClock(await readContainerClock());
+      await moveClock(resetToTestNow);
       await use();
     },
     { auto: true },
@@ -20,8 +19,27 @@ export const test = base.extend<{ cleanBoard: void }>({
 });
 
 test.afterAll(async () => {
-  await resetClock();
+  await moveClock(resetClock);
 });
+
+/**
+ * Move the container clock, and bring MyBB's per-user activity timestamps with it.
+ *
+ * The two always travel together. MyBB's shutdown handler adds `now - lastactive` to
+ * users.timeonline, which is UNSIGNED, so a clock that moves *backwards* on its own -
+ * the rewind to real time at the end of a run, as much as the jump back to TEST_NOW at
+ * the start of each test - leaves the timestamps in the future and makes the very next
+ * page view die with "BIGINT UNSIGNED value is out of range". That outlives the suite:
+ * it is the dev forum in a browser that breaks, until the next db-restore.sh.
+ *
+ * Reading the clock back is an HTTP round trip to _clockprobe.php, which is a bare
+ * `date()` script rather than a MyBB page, so it is safe to call while the timestamps
+ * are still ahead of the clock.
+ */
+async function moveClock(move: () => Promise<void>): Promise<void> {
+  await move();
+  await alignUserActivityToClock(await readContainerClock());
+}
 
 export { expect };
 

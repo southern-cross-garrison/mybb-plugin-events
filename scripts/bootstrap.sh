@@ -43,6 +43,8 @@ fi
 # Dev-only probe so the e2e suite can assert the faked clock reached PHP.
 printf '%s' '<?php echo date("Y-m-d H:i:s");' > "$FORUM_DIR/_clockprobe.php"
 
+"$REPO_ROOT/scripts/install-theme.sh"
+
 log "Provisioning fixtures and activating the plugin"
 dc exec -T web php /dev/stdin < "$REPO_ROOT/scripts/provision.php"
 

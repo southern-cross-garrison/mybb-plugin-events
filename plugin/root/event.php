@@ -153,57 +153,60 @@ $has_wrangler_rsvp = events_has_rsvped($event_id, null, 'wrangler');
 $lock_reason = events_rsvp_lock_reason($event, null, 'trooper');
 $wrangler_lock_reason = events_rsvp_lock_reason($event, null, 'wrangler');
 
+// The signup calls to action are styled as buttons (see the events_event template), with
+// the primary colour matching the role's dot on the events listing. Everything that is not
+// a signup is a secondary button, so the two signup actions stay the obvious thing to do.
 $event_actions = '';
 if($has_trooper_rsvp)
 {
-    $event_actions .= '<span id="event_rsvp_status">You have RSVPed to this event</span> ';
+    $event_actions .= '<span class="event_action_status event_action_status_trooper" id="event_rsvp_status">&#10003; You have RSVPed to this event</span>';
 }
 elseif($lock_reason === null)
 {
-    $event_actions .= '<a href="rsvp.php?id=' . $event_id . '" id="event_rsvp">RSVP to Event</a> ';
+    $event_actions .= '<a class="event_action event_action_primary" href="rsvp.php?id=' . $event_id . '" id="event_rsvp">RSVP to Event</a>';
 }
 else
 {
-    $event_actions .= '<span id="event_rsvp_locked" data-lock-reason="' . htmlspecialchars_uni($lock_reason) . '">'
-                    . htmlspecialchars_uni(events_rsvp_lock_message($lock_reason)) . '</span> ';
+    $event_actions .= '<span class="event_action event_action_locked" id="event_rsvp_locked" data-lock-reason="' . htmlspecialchars_uni($lock_reason) . '">'
+                    . htmlspecialchars_uni(events_rsvp_lock_message($lock_reason)) . '</span>';
 }
 
 // The wrangler affordance is a link or a status, never a second lock message - an
 // excluded member should not be told they are excluded twice.
 if($has_wrangler_rsvp)
 {
-    $event_actions .= '<span id="event_wrangle_status">You are wrangling this event</span> ';
+    $event_actions .= '<span class="event_action_status event_action_status_wrangler" id="event_wrangle_status">&#10003; You are wrangling this event</span>';
 }
 elseif($wrangler_lock_reason === null)
 {
-    $event_actions .= '<a href="rsvp.php?id=' . $event_id . '&amp;role=wrangler" id="event_wrangle">Sign Up to Wrangle</a> ';
+    $event_actions .= '<a class="event_action event_action_wrangle" href="rsvp.php?id=' . $event_id . '&amp;role=wrangler" id="event_wrangle">Sign Up to Wrangle</a>';
 }
 elseif($wrangler_lock_reason === 'already_wrangling')
 {
-    $event_actions .= '<span id="event_wrangle_locked" data-lock-reason="already_wrangling">'
-                    . htmlspecialchars_uni(events_rsvp_lock_message('already_wrangling')) . '</span> ';
+    $event_actions .= '<span class="event_action event_action_locked" id="event_wrangle_locked" data-lock-reason="already_wrangling">'
+                    . htmlspecialchars_uni(events_rsvp_lock_message('already_wrangling')) . '</span>';
 }
 
 // A wrangler is attending, so they get the calendar file too.
 if($has_trooper_rsvp || $has_wrangler_rsvp)
 {
-    $event_actions .= '<a href="ical.php?id=' . $event_id . '" id="event_ical">Download iCal</a> ';
+    $event_actions .= '<a class="event_action event_action_secondary" href="ical.php?id=' . $event_id . '" id="event_ical">Add to Calendar</a>';
 }
 
 if(!empty($event['thread_id']))
 {
-    $event_actions .= '<a href="showthread.php?tid=' . (int)$event['thread_id'] . '" id="event_thread">View Discussion Thread</a> ';
+    $event_actions .= '<a class="event_action event_action_secondary" href="showthread.php?tid=' . (int)$event['thread_id'] . '" id="event_thread">View Discussion Thread</a>';
 }
 
 if(events_can_create_troop_report($event))
 {
-    $event_actions .= '<a href="troop_report.php?id=' . $event_id . '" id="event_troop_report">Create Troop Report</a> ';
+    $event_actions .= '<a class="event_action event_action_secondary" href="troop_report.php?id=' . $event_id . '" id="event_troop_report">Create Troop Report</a>';
 }
 
 $report = events_get_troop_report($event_id);
 if($report && !empty($report['posted_at']) && !empty($report['thread_id']))
 {
-    $event_actions .= '<a href="showthread.php?tid=' . (int)$report['thread_id'] . '" id="event_troop_report_posted">View Troop Report</a> ';
+    $event_actions .= '<a class="event_action event_action_secondary" href="showthread.php?tid=' . (int)$report['thread_id'] . '" id="event_troop_report_posted">View Troop Report</a>';
 }
 
 // ---------------------------------------------------------------------------
@@ -212,10 +215,15 @@ if($report && !empty($report['posted_at']) && !empty($report['thread_id']))
 $gec_block = '';
 if($is_gec)
 {
-    $gec_block = '<div id="gec_controls"><h3>Coordinator Controls</h3>'
-        . '<a href="event.php?id=' . $event_id . '&amp;action=rsvps" id="gec_view_rsvps">View RSVPs</a> | '
-        . '<a href="event.php?id=' . $event_id . '&amp;action=attendance" id="gec_attendance">View Attendance Sheet</a>'
-        . '</div>';
+    // Built with the same tborder/thead/trow structure as the plugin's templates, so the
+    // block picks up a theme's table styling like everything else rather than sitting on
+    // the page as a bare heading.
+    $gec_block = '<table border="0" cellspacing="' . (int)$theme['borderwidth'] . '" cellpadding="' . (int)$theme['tablespace'] . '" class="tborder" id="gec_controls">'
+        . '<tr><td class="thead"><strong>Coordinator Controls</strong></td></tr>'
+        . '<tr><td class="trow1"><div class="gec_actions">'
+        . '<a class="event_action event_action_secondary" href="event.php?id=' . $event_id . '&amp;action=rsvps" id="gec_view_rsvps">View RSVPs</a>'
+        . '<a class="event_action event_action_secondary" href="event.php?id=' . $event_id . '&amp;action=attendance" id="gec_attendance">View Attendance Sheet</a>'
+        . '</div></td></tr></table>';
 
     if($action === 'rsvps')
     {

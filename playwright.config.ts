@@ -5,6 +5,7 @@ const BASE_URL = process.env.BASE_URL ?? 'http://localhost:8080';
 export default defineConfig({
   testDir: './tests/e2e',
   globalSetup: './tests/global-setup.ts',
+  globalTeardown: './tests/global-teardown.ts',
   outputDir: './.devenv/test-results',
 
   // The suite drives one shared MyBB instance and one shared (faked) clock, so tests

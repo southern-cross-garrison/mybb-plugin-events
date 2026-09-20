@@ -23,10 +23,17 @@ function events_register_hooks()
 }
 
 /**
- * Add an "Events" item to the board's top navigation.
+ * Swap the board's Calendar navigation item for an "Events" one.
  *
- * MyBB's header template has no plugin-facing placeholder, so the link is injected
- * into the rendered top_links list.
+ * MyBB's header template has no plugin-facing placeholder, so this works on the rendered
+ * page. The board's own calendar is unused - events live in this plugin - so its menu item
+ * is taken over rather than sat beside, and the replacement reuses the markup the active
+ * theme put there so it stays styled like its neighbours. That matters because themes
+ * rewrite the header wholesale: the SCG theme replaces MyBB's <ul class="menu top_links">
+ * with a Bootstrap navbar.
+ *
+ * The Calendar item goes whoever is looking; the Events item only appears for users who
+ * could actually open events.php.
  *
  * @param string $page
  * @return string
@@ -35,14 +42,54 @@ function events_nav_menu(&$page)
 {
     global $mybb;
 
-    $marker = '<ul class="menu top_links">';
-    if(strpos($page, $marker) === false || strpos($page, 'id="nav_events"') !== false)
+    // Only events_hooks.php is loaded on every request (see inc/plugins/events.php), so the
+    // permission helper has to be pulled in here rather than assumed.
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
+
+    if(strpos($page, 'id="nav_events"') !== false)
     {
         return $page;
     }
 
-    $link = $marker . '<li><a href="' . $mybb->settings['bburl'] . '/events.php" id="nav_events" class="events">Events</a></li>';
-    $page = preg_replace('/' . preg_quote($marker, '/') . '/', $link, $page, 1);
+    $show_events = events_can_view_events_page();
+    $url = $mybb->settings['bburl'] . '/events.php';
+
+    // Themes that leave MyBB's template HTML comments on wrap the item in them, so those
+    // are swallowed too - otherwise removing the item would leave an empty pair behind.
+    $calendar_item = '#(?:<!--\s*start:\s*header_menu_calendar\s*-->\s*)?'
+        . '(<li\b[^>]*>)\s*(<a\b[^>]*\bhref="[^"]*calendar\.php[^"]*"[^>]*>).*?</a>\s*</li>'
+        . '(?:\s*<!--\s*end:\s*header_menu_calendar\s*-->)?#is';
+
+    if(preg_match($calendar_item, $page, $match, PREG_OFFSET_CAPTURE))
+    {
+        list($item, $offset) = $match[0];
+        $replacement = '';
+
+        if($show_events)
+        {
+            // Carry the theme's own anchor classes across, minus "calendar" - that one is
+            // how MyBB's default theme names the item's sprite icon, not a shared style.
+            $classes = array('events');
+            if(preg_match('#\bclass="([^"]*)"#i', $match[2][0], $class_match))
+            {
+                $classes = array_merge($classes, array_diff(preg_split('#\s+#', trim($class_match[1]), -1, PREG_SPLIT_NO_EMPTY), array('calendar')));
+            }
+
+            $replacement = $match[1][0] . '<a href="' . $url . '" id="nav_events" class="' . implode(' ', $classes) . '">Events</a></li>';
+        }
+
+        $page = substr_replace($page, $replacement, $offset, strlen($item));
+
+        return $page;
+    }
+
+    // Boards with the calendar switched off still have MyBB's default menu container.
+    $marker = '<ul class="menu top_links">';
+    if($show_events && ($offset = strpos($page, $marker)) !== false)
+    {
+        $item = '<li><a href="' . $url . '" id="nav_events" class="events">Events</a></li>';
+        $page = substr_replace($page, $item, $offset + strlen($marker), 0);
+    }
 
     return $page;
 }

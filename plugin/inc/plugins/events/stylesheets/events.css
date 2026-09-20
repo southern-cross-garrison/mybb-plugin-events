@@ -1,0 +1,84 @@
+/**
+ * Event Management - front-end styles
+ *
+ * Installed as a real MyBB theme stylesheet (attached to the plugin's pages) rather than
+ * inlined into the templates, so a theme can restyle the plugin the same way it restyles
+ * anything else: edit this stylesheet's copy under ACP > Templates & Style > Themes, or
+ * ship an override in the theme's own export.
+ *
+ * The values below are the plugin's defaults, chosen to sit comfortably on MyBB's default
+ * theme. Everything is a plain class on a single element, with no !important and no
+ * inline styles to fight, so overriding any of it is a one-line rule.
+ */
+
+/* ---------------------------------------------------------------------------
+ * Events list - signup counts, action buttons, status pills
+ * ------------------------------------------------------------------------ */
+.event_count { display: inline-block; margin-right: 10px; white-space: nowrap; }
+.event_count_dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: baseline; }
+.event_count_trooper .event_count_dot { background: #2f6f9f; }
+.event_count_wrangler .event_count_dot { background: #c77700; }
+.event_count_key { font-size: 0.85em; opacity: 0.7; margin-left: 2px; }
+
+.event_btn {
+	display: inline-block; padding: 5px 12px; border-radius: 4px; line-height: 1.2;
+	background: #2f6f9f; border: 1px solid #2a6390; color: #fff;
+	font-weight: 600; font-size: 0.9em; text-decoration: none;
+}
+.event_btn:hover { text-decoration: none; filter: brightness(1.08); }
+
+.event_pill {
+	display: inline-block; padding: 4px 10px; border-radius: 999px;
+	font-size: 0.85em; font-weight: 600; border: 1px solid; white-space: nowrap;
+}
+.event_pill_trooper { background: #eaf2f8; border-color: #b8d4e8; color: #1f4e6e; }
+.event_pill_wrangler { background: #fdf3e3; border-color: #f0d5a8; color: #8a5300; }
+.event_pill_locked { background: #f2f2f2; border-color: #dedede; color: #767676; font-weight: normal; }
+
+/* ---------------------------------------------------------------------------
+ * Event page - the RSVP / wrangle / coordinator action row
+ * ------------------------------------------------------------------------ */
+#event_actions, #gec_controls .gec_actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#event_actions { margin: 2px 0; }
+
+/* The coordinator block is a second table under the event's own, so it needs the gap. */
+#gec_controls { margin-top: 10px; }
+
+.event_action, a.event_action {
+	display: inline-block; padding: 8px 15px; border-radius: 4px; line-height: 1.2;
+	font-weight: 600; font-size: 0.95em; text-decoration: none; border: 1px solid transparent;
+}
+a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
+.event_action_primary { background: #2f6f9f; border-color: #2a6390; color: #fff; }
+.event_action_wrangle { background: #c77700; border-color: #b36c00; color: #fff; }
+.event_action_secondary { background: #fdfdfd; border-color: #bcbcbc; color: #333; }
+.event_action_secondary:hover { background: #f3f3f3; }
+.event_action_locked { background: #f2f2f2; border-color: #dedede; color: #767676; font-weight: normal; }
+
+.event_action_status {
+	display: inline-block; padding: 7px 13px; border-radius: 999px;
+	font-size: 0.9em; font-weight: 600; border: 1px solid;
+}
+.event_action_status_trooper { background: #eaf2f8; border-color: #b8d4e8; color: #1f4e6e; }
+.event_action_status_wrangler { background: #fdf3e3; border-color: #f0d5a8; color: #8a5300; }
+
+/* ---------------------------------------------------------------------------
+ * Calendar view
+ * ------------------------------------------------------------------------ */
+#events_calendar { width: 100%; border-collapse: collapse; }
+#events_calendar td { border: 1px solid #ccc; vertical-align: top; height: 80px; width: 14%; padding: 4px; }
+#events_calendar td.other_month { background: #f5f5f5; }
+#events_calendar .calendar_event { display: block; font-size: 11px; margin: 2px 0; padding: 2px; background: #4CAF50; color: #fff; }
+#events_calendar .calendar_event.rsvped { background: #2196F3; }
+
+/* ---------------------------------------------------------------------------
+ * Attendance sheet - built to be printed, so it keeps its own plain table rules
+ * ------------------------------------------------------------------------ */
+#attendance_table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+#attendance_table th, #attendance_table td { border: 1px solid #999; padding: 8px; text-align: left; }
+#attendance_table th { background: #f0f0f0; font-weight: bold; }
+
+@media print {
+	.no-print { display: none; }
+	body { margin: 0; padding: 20px; }
+}

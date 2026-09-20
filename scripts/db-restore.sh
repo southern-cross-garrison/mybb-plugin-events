@@ -19,4 +19,20 @@ rebuild_settings();
 mkdir -p "$(dirname "$FAKETIME_FILE")"
 printf '+0' > "$FAKETIME_FILE"
 
+# MyBB's shutdown handler adds `now - lastactive` to users.timeonline, which is UNSIGNED.
+# The snapshot carries whatever timestamps the clock held when it was taken, so restoring
+# it and rewinding to real time leaves lastactive in the future - the next page view then
+# tries to add a negative number and MySQL rejects it with "BIGINT UNSIGNED value is out
+# of range". Realign the timestamps to the clock we just reset to. This must run after the
+# faketime file is written, so that time() reads the restored clock.
+dc exec -T web php -r '
+define("IN_MYBB", 1);
+define("MYBB_ROOT", "/var/www/html/");
+define("THIS_SCRIPT", "reset.php");
+require MYBB_ROOT."inc/init.php";
+$now = (int)time();
+$db->write_query("UPDATE ".TABLE_PREFIX."users SET lastactive={$now}, lastvisit={$now}, timeonline=0");
+$db->write_query("UPDATE ".TABLE_PREFIX."sessions SET time={$now}");
+' > /dev/null
+
 log "Database restored from snapshot; clock reset to real time"

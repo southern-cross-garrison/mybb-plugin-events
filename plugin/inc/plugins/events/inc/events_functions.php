@@ -248,6 +248,22 @@ function events_get_event_days($event_id)
 }
 
 /**
+ * May this user open the events pages at all?
+ *
+ * The events index is members-only. The navigation link is gated on the same check, so
+ * nobody is offered a link that would only ever answer "no permission".
+ *
+ * @param int|null $user_id
+ * @return bool
+ */
+function events_can_view_events_page($user_id = null)
+{
+    $user = events_get_user($user_id);
+
+    return !empty($user['uid']);
+}
+
+/**
  * Can the user see this event at all?
  *
  * Pending events are only visible to coordinators and admins; live and archived

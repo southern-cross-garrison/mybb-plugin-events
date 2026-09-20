@@ -82,10 +82,12 @@ function events_install()
 
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_install.php";
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_templates.php";
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_stylesheets.php";
 
     events_install_database();
     events_upgrade_database();
     events_install_templates();
+    events_install_stylesheet();
 
     $query = $db->simple_select("settinggroups", "gid", "name = 'events'");
     if($db->num_rows($query) == 0)
@@ -172,6 +174,7 @@ function events_activate()
 
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_install.php";
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_templates.php";
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_stylesheets.php";
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_tasks.php";
 
     // MyBB has no upgrade hook, so schema changes land here - _install() only ever runs
@@ -180,6 +183,7 @@ function events_activate()
 
     // Re-sync templates so editing a .html file and re-activating picks up the change.
     events_install_templates();
+    events_install_stylesheet();
     events_register_task();
 
     $optionscode = events_build_profile_field_optionscode();
@@ -227,10 +231,12 @@ function events_uninstall()
 
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_uninstall.php";
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_templates.php";
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_stylesheets.php";
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_tasks.php";
 
     events_uninstall_database();
     events_uninstall_templates();
+    events_uninstall_stylesheet();
     events_unregister_task();
 
     rebuild_settings();

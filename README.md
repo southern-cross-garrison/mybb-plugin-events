@@ -14,8 +14,8 @@ npx playwright test
 ```
 
 `bootstrap.sh` downloads the pinned MyBB release into `test-forum/`, starts the containers,
-runs MyBB's installer non-interactively, deploys the plugin, provisions the fixtures, and
-takes a database snapshot the suite resets to.
+runs MyBB's installer non-interactively, deploys the plugin, imports the garrison's custom
+theme, provisions the fixtures, and takes a database snapshot the suite resets to.
 
 When it finishes:
 
@@ -51,6 +51,40 @@ docker compose exec -T web php /dev/stdin < scripts/provision.php
 
 If the environment gets into a strange state, `./scripts/bootstrap.sh --fresh` rebuilds it
 from nothing.
+
+## The custom theme
+
+The test forum runs the garrison's live theme rather than MyBB's default, so the suite
+exercises the plugin's pages against the markup they actually ship on. The theme comes
+from [southern-cross-garrison/mybb-custom-theme][theme], pinned to a commit by `THEME_REF`
+in [scripts/env.sh](scripts/env.sh); `scripts/install-theme.sh` imports its XML through
+MyBB's own ACP import code path, copies the theme's images into `test-forum/images/`, and
+sets it as the board default.
+
+To move to a newer theme commit, bump `THEME_REF` and re-import:
+
+```bash
+./scripts/install-theme.sh
+./scripts/db-snapshot.sh
+```
+
+Re-importing is a clean replace: the previous copy of the theme and its template set are
+dropped first, so nothing is left orphaned in ACP > Templates.
+
+`MYBB_VERSION` is pinned to the release the theme is exported from (1.8.40), so the import
+runs under MyBB's own version check rather than waiving it. If the two drift apart the
+import stops with a message saying so, which is the point - a theme built against a
+different MyBB is worth looking at rather than waving through.
+
+Two assets the theme asks for are in neither MyBB nor the theme repo, so they 404 in the
+test forum: `images/sort-solid.svg` (the dropdown arrow on `<select>` elements) and
+`images/icons/noicon.png` (the "no icon" option when posting). Both are cosmetic, and both
+presumably sit on the production server un-committed - worth adding to the theme repo.
+
+The plugin's own templates are unaffected by any of this: they live in the master template
+set (`sid = -2`), which every theme falls back to, so the theme import never touches them.
+
+[theme]: https://github.com/southern-cross-garrison/mybb-custom-theme
 
 ## How the suite works
 

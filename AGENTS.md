@@ -12,7 +12,8 @@
   - `plugin/root/` - front-end pages. MyBB pages `require ./global.php`, so these must be
     deployed to the web root, not left under `inc/`.
 - `test-forum/` is a disposable MyBB tree (gitignored). `scripts/bootstrap.sh` downloads the
-  pinned MyBB release into it and `scripts/deploy.sh` copies the plugin in.
+  pinned MyBB release into it, `scripts/deploy.sh` copies the plugin in, and
+  `scripts/install-theme.sh` imports the garrison's custom theme and makes it the default.
 - `tests/` is the Playwright end-to-end suite; `scripts/` holds the environment tooling.
 
 ## Everyday commands
@@ -46,6 +47,21 @@ baseline picks the change up.
   template as one variable.
 - Front-end hooks are registered at the top of `inc/plugins/events.php` (MyBB includes active
   plugin files on every request). Registering them in `_activate()` only ever runs once.
+- The test forum runs the garrison's live theme (see README), not MyBB's default. Anything
+  that reaches into rendered board markup - `events_nav_menu()`, which swaps the board's
+  Calendar menu item for an Events one on `pre_output_page` - has to cope with a theme that
+  rewrites MyBB's header wholesale, so it matches on the Calendar link rather than on any
+  one theme's container markup. The plugin's own templates are safe: they sit in the master
+  template set (`sid = -2`), which every theme falls back to.
+- `events_hooks.php` is the only plugin include loaded on every request. Anything a hook
+  needs from `events_functions.php` has to be `require_once`d, not assumed.
 - The web container has libfaketime preloaded, reading `.devenv/faketime/faketime.rc`.
   Writing that file moves PHP's clock for both Apache and CLI. The database clock is *not*
   faked, so plugin code compares times in PHP rather than with SQL `NOW()`.
+- Moving that clock *backwards* has to be paired with realigning MyBB's activity
+  timestamps. MyBB's shutdown handler adds `now - lastactive` to `users.timeonline`, which
+  is UNSIGNED, so stamps left in the future make the next page view fail with "BIGINT
+  UNSIGNED value is out of range" - and it is the dev forum in a browser that breaks, long
+  after the run that caused it. The suite pairs the two in `moveClock()`
+  (`tests/helpers/fixtures.ts`) and once more in `tests/global-teardown.ts`;
+  `scripts/db-restore.sh` is the manual repair.

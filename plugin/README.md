@@ -17,6 +17,8 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 - **Automated Reminders**: PM reminders for incomplete troop reports
 - **iCal Export**: Export events to calendar applications
 - **Thread Integration**: Link events to forum threads
+- **Board Navigation**: Takes over MyBB's Calendar menu item, and only shows the Events
+  link to members who can open the events page
 
 ## Installation
 
