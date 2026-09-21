@@ -287,7 +287,7 @@ test.describe("configurable regions", () => {
     await gotoSettings(page);
     await page.locator('.events_region_delete[data-region="Canberra"]').click();
     await expect(page.locator("#events_region_modal_message")).toContainText(
-      "1 event is filed under it",
+      "1 event is associated with this region",
     );
 
     // Confirming the first step is not the deletion: the event has nowhere to go yet.
@@ -421,7 +421,7 @@ test.describe("configurable regions without JavaScript", () => {
     await page.locator('.events_region_delete[data-region="Canberra"]').click();
 
     await expect(page.locator("body")).toContainText(
-      "1 event is filed under it",
+      "1 event is associated with this region",
     );
     await page.locator('select[name="region_move_to"]').selectOption("Hunter");
     await page

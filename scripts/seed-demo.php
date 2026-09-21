@@ -133,43 +133,25 @@ function demo_days($from_offset, $to_offset, $start_time = '09:00:00', $end_time
 $DEMO_PASSWORD = 'testpass123';
 
 /**
- * The costume list the board actually offers, read from the mapped profile field so the
- * demo never signs anybody up in a costume the field would not let them pick.
+ * The costumes the demo members own.
+ *
+ * This used to be read out of the mapped profile field, back when that field was a
+ * multiselect and "the costumes a member can pick" was a real list the board held. It is
+ * free text now - one costume per line, as on the real board - so there is no list to
+ * read: these are simply the costumes the demo hands out, and they are written to members'
+ * profiles like any other free-text value.
  *
  * @return array
  */
 function demo_costume_options()
 {
-    global $db;
-
-    static $options = null;
-
-    if($options !== null)
-    {
-        return $options;
-    }
-
-    $options = array();
-
-    $fid = (int)events_get_setting('costume_field');
-    if($fid)
-    {
-        $field = $db->fetch_array($db->simple_select('profilefields', 'type', 'fid = ' . $fid));
-        if($field)
-        {
-            // MyBB stores a multiselect as "multiselect\noption\noption".
-            $lines = preg_split('/\r\n|\r|\n/', (string)$field['type']);
-            array_shift($lines);
-            $options = array_values(array_filter(array_map('trim', $lines), 'strlen'));
-        }
-    }
-
-    if(!$options)
-    {
-        fail('no costume options are configured - run scripts/provision.php first.');
-    }
-
-    return $options;
+    return array(
+        'TK - Stormtrooper',
+        'TD - Sandtrooper',
+        'TB - Biker Scout',
+        'TI - TIE Pilot',
+        'DZ - Death Star Trooper',
+    );
 }
 
 /**

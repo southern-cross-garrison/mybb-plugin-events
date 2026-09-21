@@ -71,10 +71,16 @@ out('board settings applied');
 $costume_options = array('TK - Stormtrooper', 'TD - Sandtrooper', 'TB - Biker Scout', 'TI - TIE Pilot', 'DZ - Death Star Trooper');
 
 $profile_field_specs = array(
+    // Free text, one costume per line, because that is what the real board uses: nobody
+    // maintains a complete list of approved 501st costumes, and a multiselect here made
+    // the dev board the one place a costume had to be picked from a fixed set - which hid
+    // the whole free-text path from the suite. The strings below are just the fixtures'
+    // own costumes now, not the options the field offers; they are still published to
+    // events-fixtures.json because the suite builds signups out of them.
     'costume' => array(
         'name' => 'Costumes',
-        'description' => 'Costumes you own and can deploy',
-        'type' => "multiselect\n" . implode("\n", $costume_options),
+        'description' => 'Costumes you own and can deploy, one per line',
+        'type' => 'textarea',
     ),
     'tk_id' => array('name' => 'TK ID', 'description' => 'Your 501st legion ID', 'type' => 'text'),
     'wwcc' => array('name' => 'WWCC Number', 'description' => 'Working With Children Check number', 'type' => 'text'),

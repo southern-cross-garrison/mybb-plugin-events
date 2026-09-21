@@ -1131,7 +1131,12 @@ function events_check_prerequisites($event, $user_id = null, $roles = 'trooper')
     $required = array('mobile', 'emergency_contact');
     if(in_array('trooper', $roles, true))
     {
-        array_unshift($required, 'tk_id');
+        // Costumes belong here for the same reason the Legion ID does: they are asked of
+        // a trooper and not of a wrangler, who turns out uncostumed. Asking in this step
+        // is what keeps a member with an empty costume field inside the wizard - before,
+        // the costumes step could only send them to the User CP to fill the field in and
+        // start the signup again.
+        array_unshift($required, 'tk_id', 'costume');
     }
 
     if(!empty($event['requires_wwcc']))
@@ -1220,8 +1225,11 @@ function events_save_user_fields($user_id, array $values)
  */
 function events_prerequisite_labels()
 {
+    // 'multiline' picks the control: costumes are a list rather than a value, so the field
+    // is a textarea, matching the profile field they are saved to.
     return array(
         'tk_id'             => array('label' => 'Legion ID', 'hint' => 'Your 501st legion ID, e.g. if you are TK-12345 then type "12345" here.'),
+        'costume'           => array('label' => 'Approved Costumes', 'hint' => 'One per line. These are saved to your profile, and you pick from them on the next step.', 'multiline' => true),
         'wwcc'              => array('label' => 'WWCC Number', 'hint' => 'This event requires a Working With Children Check.'),
         'mobile'            => array('label' => 'Mobile Number', 'hint' => 'So the coordinator can reach you on the day.'),
         'emergency_contact' => array('label' => 'Emergency Contact', 'hint' => 'Name and number of someone to call in an emergency.'),
@@ -1335,15 +1343,24 @@ function events_format_date($date, $format = null)
 }
 
 /**
- * Format an event start for the listing column.
+ * Format an event's dates for the listing column.
  *
- * "Sep 8 - 9AM" or "Sep 12 - 9:30AM" within the current year, with the year
- * added ("Sep 8 2027 - 9AM") once the event falls outside it.
+ * A one-day event is a date and the hours it runs - "Oct 26 - 9AM to 5PM". A multi-day one
+ * is the span of dates instead - "Oct 26 - Oct 28" - because the hours differ from day to
+ * day and one pair of them would misreport the rest; the per-day times are on the event's
+ * own page, which is where somebody reading them is going anyway.
+ *
+ * The year is added to either form once the date falls outside the current one, so
+ * "Oct 26 2027 - 9AM to 5PM" - see events_format_date_day().
+ *
+ * With no end date the start alone is written, which is what every caller got before the
+ * span existed.
  *
  * @param string $date
+ * @param string|null $end_date
  * @return string
  */
-function events_format_list_date($date)
+function events_format_list_date($date, $end_date = null)
 {
     if(empty($date) || $date === '0000-00-00 00:00:00')
     {
@@ -1357,9 +1374,36 @@ function events_format_list_date($date)
         return '';
     }
 
-    $time = events_date((int)events_date('i', $timestamp) === 0 ? 'gA' : 'g:iA', $timestamp);
+    $end = empty($end_date) || $end_date === '0000-00-00 00:00:00'
+        ? false
+        : events_strtotime($end_date);
+
+    if($end !== false && events_date('Y-m-d', $end) !== events_date('Y-m-d', $timestamp))
+    {
+        return events_format_date_day($timestamp) . ' - ' . events_format_date_day($end);
+    }
+
+    $time = events_format_list_time($timestamp);
+
+    // An end that lands on the same minute as the start says nothing, so it is left off
+    // rather than written as "9AM to 9AM".
+    if($end !== false && $end > $timestamp)
+    {
+        $time .= ' to ' . events_format_list_time($end);
+    }
 
     return events_format_date_day($timestamp) . ' - ' . $time;
+}
+
+/**
+ * The clock half of the listing's date: "9AM", or "9:30AM" when there are minutes to say.
+ *
+ * @param int $timestamp
+ * @return string
+ */
+function events_format_list_time($timestamp)
+{
+    return events_date((int)events_date('i', $timestamp) === 0 ? 'gA' : 'g:iA', $timestamp);
 }
 
 /**

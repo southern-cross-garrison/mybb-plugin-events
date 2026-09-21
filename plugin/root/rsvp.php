@@ -323,6 +323,12 @@ if($mybb->request_method === 'post')
 
         events_save_user_fields($mybb->user['uid'], $values);
 
+        // Costumes are one of the prerequisites now, and they were read into
+        // $user_costumes long before this POST was handled. Re-read them, or the costumes
+        // step that follows would be built from the empty list the member arrived with and
+        // send them to the User CP for costumes they have just this moment typed in.
+        $user_costumes = events_get_user_costumes($mybb->user['uid']);
+
         $missing = events_check_prerequisites($event, null, $roles);
         if(!empty($missing))
         {
@@ -547,16 +553,43 @@ elseif($rsvp_step === 'prerequisites')
         $label = $labels[$field];
         $current = htmlspecialchars_uni($mybb->get_input($field));
 
+        // A list-valued prerequisite gets a textarea: the costumes field holds one costume
+        // per line, and a single-line input cannot express that at all - it would take the
+        // first line and silently lose the rest.
+        if(!empty($label['multiline']))
+        {
+            // .events_input only - not .events_textarea, which is the troop report's
+            // 22em floor and would make a four-line costume list fill the screen.
+            $control = '<textarea class="events_input" id="prereq_' . $field . '" name="' . $field . '"'
+                . ' rows="4" required="required" aria-describedby="hint_' . $field . '">' . $current . '</textarea>';
+        }
+        else
+        {
+            $control = '<input type="text" class="events_input" id="prereq_' . $field . '" name="' . $field . '" value="' . $current . '"'
+                . ' required="required" aria-describedby="hint_' . $field . '" />';
+        }
+
         // Label, control, hint - each on its own line. The asterisk is decoration for
         // sighted readers; the required attribute is what actually says so, which is why
         // it is hidden from assistive technology rather than read out as "star".
         $rsvp_body .= '<div class="events_field">'
             . '<label class="events_label" for="prereq_' . $field . '">' . $label['label']
             . '<span class="events_required" aria-hidden="true">*</span></label>'
-            . '<input type="text" class="events_input" id="prereq_' . $field . '" name="' . $field . '" value="' . $current . '"'
-            . ' required="required" aria-describedby="hint_' . $field . '" />'
+            . $control
             . '<span class="events_hint" id="hint_' . $field . '">' . $label['hint'] . '</span>'
             . '</div>';
+    }
+
+    // Being asked for costumes is a fair question, and a wall for somebody who has none
+    // yet. A wrangler turns out uncostumed, so the way past is offered right here, at the
+    // point they have hit the problem - the costumes step used to carry this, a step later
+    // and only after the field had already stopped them. Costumes are only ever missing
+    // for a trooper, so this needs no separate test for the role.
+    if(isset($missing['costume']))
+    {
+        $rsvp_body .= '<p id="rsvp_wrangle_note" class="events_hint">No costumes to list yet? '
+            . '<a href="rsvp.php?id=' . $event_id . '&amp;role=wrangler" id="rsvp_wrangle_instead">'
+            . 'Sign up to wrangle instead</a> - wranglers help out without being in costume.</p>';
     }
 
     $rsvp_submit_label = 'Save and Continue';

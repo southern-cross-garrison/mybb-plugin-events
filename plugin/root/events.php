@@ -206,7 +206,8 @@ foreach($events as $event)
     $events_rows .= '<td class="trow1 event_title"><a class="event_link" href="event.php?id=' . (int)$event['id'] . '">'
         . htmlspecialchars_uni($event['title']) . '</a>' . $address_line . '</td>';
     $events_rows .= '<td class="trow1 event_region">' . htmlspecialchars_uni($event['region']) . '</td>';
-    $events_rows .= '<td class="trow1 event_start">' . events_format_list_date($event['start_date']) . '</td>';
+    $events_rows .= '<td class="trow1 event_start">'
+        . events_format_list_date($event['start_date'], isset($event['end_date']) ? $event['end_date'] : null) . '</td>';
     // Abbreviated to T / W here: the column is narrow and the pair repeats once per row.
     // The event page shows the same lozenges with the words spelled out - see
     // events_signup_counts().

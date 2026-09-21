@@ -22,9 +22,40 @@ test.describe('events listing', () => {
 
     const row = page.locator(`tr.event_row[data-event-id="${eventId}"]`);
     await expect(row.locator('.event_region')).toHaveText('Canberra');
-    await expect(row.locator('.event_start')).toHaveText('Oct 20 - 10AM');
+    await expect(row.locator('.event_start')).toHaveText('Oct 20 - 10AM to 4PM');
     await expect(row.locator('.event_rsvp_count')).toHaveText('2');
     await expect(row.locator('.event_status')).toHaveText('Live');
+  });
+
+  test('writes a multi-day event as a span of dates, not a pair of times', async ({ page }) => {
+    // A single day is "date - hours", because the hours are the useful half. Across days
+    // the hours differ day to day, so one pair of them would misreport the others and the
+    // span of dates is what the column says instead.
+    const oneDay = await createEvent({
+      title: 'One Day Troop',
+      start: '2026-10-20 10:00:00',
+      end: '2026-10-20 16:00:00',
+    });
+    const manyDays = await createEvent({
+      title: 'Many Day Troop',
+      start: '2026-10-26 09:00:00',
+      end: '2026-10-28 17:00:00',
+      days: [
+        { date: '2026-10-26', start: '09:00:00', end: '17:00:00' },
+        { date: '2026-10-27', start: '10:00:00', end: '16:00:00' },
+        { date: '2026-10-28', start: '08:30:00', end: '17:00:00' },
+      ],
+    });
+
+    await loginAs(page, 'trooper1');
+    await page.goto('/events.php');
+
+    await expect(page.locator(`tr[data-event-id="${oneDay}"] .event_start`)).toHaveText(
+      'Oct 20 - 10AM to 4PM',
+    );
+    await expect(page.locator(`tr[data-event-id="${manyDays}"] .event_start`)).toHaveText(
+      'Oct 26 - Oct 28',
+    );
   });
 
   test('says so when there is nothing on', async ({ page }) => {

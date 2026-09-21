@@ -17,6 +17,7 @@ import {
 } from '../helpers/db';
 
 import { relativeToTestNow } from '../helpers/clock';
+import { withSettings } from '../helpers/settings';
 
 const [TK, TD, TB] = [0, 1, 2].map((index) => fixtures().costumeOptions[index]);
 
@@ -409,7 +410,7 @@ test.describe('signup wizard', () => {
     expect(await countRsvps(eventId)).toBe(0);
   });
 
-  test('tells a member with no costumes on file to update their profile or wrangle instead', async ({ page }) => {
+  test('asks a member with no costumes for them in the flow rather than sending them away', async ({ page }) => {
     const eventId = await createEvent({ title: 'Costumeless Troop' });
     await setUserField('trooper2', 'costume', '');
 
@@ -417,22 +418,57 @@ test.describe('signup wizard', () => {
     await page.goto(`/rsvp.php?id=${eventId}`);
     await page.locator('#rsvp_submit').click();
 
-    await expect(page.locator('#rsvp_no_costumes')).toContainText('No costumes are listed on your profile');
+    // Costumes are a trooper prerequisite, so they are asked for here. trooper2 has every
+    // other prerequisite on file, so this is the only field on the step.
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
+    const costumes = page.locator('#prereq_costume');
+    await expect(costumes).toBeVisible();
+    // A list, so a textarea: a single-line input would keep the first costume and
+    // silently drop the rest.
+    expect(await costumes.evaluate((node) => node.tagName)).toBe('TEXTAREA');
+
+    // Having none yet is a wall, so the way past is offered on the step that asks.
     await expect(page.locator('#rsvp_wrangle_instead')).toBeVisible();
-    expect(await countRsvps(eventId)).toBe(0);
+
+    await costumes.fill(`${TK}\n${TD}`);
+    await page.locator('#rsvp_submit').click();
+
+    // Straight on to picking from the costumes just entered - no trip to the User CP, and
+    // no dead end.
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'costumes');
+    await expect(page.locator('#rsvp_no_costumes')).toHaveCount(0);
+    await expect(page.locator('#rsvp_page')).toContainText(TK);
+    await expect(page.locator('#rsvp_page')).toContainText(TD);
+
+    // Saved to the profile on the way past, like every other prerequisite. The browser
+    // submits a textarea with CRLF line endings, which is not the plugin's doing.
+    expect((await getUserField('trooper2', 'costume')).replace(/\r/g, '')).toBe(`${TK}\n${TD}`);
   });
 
-  test('the wrangle-instead way out lands on the attendance step with wrangling chosen', async ({ page }) => {
-    const eventId = await createEvent({ title: 'Costumeless Wrangle Out' });
-    await setUserField('trooper2', 'costume', '');
+  test('falls back to the wrangle-instead way out when no costume field is mapped', async ({ page }) => {
+    // With no profile field behind them, costumes cannot be asked for as a prerequisite -
+    // there is nowhere to save the answer - so the costumes step is reached empty and the
+    // way out of that dead end is to wrangle instead. This is the one route by which a
+    // board still sees that message.
+    const restore = await withSettings({ events_costume_field: '0' });
+    try {
+      const eventId = await createEvent({ title: 'Costumeless Wrangle Out' });
 
-    await loginAs(page, 'trooper2');
-    await page.goto(`/rsvp.php?id=${eventId}`);
-    await page.locator('#rsvp_submit').click();
-    await page.locator('#rsvp_wrangle_instead').click();
+      await loginAs(page, 'trooper2');
+      await page.goto(`/rsvp.php?id=${eventId}`);
+      await page.locator('#rsvp_submit').click();
 
-    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'attendance');
-    await expect(page.locator('#signup_role_wrangler')).toBeChecked();
+      await expect(page.locator('#rsvp_no_costumes')).toContainText(
+        'No costumes are listed on your profile',
+      );
+      await page.locator('#rsvp_wrangle_instead').click();
+
+      await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'attendance');
+      await expect(page.locator('#signup_role_wrangler')).toBeChecked();
+      expect(await countRsvps(eventId)).toBe(0);
+    } finally {
+      await restore();
+    }
   });
 
   test('splits a multiselect costume field into individual costumes', async ({ page }) => {

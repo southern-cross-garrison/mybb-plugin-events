@@ -1,6 +1,8 @@
 import { test, expect } from '../helpers/fixtures';
 import { loginAs } from '../helpers/auth';
-import { createEvent, countRsvps, getUserField, execute, uid, T } from '../helpers/db';
+import { createEvent, countRsvps, getUserField, execute, uid, T, fixtures } from '../helpers/db';
+
+const [TK, TD] = [0, 1].map((index) => fixtures().costumeOptions[index]);
 
 /**
  * A member can have no row in MyBB's `userfields` table at all: the account the installer
@@ -27,6 +29,9 @@ test('a member with no userfields row can still complete a signup', async ({ pag
 
   await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
   await page.locator('#prereq_tk_id').fill('12345');
+  // Deleting the row takes the costumes with it, and costumes are a trooper prerequisite,
+  // so this step asks for them too.
+  await page.locator('#prereq_costume').fill(`${TK}\n${TD}`);
   await page.locator('#prereq_mobile').fill('0400 111 222');
   await page.locator('#prereq_emergency_contact').fill('Next Of Kin 0400 333 444');
   await page.locator('#rsvp_submit').click();
