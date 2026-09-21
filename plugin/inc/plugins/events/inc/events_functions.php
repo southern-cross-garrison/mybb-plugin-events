@@ -1192,6 +1192,23 @@ function events_save_user_fields($user_id, array $values)
     else
     {
         $update['ufid'] = $user_id;
+
+        // A member with no userfields row at all - the account the MyBB installer creates
+        // has none, and neither does anything imported around the datahandler - needs an
+        // INSERT rather than an UPDATE, and a partial one will not do. MyBB declares each
+        // fid column TEXT NOT NULL with no default, so under STRICT_TRANS_TABLES MySQL
+        // refuses to fill in the columns this insert does not name and the signup dies
+        // with "Field 'fid1' doesn't have a default value" - after the prerequisites step,
+        // which is the point the member has just filled that form in. So name every field
+        // the table has, blank for the ones this call carries no value for.
+        foreach($db->show_fields_from("userfields") as $column)
+        {
+            if(preg_match('/^fid\d+$/', $column['Field']) && !isset($update[$column['Field']]))
+            {
+                $update[$column['Field']] = '';
+            }
+        }
+
         $db->insert_query("userfields", $update);
     }
 }
