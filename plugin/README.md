@@ -170,11 +170,11 @@ when it is ready to take signups.
 An event is **Pending**, **Live** or **Archived**, and the status decides who sees it on
 the events index and whether it takes signups.
 
-| Status | On the events index | Signups |
-|---|---|---|
-| Pending | Coordinators and admins only | Closed |
-| Live | Everybody, by default | Open, subject to the cutoff and the event's end |
-| Archived | Only when **Show archived** is ticked | Closed |
+| Status   | On the events index                   | Signups                                         |
+| -------- | ------------------------------------- | ----------------------------------------------- |
+| Pending  | Coordinators and admins only          | Closed                                          |
+| Live     | Everybody, by default                 | Open, subject to the cutoff and the event's end |
+| Archived | Only when **Show archived** is ticked | Closed                                          |
 
 Archiving is how an event is closed out, not how it is deleted. Posting its troop report
 archives it automatically, and a coordinator can set the status by hand from either form.

@@ -169,8 +169,11 @@ foreach($events as $event)
     $signed_up_as = isset($user_roles[(int)$event['id']]) ? $user_roles[(int)$event['id']] : array();
     $lock_reason = events_signup_lock_reason($event);
 
-    // Note the pill text stays exactly "Trooping"/"Wrangling": the styling lives on the
-    // class, so the labels remain the whole text content of those elements.
+    // Once the event is over the pill reports what the member did rather than what they
+    // are down to do - "Trooped", not "Trooping". The class keeps the present-tense verb
+    // whatever the text says: it is what the stylesheet colours and what the suite locates
+    // the pill by, and neither has any business changing when the event ends.
+    $ended = events_has_ended($event);
     if(!empty($signed_up_as))
     {
         $you = '';
@@ -179,7 +182,7 @@ foreach($events as $event)
             if(in_array($role, $signed_up_as, true))
             {
                 $you .= '<span class="event_pill event_pill_' . $role . ' event_signed_up event_' . strtolower(events_role_verb($role)) . '">'
-                      . events_role_verb($role) . '</span> ';
+                      . events_role_verb($role, $ended) . '</span> ';
             }
         }
     }
@@ -189,8 +192,9 @@ foreach($events as $event)
     }
     else
     {
-        $you = '<span class="event_pill event_pill_locked event_locked" data-lock-reason="' . htmlspecialchars_uni($lock_reason) . '">'
-             . htmlspecialchars_uni(events_signup_lock_message($lock_reason)) . '</span>';
+        $you = '<span class="event_pill event_pill_locked event_locked" data-lock-reason="' . htmlspecialchars_uni($lock_reason) . '"'
+             . ' title="' . htmlspecialchars_uni(events_signup_lock_message($lock_reason)) . '">'
+             . htmlspecialchars_uni(events_signup_lock_label($lock_reason, $event)) . '</span>';
     }
 
     $events_rows .= '<tr class="event_row" data-event-id="' . (int)$event['id'] . '" data-event-status="' . htmlspecialchars_uni($event['status']) . '">';

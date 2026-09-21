@@ -819,6 +819,47 @@ function events_signup_lock_message($reason)
 }
 
 /**
+ * Short form of a signup lock reason, for the listing's "You" column.
+ *
+ * That column is one narrow cell holding either a button, a role pill or this, and the
+ * sentences events_signup_lock_message() returns are nearly as long as the rest of the
+ * row. They sized the column, which left every button in it looking a different size from
+ * the message beside it. The event page and the signup page have room to explain; in the
+ * column the state is the whole point, so it gets the state and keeps the sentence on the
+ * pill's title attribute - "Closed" on its own cannot say whether the cutoff passed or the
+ * event is over, and that difference is the reason a member is looking.
+ *
+ * A reason with no short form falls back to the sentence rather than to a word invented
+ * here, so adding a lock reason cannot quietly mislabel itself.
+ *
+ * @param string $reason
+ * @param array|null $event The event row, where one is at hand - see below
+ * @return string
+ */
+function events_signup_lock_label($reason, $event = null)
+{
+    // One reason, two states. events_signup_lock_reason() answers 'not_live' for anything
+    // whose status is not live, so a pending event and an archived one reach this point
+    // indistinguishable - and they want opposite words: a pending event is waiting to
+    // open, an archived one is shut for good. Only the row knows which, so the label needs
+    // it. Without this an archived row read "Pending" next to a Status column that said
+    // "Archived". The reason token itself stays 'not_live' - it is what the event page and
+    // the suite read, and the distinction is a matter of wording, not of permission.
+    if($reason === 'not_live' && isset($event['status']) && $event['status'] === 'archived')
+    {
+        return 'Closed';
+    }
+
+    $labels = array(
+        'cutoff_passed' => 'Closed',
+        'event_ended'   => 'Closed',
+        'not_live'      => 'Pending',
+    );
+
+    return isset($labels[$reason]) ? $labels[$reason] : events_signup_lock_message($reason);
+}
+
+/**
  * Has the user signed up to this event in the given role?
  *
  * Defaults to 'trooper' so that any caller which does not care keeps the meaning it had

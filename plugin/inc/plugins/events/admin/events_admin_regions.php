@@ -551,7 +551,7 @@ function events_admin_output_region_delete_page($region)
     $container = new FormContainer("Delete " . htmlspecialchars_uni($region));
     $container->output_row("Are you sure?",
         $count === 0
-            ? "No events are filed under it, so nothing else changes."
+            ? "No events are associated with this region, so nothing else changes."
             : events_admin_region_event_phrase($count) . " filed under it, and will move to the region chosen below.",
         "Deleting \"" . htmlspecialchars_uni($region) . "\" cannot be undone.");
 
@@ -637,7 +637,7 @@ function events_admin_output_region_rows($form, array $rows, array $counts, arra
         // the list into a wall of the same sentence.
         // output_row() writes its title into the markup as-is.
         $container->output_row(htmlspecialchars_uni($original),
-            $count === 0 ? "No events are filed under it." : events_admin_region_event_phrase($count) . " filed under it.",
+            $count === 0 ? "No events are associated with this region." : events_admin_region_event_phrase($count) . " filed under it.",
             $content, "region_name_" . $index);
     }
 
@@ -752,9 +752,9 @@ function events_admin_output_region_modals(array $rows, array $counts)
 
         title.textContent = 'Delete ' + region;
         message.textContent = events === 0
-            ? 'Are you sure you want to delete "' + region + '"? No events are filed under it.'
+            ? 'Are you sure you want to delete "' + region + '"? No events are associated with this region.'
             : 'Are you sure you want to delete "' + region + '"? ' + events
-              + (events === 1 ? ' event is' : ' events are') + ' filed under it.';
+              + (events === 1 ? ' event is' : ' events are') + ' associated with this region.';
         submit.textContent = 'Yes, delete it';
 
         open('confirm');

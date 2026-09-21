@@ -384,9 +384,15 @@ textarea.events_input { resize: vertical; }
 /* The last column is the one thing on the row the viewer can act on, and it holds either
    a button, a pill or a sentence. Left aligned, each of those started at a different
    place - the button under the "Y" of the heading, a lock message filling the column from
-   the same edge - so the button a member is reaching for moved row to row. Ranged right
-   it is always against the same edge, which is also the edge the cards put it on. */
-.event_you, .event_you_head { text-align: right; }
+   the same edge - so the button a member is reaching for moved row to row. Centred, each
+   one is anchored to the same point however wide it is, and it keeps clear of the table's
+   outer border: ranged right the button sat hard against the edge of the board, which
+   read as belonging to the page rather than to the row it acts on.
+
+   The cards at narrow widths still range this cell right, via justify-content on the grid
+   area below - there it is the last thing in a stack rather than a column of its own, and
+   the edge it is against is the card's, not the table's. */
+.event_you, .event_you_head { text-align: center; }
 
 /* ---------------------------------------------------------------------------
  * The event page's turnout tab

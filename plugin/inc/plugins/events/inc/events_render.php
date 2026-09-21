@@ -787,8 +787,13 @@ function events_signup_next_step($step, array $roles, array $missing)
  * @param string $role
  * @return string
  */
-function events_role_verb($role)
+function events_role_verb($role, $past = false)
 {
+    if($past)
+    {
+        return $role === 'wrangler' ? 'Wrangled' : 'Trooped';
+    }
+
     return $role === 'wrangler' ? 'Wrangling' : 'Trooping';
 }
 
