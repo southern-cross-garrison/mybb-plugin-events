@@ -72,6 +72,10 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: playwright-report
+          # Everything below lives under .devenv/, and the action ignores files inside
+          # dot-directories unless this is set - so without it a failing run uploads an
+          # empty artifact and takes its own traces and container logs with it.
+          include-hidden-files: true
           path: |
             .devenv/playwright-report
             .devenv/test-results
