@@ -90,6 +90,143 @@ function events_admin_assets($base)
 }
 
 /**
+ * The <link> that styles the description preview.
+ *
+ * Both forms preview, so the sheet is loaded from both roots for the same reason the
+ * calendar's and the tag field's are: the Admin CP has no theme stylesheet to put it in,
+ * and the preview should not read as one control on the board and another in the ACP.
+ *
+ * @param string $base 'jscripts/events/' on the front end, '../jscripts/events/' in the ACP
+ * @return string
+ */
+function events_preview_assets($base)
+{
+    return '<link rel="stylesheet" href="' . $base . 'events-preview.css" />';
+}
+
+/**
+ * Whether the description box gets MyBB's BBCode editor.
+ *
+ * Two board settings decide it and neither is the plugin's: "BBCode inserter" turns the
+ * editor off board-wide, and a member can turn it off for themselves in their own
+ * options. The description is written in the same BBCode a post is, so somebody who has
+ * asked not to be given the editor when they post should not be handed it here either -
+ * including in the Admin CP, where MyBB's own signature box ignores the preference. The
+ * plugin's two forms agreeing with each other matters more here than matching MyBB's.
+ *
+ * With it off the box is the plain textarea it has always been, and BBCode typed into it
+ * is parsed exactly the same way.
+ *
+ * @return bool
+ */
+function events_description_editor_enabled()
+{
+    global $mybb;
+
+    return !empty($mybb->settings['bbcodeinserter'])
+        && (!isset($mybb->user['showcodebuttons']) || $mybb->user['showcodebuttons'] != 0);
+}
+
+/**
+ * MyBB's BBCode editor, bound to a textarea.
+ *
+ * build_mycode_inserter() is the board's own, and it already knows which half of it to
+ * emit: the front end gets the `codebuttons` template, which carries its own stylesheet
+ * and scripts, and the Admin CP gets the script alone - see events_description_editor_assets()
+ * for the rest of that half.
+ *
+ * @param string $bind The textarea's id
+ * @return string empty when the editor is turned off
+ */
+function events_description_editor($bind)
+{
+    if(!events_description_editor_enabled())
+    {
+        return '';
+    }
+
+    // Smilies on, because a description is read as a post is. The dropdown itself still
+    // obeys the board's smilie inserter settings, inside build_mycode_inserter().
+    return build_mycode_inserter($bind, true);
+}
+
+/**
+ * The editor's stylesheet and scripts, for the Admin CP only.
+ *
+ * The front-end half of build_mycode_inserter() renders the `codebuttons` template, which
+ * brings these with it; the Admin CP half returns the configuration script on its own and
+ * leaves the page to have loaded sceditor already. MyBB's own user editor does this in
+ * exactly this way, down to the `../jscripts/` paths - which is how the Admin CP reaches
+ * the board root wherever the admin directory has been renamed to.
+ *
+ * Must be added to $page->extra_header before output_header() has written the <head>.
+ *
+ * @return string empty when the editor is turned off
+ */
+function events_description_editor_assets()
+{
+    global $mybb;
+
+    if(!events_description_editor_enabled())
+    {
+        return '';
+    }
+
+    $version = (int)$mybb->version_code;
+
+    return '<link rel="stylesheet" href="../jscripts/sceditor/themes/mybb.css" type="text/css" media="all" />'
+         . '<script type="text/javascript" src="../jscripts/sceditor/jquery.sceditor.bbcode.min.js?ver=' . $version . '"></script>'
+         . '<script type="text/javascript" src="../jscripts/bbcodes_sceditor.js?ver=' . $version . '"></script>'
+         . '<script type="text/javascript" src="../jscripts/sceditor/plugins/undo.js?ver=' . $version . '"></script>';
+}
+
+/**
+ * Whether the submitted form is the Preview button rather than the save.
+ *
+ * Preview is a plain submit that posts the form and comes back with it, which is what
+ * MyBB's own Preview Post is - so it works with the script off, and the editor has
+ * written its contents back into the textarea by the time the form is posted either way.
+ *
+ * Both forms give the button `formnovalidate`. An event needs a title and two dates, so
+ * those controls are marked required and the browser refuses to submit the form without
+ * them - which would mean a description could only be previewed once the rest of the
+ * form was filled in, and a description is most often previewed while it is being
+ * written. Preview saves nothing, so nothing is riding on the fields it skips.
+ *
+ * @return bool
+ */
+function events_is_description_preview()
+{
+    global $mybb;
+
+    return $mybb->request_method === 'post' && $mybb->get_input('preview_description') !== '';
+}
+
+/**
+ * The panel that shows what the description will look like.
+ *
+ * Rendered with the same events_parse_description() the event page uses, so the preview
+ * is the page rather than an approximation of it.
+ *
+ * @param string $description Raw, as typed
+ * @return string
+ */
+function events_description_preview($description)
+{
+    $body = events_parse_description($description);
+
+    if($body === '')
+    {
+        $body = '<p class="events_preview_empty">The description is empty.</p>';
+    }
+
+    return '<div class="events_preview" id="event_description_preview">'
+         . '<h2 class="events_preview_heading">Description Preview</h2>'
+         . '<div class="events_preview_body" id="event_description_preview_body">' . $body . '</div>'
+         . '</div>';
+}
+
+/**
  * One date box and the time beside it.
  *
  * Rendered here rather than by each form so the Admin CP and the front end post the same
@@ -532,12 +669,22 @@ function events_validate_event_input(array $input, array $event = array())
 
     // Each date is checked on its own before the two are compared, so an event is never
     // told its end is before its start on the strength of a date that is not a date.
+    //
+    // The article is spelled out beside each label rather than derived from it, which is
+    // what produced "A end date is required."
+    $date_fields = array(
+        'start_date' => array('label' => 'start date', 'article' => 'A'),
+        'end_date'   => array('label' => 'end date',   'article' => 'An'),
+    );
+
     $stamps = array();
-    foreach(array('start_date' => 'start date', 'end_date' => 'end date') as $field => $label)
+    foreach($date_fields as $field => $spec)
     {
+        $label = $spec['label'];
+
         if($input[$field] === '')
         {
-            $errors[] = "A " . $label . " is required.";
+            $errors[] = $spec['article'] . " " . $label . " is required.";
             continue;
         }
 
@@ -1053,7 +1200,33 @@ function events_datepicker_script()
 	if(!window.jQuery || !window.jQuery.datepicker) { return; }
 
 	jQuery(function(\$) {
-		\$('.events_datepicker').datepicker({
+		var inputs = \$('.events_datepicker');
+
+		// A submit that fails the browser's own required-field check focuses the first
+		// control it stopped on and pops its message over it - and the picker opens on
+		// focus, so that one focus used to put the whole calendar on top of the message
+		// the member most needs to read. The next open is suppressed instead, and only
+		// until the end of the current task, so a focus the member caused themselves
+		// still opens the calendar.
+		var block_open = false;
+		inputs.on('invalid', function() {
+			block_open = true;
+			// The picker is not open yet - the focus that opens it comes after this
+			// event - but it is, if the member submitted with the calendar already down.
+			\$(this).datepicker('hide');
+			setTimeout(function() { block_open = false; }, 0);
+		});
+
+		// The browser leaves the field focused once it has reported a problem on it, so
+		// the picker's own focus trigger never fires again and the member's next click on
+		// the box would do nothing at all. A click is them asking for the calendar whether
+		// the focus moved or not, and asking for one that is already down is a no-op
+		// inside jQuery UI.
+		inputs.on('click', function() {
+			if(!block_open) { \$(this).datepicker('show'); }
+		});
+
+		inputs.datepicker({
 			dateFormat: 'yy-mm-dd',
 			changeMonth: true,
 			changeYear: true,
@@ -1062,6 +1235,12 @@ function events_datepicker_script()
 			firstDay: {$first_day},
 			showOtherMonths: true,
 			selectOtherMonths: true,
+
+			// Returning false is jQuery UI's own way of cancelling an open, so a
+			// suppressed calendar is never shown rather than shown and closed again.
+			beforeShow: function() {
+				return block_open ? false : {};
+			},
 
 			// jQuery's own trigger('change') runs jQuery handlers only - it does not
 			// dispatch a DOM event, so nothing bound with addEventListener would hear it,

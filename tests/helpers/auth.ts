@@ -117,3 +117,42 @@ export async function loginToAdminCp(page: Page, username: FixtureUser = 'admin'
 export async function gotoEventsAdmin(page: Page, query = ''): Promise<void> {
   await page.goto(`/admin/index.php?module=events${query}`);
 }
+
+/**
+ * Follow one of the Admin CP's action links (status, delete) the way clicking it does.
+ *
+ * These actions are links rather than forms, and two things stop a plain page.goto()
+ * standing in for a click. MyBB's verify_post_check() refuses any request whose
+ * Sec-Fetch-Site header is not same-origin while cookiesamesiteflag is on, and a typed
+ * navigation sends `none` - so a goto() is turned away whatever key it carries, and a
+ * test written that way would pass without the plugin's own check ever running. The key
+ * itself is per-session, so it is scraped from a link that already carries one rather
+ * than guessed.
+ *
+ * Pass `withKey: false` to make the same request with the key left off, which is the
+ * forged-link case.
+ */
+export async function followAdminActionLink(
+  page: Page,
+  query: string,
+  { withKey = true }: { withKey?: boolean } = {},
+): Promise<string> {
+  await page.goto('/admin/index.php?module=events');
+
+  let url = `/admin/index.php?module=events&${query}`;
+
+  if (withKey) {
+    const href = await page.locator('a[href*="my_post_key="]').first().getAttribute('href');
+    const key = href?.match(/my_post_key=([a-f0-9]+)/)?.[1];
+    if (!key) {
+      throw new Error('No post key on the Admin CP events list to borrow');
+    }
+    url += `&my_post_key=${key}`;
+  }
+
+  const response = await page.request.get(url, {
+    headers: { 'Sec-Fetch-Site': 'same-origin' },
+  });
+
+  return response.text();
+}

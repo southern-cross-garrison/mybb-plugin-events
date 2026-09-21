@@ -3,6 +3,7 @@ import { loginAs, loginToAdminCp, gotoEventsAdmin } from '../helpers/auth';
 import { setClock } from '../helpers/clock';
 import { lockReasonOnEventPage } from '../helpers/rsvp';
 import { createEvent, createRsvp, getSetting, fixtures } from '../helpers/db';
+import { setSettings } from '../helpers/settings';
 
 const TK = fixtures().costumeOptions[0];
 
@@ -143,5 +144,47 @@ test.describe(`events in ${ZONE}`, () => {
 
     expect(body).toContain('DTSTART:20261005T080000Z');
     expect(body).toContain('DTEND:20261005T113000Z');
+  });
+});
+
+/**
+ * The setting is a plain text column that predates the picker, so a board upgraded from
+ * an older release - or one whose PHP has since dropped a zone - can hold a name this
+ * server cannot resolve. Falling back to UTC is what stops that taking the whole board
+ * down; the settings page then has to show the zone actually in force rather than the
+ * unusable name, or an admin saving an unrelated change would be quietly agreeing to it.
+ */
+test.describe('a timezone this PHP does not have', () => {
+  test.afterEach(async () => {
+    await setSettings({ events_timezone: 'UTC' });
+    expect(await getSetting('events_timezone')).toBe('UTC');
+  });
+
+  test('falls back to UTC rather than breaking every page', async ({ page }) => {
+    const eventId = await createEvent({
+      title: 'Nowhere Zone Troop',
+      status: 'live',
+      start: '2026-10-08 12:00:00',
+      end: '2026-10-08 18:00:00',
+    });
+
+    await setSettings({ events_timezone: 'Mars/Olympus_Mons' });
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/event.php?id=${eventId}`);
+
+    await expect(page.locator('#event_page')).toContainText('Nowhere Zone Troop');
+    await expect(page.locator('body')).not.toContainText(/Warning|Fatal error|SQL Error/);
+    // UTC, so the stored wall clock reads back as itself.
+    await expect(page.locator('#event_page')).toContainText('12:00');
+  });
+
+  test('the settings page offers the zone in force, not the unusable name', async ({ page }) => {
+    await setSettings({ events_timezone: 'Mars/Olympus_Mons' });
+
+    await loginToAdminCp(page);
+    await gotoEventsAdmin(page, '&action=settings');
+
+    await expect(page.locator('#timezone')).toHaveValue('UTC');
   });
 });

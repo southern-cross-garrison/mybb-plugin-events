@@ -14,6 +14,7 @@ import {
 } from '../helpers/db';
 import { relativeToTestNow } from '../helpers/clock';
 import { addTags, excludedValue, removeTag, tag, tagOption } from '../helpers/tag-field';
+import { descriptionValue, expectEditorAttached, fillDescription } from '../helpers/editor';
 
 /**
  * Coordinators run events but hold no Admin CP rights, so manage_event.php is the only
@@ -50,7 +51,7 @@ async function fillDateTime(page: Page, id: string, value: string) {
 
 async function fillEventForm(page: Page, values: EventFormValues) {
   if (values.title !== undefined) await page.locator('#event_form_title').fill(values.title);
-  if (values.description !== undefined) await page.locator('#event_form_description').fill(values.description);
+  if (values.description !== undefined) await fillDescription(page, 'event_form_description', values.description);
   if (values.status !== undefined) await page.locator('#event_form_status').selectOption(values.status);
   if (values.region !== undefined) await page.locator('#event_form_region').selectOption(values.region);
   if (values.address !== undefined) await page.locator('#event_form_address').fill(values.address);
@@ -514,6 +515,50 @@ test.describe('front-end event management', () => {
     expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Backwards Troop'`)).toHaveLength(0);
   });
 
+  test('the calendar stays shut when the browser reports an empty date', async ({ page }) => {
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+
+    // Only the title, so the browser stops the submit on the start date and focuses it to
+    // say so. The picker opens on focus, and that one focus used to drop the calendar on
+    // top of the message - which then covered the rest of the dates as well.
+    await page.locator('#event_form_title').fill('Unfinished Troop');
+    await page.locator('#manage_event_submit').click();
+
+    await expect(page.locator('#ui-datepicker-div')).toBeHidden();
+    const message = await page
+      .locator('#event_form_start_date')
+      .evaluate((input: HTMLInputElement) => input.validationMessage);
+    expect(message).not.toBe('');
+
+    // Nothing was posted, so the form is still the one that was being filled in, and the
+    // calendar still opens when it is asked to.
+    await expect(page.locator('#event_form_title')).toHaveValue('Unfinished Troop');
+    await page.locator('#event_form_start_date').click();
+    await expect(page.locator('#ui-datepicker-div')).toBeVisible();
+  });
+
+  test('names every missing field when the form is posted past the browser', async ({ page }) => {
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+
+    // The required attributes are the browser's check, not the plugin's, and a forged or
+    // scripted post arrives without having passed it. Turning them off is how the
+    // server's own messages - the ones a member sees after any other failed submit - can
+    // be read at all.
+    await page
+      .locator('#manage_event_form')
+      .evaluate((form: HTMLFormElement) => {
+        form.noValidate = true;
+      });
+    await submitEventForm(page);
+
+    const errors = page.locator('#manage_event_errors');
+    await expect(errors).toContainText('A title is required.');
+    await expect(errors).toContainText('A start date is required.');
+    await expect(errors).toContainText('An end date is required.');
+  });
+
   test('reports an unparseable day time as a form error rather than a SQL error', async ({ page }) => {
     await loginAs(page, 'gec');
     await page.goto('/manage_event.php');
@@ -563,24 +608,118 @@ test.describe('front-end event management', () => {
     expect((rows[0] as any).description).toBe("It's a visit; bring the 'good' armour.");
   });
 
-  test('the Create button is the same control as the Filter button beside it', async ({ page }) => {
+  test('the description box is the board\'s BBCode editor', async ({ page }) => {
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+
+    // A description is written in the same BBCode as a post and shown the same way, so
+    // it is written in the same editor - not in a bare textarea a coordinator has to
+    // know the tags for.
+    await expectEditorAttached(page, 'event_form_description');
+    await expect(page.locator('#field_event_form_description .sceditor-toolbar')).toBeVisible();
+  });
+
+  test('BBCode typed into the description is rendered on the event page', async ({ page }) => {
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+
+    await fillEventForm(page, {
+      title: 'Formatted Description Troop',
+      description: '[b]Full armour[/b] and a [url=http://example.test]kit list[/url].',
+      status: 'live',
+      start: relativeToTestNow({ days: 21 }),
+      end: relativeToTestNow({ days: 21, hours: 6 }),
+    });
+    await submitEventForm(page);
+
+    const description = page.locator('#event_description');
+    await expect(description.locator('.mycode_b')).toHaveText('Full armour');
+    await expect(description.locator('a[href="http://example.test"]')).toHaveText('kit list');
+    await expect(description).not.toContainText('[b]');
+
+    // Stored as BBCode, not as the HTML it renders to: the source is what the editor
+    // reopens with and what the announcement thread is built from.
+    const rows = await query(`SELECT description FROM ${T('event_plugin_events')} WHERE title = 'Formatted Description Troop'`);
+    expect((rows[0] as any).description).toBe('[b]Full armour[/b] and a [url=http://example.test]kit list[/url].');
+  });
+
+  test('HTML in the description is shown rather than rendered', async ({ page }) => {
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+
+    // Coordinators are trusted with BBCode exactly as every poster is, which is a long
+    // way from being trusted with raw markup.
+    await fillEventForm(page, {
+      title: 'Raw Markup Troop',
+      description: 'Careful <script>window.pwned = 1;</script> now',
+      status: 'live',
+      start: relativeToTestNow({ days: 21 }),
+      end: relativeToTestNow({ days: 21, hours: 6 }),
+    });
+    await submitEventForm(page);
+
+    await expect(page.locator('#event_description')).toContainText('<script>window.pwned = 1;</script>');
+    expect(await page.evaluate(() => (window as unknown as { pwned?: number }).pwned)).toBeUndefined();
+  });
+
+  test('Preview renders the description without saving the event', async ({ page }) => {
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+
+    await fillEventForm(page, {
+      title: 'Previewed Troop',
+      description: '[b]Under review[/b]',
+      status: 'live',
+      start: relativeToTestNow({ days: 21 }),
+      end: relativeToTestNow({ days: 21, hours: 6 }),
+    });
+    await page.locator('#manage_event_preview').click();
+
+    // Still on the form, with the rendered description above it.
+    await expect(page.locator('#manage_event_page')).toBeVisible();
+    await expect(page.locator('#event_description_preview_body .mycode_b')).toHaveText('Under review');
+
+    // Preview is not a save, and nothing it does may look like one.
+    expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Previewed Troop'`)).toHaveLength(0);
+    await expect(page.locator('#manage_event_errors')).toHaveCount(0);
+
+    // The form comes back as it was typed, so previewing is not a detour that costs the
+    // coordinator their work.
+    await expect(page.locator('#event_form_title')).toHaveValue('Previewed Troop');
+    await expect(page.locator('#event_form_status')).toHaveValue('live');
+    expect(await descriptionValue(page, 'event_form_description')).toBe('[b]Under review[/b]');
+  });
+
+  test('Preview says so rather than showing an empty box, and reports nothing else', async ({ page }) => {
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+
+    // Previewing before the rest of the form is filled in is the normal way round:
+    // telling somebody checking their formatting that they have no start date yet is an
+    // answer to a question they did not ask.
+    await page.locator('#manage_event_preview').click();
+
+    await expect(page.locator('#event_description_preview_body')).toContainText('The description is empty.');
+    await expect(page.locator('#manage_event_errors')).toHaveCount(0);
+  });
+
+  test('the Create button is a real button control, not a styled link', async ({ page }) => {
     await loginAs(page, 'gec');
     await page.goto('/events.php');
 
     // Themes style `input.button` and `button.button`, never a bare `.button` on an
-    // anchor, so the only way this reads as the same kind of control as its neighbour on
-    // an arbitrary theme is to be the same kind of control.
+    // anchor, so the only way this takes the theme's own button look is to be one of the
+    // two. It used to be checked by comparing it against the Filter button beside it;
+    // the filters apply as they are changed now, so on a browser running the script
+    // there is no Filter button left to compare it to.
     const create = page.locator('#events_create');
     await expect(create).toHaveJSProperty('tagName', 'INPUT');
     await expect(create).toHaveClass(/\bbutton\b/);
 
-    const filter = page.locator('.events_filter_form input[type="submit"][value="Filter"]');
-    const [createStyle, filterStyle] = await Promise.all([create, filter].map((locator) =>
-      locator.evaluate((el) => {
-        const s = getComputedStyle(el);
-        return [s.backgroundColor, s.color, s.borderRadius, s.fontSize, s.padding].join(' | ');
-      })));
-    expect(createStyle).toBe(filterStyle);
+    // The look a theme gives its buttons, rather than a browser default: something has
+    // painted it, and it is not the transparent background an unstyled control has.
+    const background = await create.evaluate((el) => getComputedStyle(el).backgroundColor);
+    expect(background).not.toBe('rgba(0, 0, 0, 0)');
   });
 
   test('action buttons keep their label legible while hovered', async ({ page }) => {
@@ -634,7 +773,7 @@ test.describe('event card presentation', () => {
         return `${style.fontSize} ${style.fontWeight} ${style.color}`;
       });
 
-    // "Wranglers:", "Troopers:" - the level the card already names things at.
+    // "Status:", "Region:" - the level the card already names things at.
     const label = await typeOf('#event_meta strong');
 
     expect(await typeOf('#event_days .events_section_heading')).toBe(label);

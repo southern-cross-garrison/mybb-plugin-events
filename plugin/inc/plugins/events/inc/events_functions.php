@@ -550,10 +550,153 @@ function events_can_view_events_page($user_id = null)
 }
 
 /**
+ * Is the user on one event's exclusion list?
+ *
+ * The bare fact, with none of the coordinator carve-out events_hidden_event_ids()
+ * applies: being excluded closes signups to you whoever you are, including the
+ * coordinator of the event you have been excluded from.
+ *
+ * @param int $event_id
+ * @param int|null $user_id
+ * @return bool
+ */
+function events_is_excluded($event_id, $user_id = null)
+{
+    global $db;
+
+    $user = events_get_user($user_id);
+    if(empty($user['uid']))
+    {
+        return false;
+    }
+
+    // Exclusions have no role column: being excluded from an event excludes you from
+    // every way of signing up to it.
+    $query = $db->simple_select("event_plugin_event_exclusions", "user_id",
+        "event_id = " . (int)$event_id . " AND user_id = " . (int)$user['uid']);
+
+    return $db->num_rows($query) > 0;
+}
+
+/**
+ * The events this user is not allowed to know about.
+ *
+ * An exclusion used to leave the event in full view with the signup button locked, which
+ * told the excluded member everything about an event except the one thing they wanted -
+ * and "you have been excluded" beside a list of everyone who is going is a worse way to
+ * find out than not being told at all. So an exclusion now hides the event: it is gone
+ * from the listing and the calendar, its page, feed and troop report form answer no, and
+ * its announcement thread is unreachable (see events_hidden_thread_ids()).
+ *
+ * Two people are never hidden from an event: whoever coordinates it, and any general
+ * coordinator or administrator. Somebody who has to run an event has to be able to open
+ * it, and the Admin CP is where an exclusion is put right.
+ *
+ * Cached for the request. Exclusions only change when an event is saved, and both forms
+ * redirect straight afterwards rather than rendering anything that reads this.
+ *
+ * @param int|null $user_id
+ * @return array of int event id
+ */
+function events_hidden_event_ids($user_id = null)
+{
+    global $db;
+
+    static $cache = array();
+
+    $user = events_get_user($user_id);
+    $uid = empty($user['uid']) ? 0 : (int)$user['uid'];
+
+    // Exclusions name members, so a guest has none. Whether a guest sees an event at all
+    // is events_can_view_event()'s business.
+    if(!$uid)
+    {
+        return array();
+    }
+
+    if(!isset($cache[$uid]))
+    {
+        $ids = array();
+
+        if(!events_is_gec($uid))
+        {
+            $query = $db->query("
+                SELECT x.event_id
+                FROM " . TABLE_PREFIX . "event_plugin_event_exclusions x
+                INNER JOIN " . TABLE_PREFIX . "event_plugin_events e ON e.id = x.event_id
+                WHERE x.user_id = " . $uid . " AND e.gec_user_id != " . $uid . "
+            ");
+
+            while($row = $db->fetch_array($query))
+            {
+                $ids[] = (int)$row['event_id'];
+            }
+        }
+
+        $cache[$uid] = $ids;
+    }
+
+    return $cache[$uid];
+}
+
+/**
+ * The announcement threads this user is not allowed to know about.
+ *
+ * The board's members follow the forums rather than the events listing, so an event that
+ * is hidden from the listing but still has a thread anybody can read and reply to is not
+ * hidden at all. These are the thread ids the hooks in events_hooks.php keep out of the
+ * forums for this member.
+ *
+ * Only the announcement thread. A troop report is posted to its own forum as its own
+ * thread and is deliberately left alone: the report is the garrison's record of what
+ * happened, it names who turned out rather than who may sign up, and somebody who was
+ * excluded from one event has no reason to be cut out of the board's history of it.
+ *
+ * @param int|null $user_id
+ * @return array of int thread id
+ */
+function events_hidden_thread_ids($user_id = null)
+{
+    global $db;
+
+    static $cache = array();
+
+    $user = events_get_user($user_id);
+    $uid = empty($user['uid']) ? 0 : (int)$user['uid'];
+
+    if(!$uid)
+    {
+        return array();
+    }
+
+    if(!isset($cache[$uid]))
+    {
+        $thread_ids = array();
+        $event_ids = events_hidden_event_ids($uid);
+
+        if(!empty($event_ids))
+        {
+            $query = $db->simple_select("event_plugin_events", "thread_id",
+                "id IN (" . implode(',', $event_ids) . ") AND thread_id > 0");
+
+            while($row = $db->fetch_array($query))
+            {
+                $thread_ids[] = (int)$row['thread_id'];
+            }
+        }
+
+        $cache[$uid] = $thread_ids;
+    }
+
+    return $cache[$uid];
+}
+
+/**
  * Can the user see this event at all?
  *
  * Pending events are only visible to coordinators and admins; live and archived
- * events are visible to every logged in member.
+ * events are visible to every logged in member except one who has been excluded from
+ * them - see events_hidden_event_ids() for why an exclusion hides rather than locks.
  *
  * @param array $event
  * @param int|null $user_id
@@ -572,8 +715,12 @@ function events_can_view_event($event, $user_id = null)
     }
 
     $user = events_get_user($user_id);
+    if(empty($user['uid']))
+    {
+        return false;
+    }
 
-    return !empty($user['uid']);
+    return !in_array((int)$event['id'], events_hidden_event_ids($user_id), true);
 }
 
 /**
@@ -596,8 +743,6 @@ function events_can_view_event($event, $user_id = null)
  */
 function events_signup_lock_reason($event, $user_id = null)
 {
-    global $db;
-
     if(!is_array($event))
     {
         $event = events_get_event($event);
@@ -619,11 +764,11 @@ function events_signup_lock_reason($event, $user_id = null)
         return 'not_live';
     }
 
-    // Exclusions have no role column: being excluded from an event excludes you from
-    // every way of signing up to it.
-    $excluded = $db->simple_select("event_plugin_event_exclusions", "user_id",
-        "event_id = " . (int)$event['id'] . " AND user_id = " . (int)$user['uid']);
-    if($db->num_rows($excluded) > 0)
+    // An excluded member normally cannot reach a page that asks this - the event is
+    // hidden from them outright - so this is the check that still has to hold for the
+    // coordinator of an event they have been excluded from, and for anything that posts
+    // to rsvp.php without having been offered the form.
+    if(events_is_excluded($event['id'], $user['uid']))
     {
         return 'excluded';
     }
@@ -1154,6 +1299,23 @@ function events_format_list_date($date)
         return '';
     }
 
+    $time = events_date((int)events_date('i', $timestamp) === 0 ? 'gA' : 'g:iA', $timestamp);
+
+    return events_format_date_day($timestamp) . ' - ' . $time;
+}
+
+/**
+ * The date half the dense formats share: month and day, with the year added only when
+ * the date does not fall in the current one.
+ *
+ * A schedule that is almost all this year reads better without the year repeated down
+ * every row, and a date in another year has to say which.
+ *
+ * @param int $timestamp
+ * @return string
+ */
+function events_format_date_day($timestamp)
+{
     $day = events_date('M j', $timestamp);
 
     if(events_date('Y', $timestamp) !== events_date('Y', TIME_NOW))
@@ -1161,9 +1323,37 @@ function events_format_list_date($date)
         $day .= ' ' . events_date('Y', $timestamp);
     }
 
-    $time = events_date((int)events_date('i', $timestamp) === 0 ? 'gA' : 'g:iA', $timestamp);
+    return $day;
+}
 
-    return $day . ' - ' . $time;
+/**
+ * "Oct 20 at 10am" - a date written to sit inside a sentence.
+ *
+ * Joined with "at" and set in lower case, where events_format_list_date() writes the
+ * same moment as "Oct 20 - 10AM". That one is a table cell: a dash reads as the column's
+ * own punctuation and the capitals stay legible when the eye is running down a row of
+ * them. This one is prose, and is read as prose.
+ *
+ * @param string $date
+ * @return string empty when the date is missing or unparseable
+ */
+function events_format_when($date)
+{
+    if(empty($date) || $date === '0000-00-00 00:00:00')
+    {
+        return '';
+    }
+
+    $timestamp = events_strtotime($date);
+
+    if($timestamp === false)
+    {
+        return '';
+    }
+
+    $time = events_date((int)events_date('i', $timestamp) === 0 ? 'ga' : 'g:ia', $timestamp);
+
+    return events_format_date_day($timestamp) . ' at ' . $time;
 }
 
 /**

@@ -139,32 +139,46 @@ function events_admin_edit_event()
 
     $errors = array();
     $values = events_event_form_values($event);
+    $preview = '';
 
     if($mybb->request_method === "post")
     {
         // Re-rendering from the submitted values rather than from the database is what
         // puts a failed submit back on screen as it was typed.
         $values = events_event_form_input();
-        $errors = events_validate_event_input($values, $event);
 
-        if(empty($errors))
+        // Preview comes straight back with the form, the way MyBB's own Preview Post
+        // does, and validates nothing: nothing is being saved, and a form half filled in
+        // is the normal state to preview a description from.
+        if(events_is_description_preview())
         {
-            $thread_error = null;
-            events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error);
+            $preview = events_description_preview($values['description']);
+        }
+        else
+        {
+            $errors = events_validate_event_input($values, $event);
 
-            $message = $is_edit ? "Event updated successfully." : "Event created successfully.";
-            if($thread_error !== null)
+            if(empty($errors))
             {
-                // The event saved; only its announcement did not.
-                flash_message($message . " " . $thread_error, "error");
+                $thread_error = null;
+                events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error);
+
+                $message = $is_edit ? "Event updated successfully." : "Event created successfully.";
+                if($thread_error !== null)
+                {
+                    // The event saved; only its announcement did not.
+                    flash_message($message . " " . $thread_error, "error");
+                }
+                else
+                {
+                    flash_message($message, "success");
+                }
+                admin_redirect("index.php?module=events");
             }
-            else
-            {
-                flash_message($message, "success");
-            }
-            admin_redirect("index.php?module=events");
         }
     }
+
+    echo $preview;
 
     if(!empty($errors))
     {
@@ -182,7 +196,16 @@ function events_admin_edit_event()
 
     $container = new FormContainer($is_edit ? "Edit Event" : "Add Event");
     $container->output_row("Title", "The event's name", $form->generate_text_box("title", $values['title'], array("id" => "title")), "title");
-    $container->output_row("Description", "Shown on the event page", $form->generate_text_area("description", $values['description'], array("id" => "description", "rows" => 8)), "description");
+    // The description is BBCode, so it gets the board's own editor - see
+    // events_description_editor(). The markup goes after the box it binds to, which is
+    // where MyBB puts it in its own posting templates and in the Admin CP's signature box.
+    $container->output_row(
+        "Description",
+        "Shown on the event page and in the announcement thread. BBCode and smilies work here the same way they do in a post.",
+        $form->generate_text_area("description", $values['description'], array("id" => "description", "rows" => 8))
+            . events_description_editor("description"),
+        "description"
+    );
     $container->output_row("Status", "Pending events are only visible to coordinators; setting an event live posts its announcement thread", $form->generate_select_box("status", events_event_statuses(), $values['status'], array("id" => "status")), "status");
     $container->output_row("Region", "Used by the region filter", $form->generate_select_box("region", array_combine(events_regions(), events_regions()), $values['region'], array("id" => "region")), "region");
     $container->output_row("Address", "Optional. Where the event happens; shown as a Google Maps link on the event pages and in the announcement thread", $form->generate_text_box("address", $values['address'], array("id" => "address", "maxlength" => 255)), "address");
@@ -238,7 +261,19 @@ function events_admin_edit_event()
     );
     $exclusions_container->end();
 
-    $buttons = array($form->generate_submit_button($is_edit ? "Update Event" : "Create Event"));
+    // Preview is an ordinary submit rather than anything scripted: it posts the form and
+    // the page comes back with the rendered description above it, so it works with the
+    // editor turned off and with no JavaScript at all.
+    //
+    // Written out rather than generated because it needs formnovalidate, which
+    // generate_submit_button() has no option for - see events_is_description_preview()
+    // for why the button must not be held up by the form's required dates. It wears
+    // MyBB's own .submit_button so it reads as the button beside it.
+    $buttons = array(
+        $form->generate_submit_button($is_edit ? "Update Event" : "Create Event"),
+        '<input type="submit" class="submit_button" name="preview_description"'
+            . ' id="events_preview_button" value="Preview" formnovalidate="formnovalidate" />',
+    );
     $form->output_submit_wrapper($buttons);
     $form->end();
 
@@ -257,9 +292,17 @@ function events_admin_edit_event()
  */
 function events_admin_set_status()
 {
-    global $mybb, $db;
+    global $mybb, $db, $lang;
 
-    verify_post_check($mybb->get_input('my_post_key'));
+    // In the Admin CP verify_post_check() *returns* false rather than erroring, so the
+    // result has to be acted on - calling it bare checks nothing at all. Status and
+    // delete are both GET links carrying the key, which is exactly the shape somebody
+    // can be sent as a link, so this is the whole guard on either of them.
+    if(!verify_post_check($mybb->get_input('my_post_key')))
+    {
+        flash_message($lang->invalid_post_verify_key2, 'error');
+        admin_redirect("index.php?module=events");
+    }
 
     $event_id = $mybb->get_input('id', MyBB::INPUT_INT);
     $status = $mybb->get_input('status');
@@ -305,9 +348,14 @@ function events_admin_set_status()
 
 function events_admin_delete_event()
 {
-    global $mybb, $db;
+    global $mybb, $db, $lang;
 
-    verify_post_check($mybb->get_input('my_post_key'));
+    // See events_admin_set_status(): the return value is the check.
+    if(!verify_post_check($mybb->get_input('my_post_key')))
+    {
+        flash_message($lang->invalid_post_verify_key2, 'error');
+        admin_redirect("index.php?module=events");
+    }
 
     $event_id = $mybb->get_input('id', MyBB::INPUT_INT);
     $event = events_get_event($event_id);

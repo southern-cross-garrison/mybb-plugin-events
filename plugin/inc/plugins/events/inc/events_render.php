@@ -95,22 +95,33 @@ function events_region_options($selected)
  * marking one as current: which view you are looking at is obvious from the page itself,
  * so the second link only ever said "you are already here".
  *
- * A submit button in a one-line GET form rather than an anchor, for the same reason the
- * Create Event control beside it is - see the note on it in events.php.
+ * A submit button in a one-line GET form rather than an anchor: a theme styles
+ * button.button and input.button and never a bare .button on an <a>, so an anchor would
+ * have to carry a look of its own and would drift the first time a theme restyled its
+ * buttons. A <button> rather than the <input type="submit"> this used to be, because an
+ * input has no inside to put the icon in - its label is an attribute.
  *
- * The region filter travels across the toggle; the month deliberately does not, because
- * the list has nothing to do with it and the calendar opens on the current month.
+ * It sits at the far right of the toolbar, away from the filters, because which view you
+ * are in is a property of the page rather than a filter on it - and is drawn as an
+ * outline rather than a filled button so it reads as secondary to the Create Event
+ * beside it. See .events_view_toggle in the stylesheet.
+ *
+ * Both filters travel across the toggle; the month deliberately does not, because the
+ * list has nothing to do with it and the calendar opens on the current month.
  *
  * @param string $view The view being shown
  * @param string $region_filter Current region filter, or '' for all regions
+ * @param bool $show_archived Whether archived events are being shown
  * @return string
  */
-function events_view_toggle($view, $region_filter = '')
+function events_view_toggle($view, $region_filter = '', $show_archived = false)
 {
     $target = events_other_view($view);
     $label = $target === 'calendar' ? 'Calendar' : 'List';
 
-    $html = '<form method="get" action="events.php" class="events_filter_form">'
+    // events_filter_form for the shared one-line-form layout, events_view_form for the
+    // one rule that separates this from the filters it shares the toolbar with.
+    $html = '<form method="get" action="events.php" class="events_filter_form events_view_form">'
           . '<input type="hidden" name="view" value="' . $target . '" />';
 
     if($region_filter !== '')
@@ -118,8 +129,96 @@ function events_view_toggle($view, $region_filter = '')
         $html .= '<input type="hidden" name="region" value="' . htmlspecialchars_uni($region_filter) . '" />';
     }
 
-    return $html . '<input type="submit" class="button events_view_toggle" id="events_view_' . $target . '" value="' . $label . '" />'
-         . '</form>';
+    if($show_archived)
+    {
+        $html .= '<input type="hidden" name="archived" value="1" />';
+    }
+
+    // The icon names the view the button goes to, and the word beside it says the same
+    // thing - it is decoration over a label that is already there, so it is hidden from
+    // a screen reader rather than described twice.
+    return $html . '<button type="submit" class="button events_view_toggle" id="events_view_' . $target . '">'
+         . '<span class="events_view_icon" aria-hidden="true"></span>' . $label
+         . '</button></form>';
+}
+
+/**
+ * The script that makes the index's filters apply as they are changed.
+ *
+ * Picking a region or ticking Show archived submits the form there and then, so the
+ * filter bar has no button to press. The button is still in the markup inside a
+ * <noscript>, because the page has to work with the script turned off - this enhances a
+ * control that posts the same thing either way, and events.php validates what arrives
+ * regardless of how it was sent.
+ *
+ * Bound on the form rather than on each control, so a filter added to the bar later is
+ * picked up without touching this: change bubbles, unlike focus or blur.
+ *
+ * @return string
+ */
+function events_filter_script()
+{
+    return "<script type=\"text/javascript\">\n"
+         . "(function() {\n"
+         . "\tvar form = document.getElementById('events_filter_form');\n"
+         . "\tif(!form) { return; }\n"
+         . "\tform.addEventListener('change', function() { form.submit(); });\n"
+         . "})();\n"
+         . "</script>";
+}
+
+/**
+ * The "Show archived" box in the index's filter bar.
+ *
+ * A checkbox beside the region select rather than another entry in it: region and status
+ * are two independent questions, and folding them into one list would mean a member who
+ * wanted Canberra's archived events had nothing to pick.
+ *
+ * Unchecked boxes are simply absent from a GET submission, which is exactly the default
+ * this wants - a bare events.php, a bookmark or a link from anywhere else in the board
+ * all arrive without the parameter and get the upcoming schedule.
+ *
+ * @param bool $show_archived
+ * @return string
+ */
+function events_archived_filter($show_archived)
+{
+    $checked = $show_archived ? ' checked="checked"' : '';
+
+    return '<label class="events_filter_check" for="events_show_archived">'
+         . '<input type="checkbox" name="archived" id="events_show_archived" value="1"' . $checked . ' />'
+         . ' Show archived</label>';
+}
+
+/**
+ * The index's filters as a query string fragment, for the links that are not forms.
+ *
+ * The calendar's Previous and Next are plain anchors, so paging October to November would
+ * drop whatever the member had filtered to and hand back a month of everything unless the
+ * filters are spelled out on the link.
+ *
+ * Returned with escaped ampersands because every caller interpolates it into an href in a
+ * template; urlencode() on the region covers the value itself.
+ *
+ * @param string $region_filter
+ * @param bool $show_archived
+ * @return string '' when nothing is filtered
+ */
+function events_index_filter_params($region_filter, $show_archived = false)
+{
+    $params = '';
+
+    if($region_filter !== '')
+    {
+        $params .= '&amp;region=' . urlencode($region_filter);
+    }
+
+    if($show_archived)
+    {
+        $params .= '&amp;archived=1';
+    }
+
+    return $params;
 }
 
 /**
@@ -172,6 +271,62 @@ function events_address_link($address, $class = 'events_address_link')
 }
 
 /**
+ * An event's signup counts as a pair of coloured lozenges.
+ *
+ * Two lozenges rather than one number, so an event with only wranglers still reads as
+ * "0 troopers, 1 wrangler" instead of an unexplained 0. The dot is always backed up by
+ * a word or a letter, so the breakdown never depends on colour alone.
+ *
+ * The same markup serves both pages on purpose. The listing is a narrow column a dozen
+ * rows deep, so it wears the initials; the event page has one event and a whole line to
+ * spend, so it spells them out - which is where a member learns what the T and the W on
+ * the listing meant, and why the colours have to match.
+ *
+ * @param int $trooper_count
+ * @param int $wrangler_count
+ * @param bool $spell_out Names the roles in full instead of abbreviating to T / W
+ * @param bool $with_ids Adds the ids the event page addresses its own counts by; the
+ *                       listing repeats the pair once per row and so cannot have them
+ * @return string
+ */
+function events_signup_counts($trooper_count, $wrangler_count, $spell_out = false, $with_ids = false)
+{
+    $counts = array(
+        'trooper' => (int)$trooper_count,
+        'wrangler' => (int)$wrangler_count,
+    );
+    $ids = array(
+        'trooper' => 'event_rsvp_count',
+        'wrangler' => 'event_wrangler_count',
+    );
+
+    $out = '';
+    foreach($counts as $role => $count)
+    {
+        $label = events_role_label($role);
+        // Plural only where the word is spelled out: "1 Troopers" is a typo the eye
+        // catches, and the initials are a key rather than a noun to be agreed with.
+        // A real space before the spelled-out word, not a margin: "2 Troopers" is a
+        // phrase, and it has to survive being copied, read aloud or printed.
+        $named = $spell_out
+            ? ' <span class="event_count_label">' . $label . ($count === 1 ? '' : 's') . '</span>'
+            : '<span class="event_count_key">' . $label[0] . '</span>';
+        // A tooltip repeating a word already on the page is noise, so it is only there
+        // to explain the initials.
+        $title = $spell_out ? '' : ' title="' . $label . 's"';
+        $id = $with_ids ? ' id="' . $ids[$role] . '"' : '';
+
+        $out .= '<span class="event_count event_count_' . $role . '"' . $title . '>'
+              . '<span class="event_count_dot"></span>'
+              . '<span' . $id . ' class="event_' . ($role === 'trooper' ? 'rsvp' : 'wrangler') . '_count">' . $count . '</span>'
+              . $named
+              . '</span>';
+    }
+
+    return $out;
+}
+
+/**
  * Neutralise BBCode in a value interpolated into a generated post.
  *
  * The troop report draft is a BBCode document that a human then edits and posts, so the
@@ -192,6 +347,82 @@ function events_address_link($address, $class = 'events_address_link')
 function events_escape_bbcode($value)
 {
     return str_replace(array('[', ']'), array('&#91;', '&#93;'), (string)$value);
+}
+
+/**
+ * MyBB's post parser, created on first use.
+ *
+ * MyBB builds $parser on the pages that need it and leaves the global unset everywhere
+ * else, so a plugin page cannot assume it is there - and building a second one of its
+ * own would miss whatever a parser plugin has hooked onto the first.
+ *
+ * @return postParser
+ */
+function events_parser()
+{
+    global $parser;
+
+    if(!is_object($parser))
+    {
+        require_once MYBB_ROOT . "inc/class_parser.php";
+        $parser = new postParser;
+    }
+
+    return $parser;
+}
+
+/**
+ * An event's description, rendered the way a post is.
+ *
+ * A description is written in the board's own editor and in the board's own BBCode, so
+ * it is parsed by MyBB's parser rather than by anything of the plugin's: a coordinator
+ * who can write a post can write a description, and a board that has turned a MyCode off
+ * has turned it off here too.
+ *
+ * HTML stays off. Coordinators are trusted with BBCode exactly as every poster is, which
+ * is a long way from being trusted with a <script> tag, and nothing an event needs to say
+ * wants raw markup.
+ *
+ * @param string $description Raw, as stored
+ * @return string HTML, empty for an empty description
+ */
+function events_parse_description($description)
+{
+    $description = (string)$description;
+
+    if(trim($description) === '')
+    {
+        return '';
+    }
+
+    return events_parser()->parse_message($description, array(
+        // allow_html is passed as 0 rather than left out: parse_message() reads the key
+        // directly on its way into parse_smilies(), so an absent one is a PHP warning.
+        'allow_html'      => 0,
+        'allow_mycode'    => 1,
+        'allow_smilies'   => 1,
+        'allow_imgcode'   => 1,
+        'allow_videocode' => 1,
+        'filter_badwords' => 1,
+    ));
+}
+
+/**
+ * An event's description as plain text.
+ *
+ * For the iCal feed, whose DESCRIPTION is a text property that a calendar app shows
+ * verbatim - so BBCode has to come out rather than be rendered. text_parse_message() is
+ * MyBB's own plain-text pass, the one its feeds and its search index use, and strip_tags
+ * catches the handful of places it still leaves a tag behind.
+ *
+ * @param string $description Raw, as stored
+ * @return string
+ */
+function events_description_text($description)
+{
+    return strip_tags(events_parser()->text_parse_message((string)$description, array(
+        'filter_badwords' => 1,
+    )));
 }
 
 /**
@@ -780,7 +1011,11 @@ function events_signup_summary_html(array $event_days, array $role_days, $id_pre
  * to the control with aria-describedby so a screen reader reads it as part of the field
  * rather than as loose text after it.
  *
- * @param string $id The control's id; the hint gets "hint_" + this
+ * The wrapper carries "field_" + the control's id, so a field that needs to break out of
+ * the column the others sit in - the description, whose editor wants the full width - can
+ * be reached from the stylesheet without the caller having to wrap it in anything.
+ *
+ * @param string $id The control's id; the hint gets "hint_" + this and the wrapper "field_"
  * @param string $label Plain text
  * @param string $control Markup for the control itself
  * @param string $hint Plain text, or empty for no hint
@@ -789,7 +1024,7 @@ function events_signup_summary_html(array $event_days, array $role_days, $id_pre
  */
 function events_form_field($id, $label, $control, $hint = '', $required = false)
 {
-    $html = '<div class="events_field">'
+    $html = '<div class="events_field" id="field_' . $id . '">'
           . '<label class="events_label" for="' . $id . '">' . htmlspecialchars_uni($label);
 
     if($required)

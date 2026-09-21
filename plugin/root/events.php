@@ -39,11 +39,44 @@ if(!in_array($region_filter, events_regions(), true))
     $region_filter = '';
 }
 
+// An archived event is one the board has already turned out to, and the index is a
+// schedule of what is coming - left in it they accumulate at the top of the list and in
+// every calendar month behind the current one, so the schedule reads as history. Hidden
+// by default and shown when the filter asks, rather than dropped: archiving is how an
+// event is closed out, not how it is deleted, and the record has to stay reachable.
+//
+// Only the index hides them. event.php, rsvp.php and the announcement thread all answer
+// for an archived event exactly as they did - see events_can_view_event() - so a link
+// into one from a troop report or an old thread still opens.
+$show_archived = $mybb->get_input('archived', MyBB::INPUT_INT) === 1;
+
 // Coordinators and admins also see events that are still pending.
-$where = events_is_gec() ? "status IN ('pending','live','archived')" : "status IN ('live','archived')";
+$statuses = array('live');
+if(events_is_gec())
+{
+    $statuses[] = 'pending';
+}
+if($show_archived)
+{
+    $statuses[] = 'archived';
+}
+
+// The names are this file's own literals, not input - $show_archived and events_is_gec()
+// are what the request gets a say in.
+$where = "status IN ('" . implode("','", $statuses) . "')";
 if($region_filter !== '')
 {
     $where .= " AND region = '" . $db->escape_string($region_filter) . "'";
+}
+
+// An event somebody has been excluded from is not theirs to know about, so it leaves the
+// list and the calendar rather than sitting there with its signup button locked. Filtered
+// in the query and not in the loop below, so a hidden event cannot be counted, paged or
+// drawn onto a calendar cell by anything downstream.
+$hidden_event_ids = events_hidden_event_ids();
+if(!empty($hidden_event_ids))
+{
+    $where .= " AND e.id NOT IN (" . implode(',', $hidden_event_ids) . ")";
 }
 
 // Tracked per role, because the listing shows which way round the viewer is signed up -
@@ -75,7 +108,13 @@ while($event = $db->fetch_array($query))
 }
 
 $region_options = events_region_options($region_filter);
-$events_view_toggle = events_view_toggle($view, $region_filter);
+$events_view_toggle = events_view_toggle($view, $region_filter, $show_archived);
+$events_archived_filter = events_archived_filter($show_archived);
+$events_filter_script = events_filter_script();
+
+// The calendar's month links are anchors rather than forms, so they have to carry the
+// filters themselves - see events_index_filter_params().
+$calendar_filter_params = events_index_filter_params($region_filter, $show_archived);
 
 // Coordinators build their own events now, so the listing is where a new one starts. It
 // sits in the toolbar on both views and is simply absent for everybody else.
@@ -109,7 +148,8 @@ if($view === 'calendar')
     $calendar_next = events_date('Y-m', events_strtotime('+1 month', $month_start));
     $calendar_content = events_calendar_grid($month_start, $events, $user_rsvps);
 
-    $events_print_header = events_print_header('Events Calendar', array($calendar_month_name, $region_filter));
+    $events_print_header = events_print_header('Events Calendar',
+        array($calendar_month_name, $region_filter, $show_archived ? 'Including archived' : ''));
 
     eval("\$page = \"" . $templates->get("events_calendar") . "\";");
     output_page($page);
@@ -156,16 +196,11 @@ foreach($events as $event)
         . htmlspecialchars_uni($event['title']) . '</a>' . $address_line . '</td>';
     $events_rows .= '<td class="trow1 event_region">' . htmlspecialchars_uni($event['region']) . '</td>';
     $events_rows .= '<td class="trow1 event_start">' . events_format_list_date($event['start_date']) . '</td>';
-    // Two lozenges rather than one number, so an event with only wranglers still reads as
-    // "0 troopers, 1 wrangler" instead of an unexplained 0. The dot is backed up by a
-    // title and a letter, so the breakdown does not depend on colour alone.
+    // Abbreviated to T / W here: the column is narrow and the pair repeats once per row.
+    // The event page shows the same lozenges with the words spelled out - see
+    // events_signup_counts().
     $events_rows .= '<td class="trow1 event_counts">'
-        . '<span class="event_count event_count_trooper" title="Troopers">'
-        . '<span class="event_count_dot"></span><span class="event_rsvp_count">' . (int)$event['rsvp_count'] . '</span>'
-        . '<span class="event_count_key">T</span></span>'
-        . '<span class="event_count event_count_wrangler" title="Wranglers">'
-        . '<span class="event_count_dot"></span><span class="event_wrangler_count">' . (int)$event['wrangler_count'] . '</span>'
-        . '<span class="event_count_key">W</span></span>'
+        . events_signup_counts($event['rsvp_count'], $event['wrangler_count'])
         . '</td>';
     $events_rows .= '<td class="trow1 event_status">' . htmlspecialchars_uni($event['status']) . '</td>';
     $events_rows .= '<td class="trow1 event_you">' . $you . '</td>';
@@ -177,7 +212,8 @@ if($events_rows === '')
     $events_rows = '<tr id="events_empty"><td class="trow1" colspan="6">There are no events to show.</td></tr>';
 }
 
-$events_print_header = events_print_header('Events', array($region_filter));
+$events_print_header = events_print_header('Events', array($region_filter,
+    $show_archived ? 'Including archived' : ''));
 
 eval("\$page = \"" . $templates->get("events_list") . "\";");
 output_page($page);

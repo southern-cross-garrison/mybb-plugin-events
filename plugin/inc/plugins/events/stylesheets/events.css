@@ -19,6 +19,9 @@
  *
  *     :root { --events-accent: #1090d0; --events-accent-border: #1090d0; }
  *
+ * --events-tab is the surface the event page's turnout tab is cut out of, and wants to
+ * be a tint the card's own background can be told apart from.
+ *
  * --events-accent-soft is the focus ring behind a form control, and wants to be the
  * accent at roughly 18% alpha. The form controls themselves are .events_input,
  * .events_select and .events_option, which a theme restyles the same way it restyles
@@ -86,9 +89,99 @@
  * out styles .events_view_toggle, which is on it either way round; it takes the theme's
  * .button look otherwise, which is the intent.
  * ------------------------------------------------------------------------ */
+/* ---------------------------------------------------------------------------
+ * Month stepper
+ *
+ * Which month the calendar is showing, with an arrow either side of it. This is the only
+ * place the month is named on screen: the page already carries a heading - the board's
+ * own, built from the breadcrumb - and a second bar repeating "Events Calendar" under it
+ * was saying the same thing twice.
+ *
+ * So the month is not a heading here, it is the label on the control that changes it,
+ * and it is set to read as one thing with its two arrows rather than as a sentence with
+ * links at each end.
+ * ------------------------------------------------------------------------ */
+.events_month_nav { display: inline-flex; align-items: center; gap: 2px; }
+.events_month_name { font-weight: 600; font-size: 1.05em; padding: 0 6px; white-space: nowrap; }
+
+/* The arrows are glyphs, so they are given a hit area to sit in rather than being left
+   as two characters to aim at, and their names live in aria-label - "«" is not one. */
+.events_month_step {
+	display: inline-flex; align-items: center; justify-content: center;
+	width: 26px; height: 26px;
+	border-radius: 4px;
+	line-height: 1;
+	text-decoration: none;
+}
+.events_month_step:hover { text-decoration: none; background: rgba(127, 127, 127, 0.18); }
+
+/* ---------------------------------------------------------------------------
+ * View toggle
+ *
+ * The control that swaps between the list and the calendar, at the far right of the
+ * toolbar - away from the filters, because which view you are in is a property of the
+ * page rather than a filter on it.
+ *
+ * Drawn as an outline rather than as a filled button, so it reads as the secondary
+ * control it is beside a filled Create Event. currentColor and `color: inherit`, so it
+ * takes the surrounding text colour and stays legible on whatever a theme paints the
+ * toolbar - including a dark one, where a hard-coded grey would not.
+ *
+ * Written under .events_page_wrap so it out-specifies the theme's own .button rule; see
+ * the note on .events_select for why equal specificity would lose. */
+.events_page_wrap .events_view_toggle {
+	display: inline-flex; align-items: center; gap: 6px;
+	padding: 3px 11px;
+	background: transparent;
+	color: inherit;
+	border: 1px solid currentColor;
+	border-radius: 4px;
+	font: inherit;
+	font-size: 0.85em;
+	line-height: 1.5;
+	font-weight: normal;
+	text-shadow: none;
+	cursor: pointer;
+	opacity: 0.85;
+}
+.events_page_wrap .events_view_toggle:hover { opacity: 1; background: rgba(127, 127, 127, 0.18); }
+
+/* Hard right, whatever else the toolbar is carrying. `margin-left: auto` on a flex item
+   eats the free space to its left, which keeps the toggle on the same row as everything
+   else instead of the absolute positioning that would drop it out of the wrap. */
+.events_toolbar .events_view_form { margin-left: auto; }
+
+/* The icon is a mask rather than the background-image the funnel and the select's arrow
+   are, because those sit on a known light surface and this one has to take the heading
+   bar's colour with it - a mask is painted in currentColor, a background image carries
+   whatever colour was baked into the data URI. */
+.events_view_icon {
+	width: 14px; height: 14px; flex: none;
+	background-color: currentColor;
+	-webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+	-webkit-mask-position: center; mask-position: center;
+	-webkit-mask-size: 14px 14px; mask-size: 14px 14px;
+}
+
+/* Each icon names the view its button goes to: a month grid for the calendar, ruled
+   lines for the list. */
+#events_view_calendar .events_view_icon {
+	-webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.4'%3E%3Crect x='1.7' y='2.7' width='12.6' height='11.6' rx='1.6'/%3E%3Cpath d='M1.7 6.4h12.6M5.2 1.2v2.8M10.8 1.2v2.8'/%3E%3C/svg%3E");
+	mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.4'%3E%3Crect x='1.7' y='2.7' width='12.6' height='11.6' rx='1.6'/%3E%3Cpath d='M1.7 6.4h12.6M5.2 1.2v2.8M10.8 1.2v2.8'/%3E%3C/svg%3E");
+}
+#events_view_list .events_view_icon {
+	-webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M5.4 3.6h9.1M5.4 8h9.1M5.4 12.4h9.1M1.7 3.6h.01M1.7 8h.01M1.7 12.4h.01'/%3E%3C/svg%3E");
+	mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M5.4 3.6h9.1M5.4 8h9.1M5.4 12.4h9.1M1.7 3.6h.01M1.7 8h.01M1.7 12.4h.01'/%3E%3C/svg%3E");
+}
+
 .events_toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; }
 .events_filter_form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
 .events_filter_form label { display: inline-flex; align-items: center; gap: 6px; }
+
+/* The archived toggle sits between the region select and the Filter button, and reads as
+   one control with its box - so it keeps its two words on one line however narrow the
+   toolbar gets, and wraps as a whole instead. */
+.events_filter_check { white-space: nowrap; font: inherit; font-weight: normal; }
 
 .events_select {
 	/* inherit, so the control follows the theme's body font - but not a label's weight:
@@ -184,6 +277,11 @@ textarea.events_input { resize: vertical; }
 
 /* The day rows are the page's one wide block, so they opt out of the 32em field column. */
 #event_form_days { max-width: none; }
+
+/* So does the description, for the same reason: it is MyBB's BBCode editor, whose toolbar
+   has some thirty buttons on it and wraps to three rows in a 32em column. events_form_field()
+   puts "field_" + the control's id on the wrapper, which is what this reaches for. */
+#field_event_form_description { max-width: none; }
 #event_form_days_hint { margin: 0 0 4px; }
 
 /* ---------------------------------------------------------------------------
@@ -194,6 +292,86 @@ textarea.events_input { resize: vertical; }
 .event_count_trooper .event_count_dot { background: var(--events-accent, #2f6f9f); }
 .event_count_wrangler .event_count_dot { background: var(--events-wrangle, #c77700); }
 .event_count_key { font-size: 0.85em; opacity: 0.7; margin-left: 2px; }
+
+/* ---------------------------------------------------------------------------
+ * The event page's turnout tab
+ *
+ * The event page carries the same two lozenges with the roles spelled out
+ * (.event_count_label, written by events_signup_counts()). Not dimmed the way the
+ * listing's T / W key is: there the letter is a key hanging off a number, here the word
+ * is the thing being read, and it stands in for the bold "Troopers:" label the row used
+ * to carry.
+ *
+ * Both sit on one line rather than a row each, so the pair reads as one fact - how many
+ * people are coming, in what capacity. The gap is wider than the listing's because the
+ * words are longer.
+ *
+ * They ride a tab in the card's top right corner: flush with the card's top and right
+ * edges, cut away on the left at an angle and rounded off at the bottom left, so it
+ * reads as a label fixed to the card rather than a box floating on it. The card is the positioning
+ * context, which is why the template wraps the table in #event_card and writes the tab
+ * as its sibling - a <td> would have anchored it inside the theme's cell padding instead
+ * of against the card's own corner.
+ *
+ * The shape is two pieces. The element itself is the flat right-hand block; ::before is a
+ * skewed slab hung off its left, overlapping far enough that the two share a background
+ * with no seam between them. Drawn this way rather than with one clip-path because a
+ * clip-path polygon cannot round the bottom left corner, and rather than skewing the
+ * whole tab because that would slant the right edge too and lift it off the card's.
+ * ------------------------------------------------------------------------ */
+.event_card { position: relative; }
+
+.event_counts_tab {
+	position: absolute; top: 0; right: 0; z-index: 1;
+	margin: 0;
+	padding: 6px 14px 7px 12px;
+	background: var(--events-tab, #eaeff4);
+	line-height: 1.3;
+	white-space: nowrap;
+}
+
+.event_counts_tab::before {
+	content: "";
+	position: absolute; top: 0; bottom: 0; left: -22px; width: 42px;
+	background: inherit;
+	border-bottom-left-radius: 12px;
+	/* Behind the tab's own text. A positioned pseudo-element otherwise paints over its
+	   parent's inline content, and this slab reaches back far enough to sit on top of
+	   the first lozenge's dot. Negative rather than a lower stack level: the tab is a
+	   stacking context of its own, so this stays above the tab's background and below
+	   its words instead of dropping behind the card. */
+	z-index: -1;
+	/* Skewed about its top edge, so the cut leans out as it falls - "/", the bottom edge
+	   the wide one and the slab undercutting the card's top edge the way a tab in a row
+	   of folders does. A negative angle: skewX moves a point right by y * tan(angle),
+	   and this wants the bottom carried left.
+
+	   Wider than the overhang it draws, because the shear carries its bottom right
+	   corner left as well - the extra width is what keeps that corner inside the block
+	   beside it so the two stay one shape along the bottom. */
+	transform: skewX(20deg);
+	transform-origin: top left;
+}
+
+.event_counts_tab .event_count { margin-right: 0; }
+
+/* A dot between the two, because in the tab they sit close enough to read as one string
+   without one. Generated content rather than a span, so the counts helper keeps writing
+   the same markup for the listing, where the lozenges are spaced apart instead. */
+.event_counts_tab .event_count + .event_count::before {
+	content: "\00b7";
+	margin: 0 10px;
+	opacity: 0.45;
+}
+
+/* Room for the tab. Narrow, it sits over the meta list's first line, so that line starts
+   below it; wide, there is room beside it and only the right hand end needs keeping
+   clear - the meta rows are short labels and would otherwise run under the tab the first
+   time an event had a long address. */
+#event_meta { padding-top: 30px; }
+@media (min-width: 620px) {
+	#event_meta { padding-top: 0; padding-right: 230px; }
+}
 
 /* The address under an event's title, rather than a column of its own: a venue runs as
    long as the rest of the row put together, and a column for it would squeeze the five
@@ -392,7 +570,6 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 /* The gap below the leading question is set from above rather than below it: the
    disclosure checkbox has to stay a sibling of the grid for the rule that opens it, so
    there is no wrapper of its own to space. */
-.signup_role_help { font-size: 0.9em; opacity: 0.85; margin: 0 0 16px; }
 
 .signup_per_day { width: 15px; height: 15px; margin: 0; vertical-align: -2px; accent-color: var(--events-accent, #2f6f9f); }
 .signup_per_day_label { margin-left: 8px; font-weight: 600; cursor: pointer; }
@@ -530,8 +707,16 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 
 	/* The trooper/wrangler dots are background colour, which a browser leaves out of a
 	   print unless the reader asks for background graphics. Drawn as outlines they keep
-	   working; the T and W beside them carry the meaning either way. */
+	   working; the word or letter beside them carries the meaning either way. */
 	.event_count_dot { background: none !important; border: 0.5pt solid #000; }
+
+	/* The turnout tab is a shape cut out of a background, and a background is the one
+	   thing a print is not guaranteed to carry. On paper it goes back into the flow as a
+	   plain line above the card - which also keeps an absolutely positioned box from
+	   landing on top of the first meta row once the page is re-laid out for print. */
+	.event_counts_tab { position: static; padding: 0 0 6pt; background: none !important; }
+	.event_counts_tab::before { display: none; }
+	#event_meta { padding: 0 !important; }
 
 	/* Controls that can only do something in a browser. The status pills are not
 	   controls, so a printed event page still says what the reader signed up for. */

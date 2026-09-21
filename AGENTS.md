@@ -39,7 +39,11 @@ baseline picks the change up.
   `users.lastactive`, and every later restore then starts with timestamps in the future -
   which surfaces as page views failing at random with "BIGINT UNSIGNED value is out of
   range", not as anything that points at the snapshot. Run `scripts/db-restore.sh` first
-  (it resets the clock and realigns the timestamps), then re-provision, then snapshot.
+  (it resets the clock and realigns the timestamps), then re-provision, then snapshot. It
+  records the run's *content* as well: threads, posts and PMs the tests created are not
+  reset between tests, so a snapshot taken after a run bakes every announcement and troop
+  report it posted into the baseline that every later run starts from. Restoring first is
+  what clears them.
 - Everything runs in Docker. Log and file paths in debugging code must be container paths
   (`/var/www/html/...`); `test-forum/` on the host is the same directory.
 - MyBB's `insert_query()`/`update_query()` quote values but do **not** escape them. Every
@@ -65,6 +69,19 @@ baseline picks the change up.
   which are served from two different roots. Everything else is rendered by PHP, and a page
   must still work with the script turned off - each of those three enhances a control that
   posts the same thing either way, and the server validates what arrives regardless.
+- An event's description is BBCode, written in MyBB's own editor on both forms
+  (`build_mycode_inserter()` via `events_description_editor()`), and rendered with MyBB's
+  own parser (`events_parse_description()`). The front end gets the whole editor from the
+  `codebuttons` template, which carries its own stylesheet and scripts; the Admin CP half
+  returns only the configuration script, so `events_admin.php` has to put sceditor in
+  `$page->extra_header` *before* `output_header()` runs. Miss that and the box is a plain
+  textarea with no error anywhere. Anything that shows a description has to go through the
+  parser - `events_description_text()` is the plain-text pass the iCal feed needs - and the
+  announcement thread carries it unescaped, unlike every other value it interpolates.
+- The Preview button on both event forms is an ordinary submit that posts the form and
+  comes back with it, and it carries `formnovalidate`. Without that the browser refuses to
+  submit a form whose required title and dates are still empty, which is precisely when a
+  description is being previewed.
 - Styling for a control that appears on both forms cannot live in `events.css`: that is a
   theme stylesheet, and the Admin CP loads no theme at all. Those go in
   `plugin/root/jscripts/events/` as a sheet both roots link
@@ -184,8 +201,54 @@ baseline picks the change up.
   intercepts the click. `tests/e2e/regions.spec.ts` runs a `javaScriptEnabled: false`
   describe over that fallback, because it is the half that would otherwise rot unnoticed.
 
+- `verify_post_check()` behaves differently in the Admin CP: on the front end it calls
+  `error()` and stops the request, but with `IN_ADMINCP` defined it merely *returns false*.
+  Calling it bare there - `verify_post_check($mybb->get_input('my_post_key'));` - therefore
+  checks nothing at all, and both `events_admin_set_status()` and `events_admin_delete_event()`
+  shipped that way. They are GET links, so that was a link an administrator could be sent and
+  click. Every Admin CP action guards on the return value and `flash_message()`s
+  `$lang->invalid_post_verify_key2` before redirecting, the way MyBB's own modules do.
+
+- A test cannot exercise that guard with `page.goto()`. The board runs with
+  `cookiesamesiteflag = 1`, and `verify_post_check()` also refuses any request whose
+  `Sec-Fetch-Site` is not `same-origin` - which a typed navigation never is. A `goto()` to one
+  of those links is refused whatever key it carries, so a test written that way passes against
+  code that checks nothing. `followAdminActionLink()` in `tests/helpers/auth.ts` sends the
+  request with the header a click would carry, and takes `withKey: false` for the forged case.
+
 - `events_hooks.php` is the only plugin include loaded on every request. Anything a hook
   needs from `events_functions.php` has to be `require_once`d, not assumed.
+
+- MyBB has no per-thread permission, so hiding an event's announcement thread from a
+  member excluded from that event means telling every surface that could name a thread,
+  one hook at a time: `global_intermediate` (which covers every page that takes a `tid`,
+  `pid` or `aid` - showthread, printthread, newreply, editpost, showpost, sendthread,
+  ratethread, polls, report, moderation, attachment), `xmlhttp` and `archive_start` for
+  the two entry points that never load `global.php`'s furniture,
+  `forumdisplay_get_threads` for the thread list, `build_forumbits_forum` for the "last
+  post" a forum row advertises, `search_do_search_process` for the search log and
+  `syndication_get_posts` for the feeds. Adding a surface means another hook - there is no
+  central place to put this, and a missed one is a thread the excluded member can read.
+
+- Two of those surfaces do not identify their thread the way the rest do, and a hook
+  registered on them is not the same thing as a hook that fires. The archive parses its
+  thread out of the URL *path* (`archive/index.php?thread-12.html`) into `archive/global.php`'s
+  own `$action` and `$id`, and never touches `$mybb->input['tid']` - so
+  `events_block_hidden_thread()` has to read those globals when `IN_ARCHIVE` is defined, and
+  check `$action` with them because `$id` is a *fid* when the action is `forum`. On
+  `xmlhttp.php` only the actions that name a `tid` or a `pid` are covered, which is why
+  `tests/e2e/exclusions.spec.ts` probes `action=edit_post` rather than a quote endpoint:
+  `get_multiquoted` reads its posts from a cookie, so nothing about the request says which
+  thread it is for. The archive was leaking whole announcement posts to excluded members for
+  exactly this reason, and it looked closed in the hook list the entire time.
+
+- Three leaks are known and left, because closing them is not something MyBB offers a hook
+  for: forumdisplay counts a forum's threads further up the page than any hook it has, so
+  the count behind the page links includes a hidden thread; the board index's thread and
+  post totals are cached columns on the forum; and the portal's "latest discussions" list
+  runs its query with no hook anywhere near it. All three are numbers or a page the board
+  need not have turned on - none of them is a subject line. If a fourth appears, check
+  whether it leaks a subject before treating it the same way.
 
 - Every date the plugin stores is a *wall clock* in the board's configured event timezone
   (the `events_timezone` setting, picked in Admin CP -> Event Management -> Settings). The

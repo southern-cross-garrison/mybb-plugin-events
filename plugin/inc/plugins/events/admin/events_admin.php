@@ -13,10 +13,22 @@ if(!defined("IN_MYBB"))
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
 
+$events_action = $mybb->get_input('action');
+
+// The event form's description box is MyBB's BBCode editor and can be previewed above the
+// form, and both want something in the <head> - which output_header() below has already
+// written by the time the action itself runs. The front-end form has no equivalent
+// problem: its template is one string, and the head is still in it when the page is built.
+if($events_action === 'add' || $events_action === 'edit')
+{
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_form.php";
+
+    $page->extra_header .= events_description_editor_assets()
+                         . events_preview_assets('../jscripts/events/');
+}
+
 $page->add_breadcrumb_item("Event Management", "index.php?module=events");
 $page->output_header("Event Management");
-
-$events_action = $mybb->get_input('action');
 
 $page->output_nav_tabs(array(
     'events'   => array('title' => 'Events', 'link' => 'index.php?module=events', 'description' => 'Create and manage events'),

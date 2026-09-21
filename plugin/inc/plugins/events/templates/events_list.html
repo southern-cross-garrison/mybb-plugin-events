@@ -10,13 +10,14 @@
 <table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
 <tr class="no-print"><td class="trow1" colspan="6">
 <div class="events_toolbar">
-{$events_view_toggle}
-<form method="get" action="events.php" class="events_filter_form">
+<form method="get" action="events.php" class="events_filter_form" id="events_filter_form">
 <input type="hidden" name="view" value="list" />
 <select name="region" id="events_region_filter" class="events_select">{$region_options}</select>
-<input type="submit" class="button" value="Filter" />
+{$events_archived_filter}
+<noscript><input type="submit" class="button" value="Filter" /></noscript>
 </form>
 {$events_manage_link}
+{$events_view_toggle}
 </div>
 </td></tr>
 <tr>
@@ -30,6 +31,7 @@
 {$events_rows}
 </table>
 </div>
+{$events_filter_script}
 {$footer}
 </body>
 </html>

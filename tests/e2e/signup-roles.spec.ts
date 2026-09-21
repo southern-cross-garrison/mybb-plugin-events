@@ -309,10 +309,12 @@ test.describe('the event page and the listing', () => {
 });
 
 test.describe('signup locking', () => {
-  test('an excluded member cannot sign up in either role, and is told once', async ({ page }) => {
-    const eventId = await createEvent({ title: 'Excluded Wrangle', excluded: ['excluded'] });
+  test('an excluded coordinator cannot sign up in either role, and is told once', async ({ page }) => {
+    // The coordinator, because an exclusion hides the event from everybody else it names
+    // and there would be no page to read the message on - see exclusions.spec.ts.
+    const eventId = await createEvent({ title: 'Excluded Wrangle', excluded: ['gec'] });
 
-    await loginAs(page, 'excluded');
+    await loginAs(page, 'gec');
     await page.goto(`/event.php?id=${eventId}`);
 
     await expect(page.locator('#event_signup_locked')).toHaveAttribute('data-lock-reason', 'excluded');
@@ -431,6 +433,29 @@ test.describe('wranglers on coordinator surfaces', () => {
 
     await expect(page.locator('#event_rsvp_count')).toHaveText('2');
     await expect(page.locator('#event_wrangler_count')).toHaveText('1');
+  });
+
+  test('the event page spells out the listing\'s T / W lozenges on one line', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Spelled Out Troop' });
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+    await createRsvp(eventId, 'trooper2', { costumes: [TD] });
+    await createRsvp(eventId, 'wrangler', { role: 'wrangler' });
+
+    await loginAs(page, 'gec');
+    await page.goto(`/event.php?id=${eventId}`);
+
+    // Same dots as the listing, but named rather than keyed - this is where a member
+    // finds out what the T and the W on the listing stood for.
+    const counts = page.locator('#event_signup_counts');
+    await expect(counts.locator('.event_count_trooper .event_count_dot')).toBeVisible();
+    await expect(counts.locator('.event_count_wrangler .event_count_dot')).toBeVisible();
+    await expect(counts.locator('.event_count_trooper')).toHaveText('2 Troopers');
+    await expect(counts.locator('.event_count_wrangler')).toHaveText('1 Wrangler');
+
+    // One line, not a row each: the pair is one fact about the event.
+    const top = (selector: string) =>
+      counts.locator(selector).evaluate((el) => el.getBoundingClientRect().top);
+    expect(await top('.event_count_trooper')).toBe(await top('.event_count_wrangler'));
   });
 
   test('show as a trooper/wrangler breakdown on the events listing', async ({ page }) => {

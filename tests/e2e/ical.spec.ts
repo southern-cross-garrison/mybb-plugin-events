@@ -85,6 +85,23 @@ test.describe('iCal export', () => {
     expect(body).toContain(String.raw`DESCRIPTION:Line one\nLine two`);
   });
 
+  test('flattens the description\'s BBCode', async ({ page }) => {
+    // DESCRIPTION is a text property: a calendar app shows whatever is in it verbatim,
+    // so the markup a description is written in has to come out rather than travel.
+    const eventId = await createEvent({
+      title: 'Marked Up Export Troop',
+      description: '[b]Full armour[/b] and a [url=http://example.test/kit]kit list[/url].',
+      start: '2026-10-20 10:00:00',
+      end: '2026-10-20 16:00:00',
+    });
+
+    await loginAs(page, 'trooper1');
+    const body = await (await page.request.get(`/ical.php?id=${eventId}`)).text();
+
+    expect(body).toContain('DESCRIPTION:Full armour and a kit list (http://example.test/kit).');
+    expect(body).not.toContain('[b]');
+  });
+
   test('is not available to guests', async ({ page }) => {
     const eventId = await createEvent({ title: 'Private Export Troop' });
 

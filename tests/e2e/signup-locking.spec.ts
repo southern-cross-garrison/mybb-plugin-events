@@ -172,10 +172,14 @@ test.describe('signup locking as the clock moves', () => {
     await expect(page.locator('body')).toContainText('This event is not open for signups');
   });
 
-  test('an excluded member can see the event but cannot sign up', async ({ page }) => {
-    const eventId = await createEvent({ title: 'Exclusive Troop', excluded: ['excluded'] });
+  test('a coordinator excluded from their own event still sees it and still cannot sign up', async ({ page }) => {
+    // An exclusion hides the event from the member it names - see exclusions.spec.ts -
+    // which leaves the coordinator as the one person who can be excluded and still open
+    // the page. Running an event is not the same as turning out to it, so the lock is
+    // still the answer rather than a hidden event they would then be unable to manage.
+    const eventId = await createEvent({ title: 'Exclusive Troop', excluded: ['gec'] });
 
-    await loginAs(page, 'excluded');
+    await loginAs(page, 'gec');
     expect(await lockReasonOnEventPage(page, eventId)).toBe('excluded');
     await expect(page).toHaveTitle(/^Exclusive Troop - /);
 

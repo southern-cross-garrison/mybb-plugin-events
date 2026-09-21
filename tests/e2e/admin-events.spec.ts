@@ -13,6 +13,7 @@ import {
 } from '../helpers/db';
 import { relativeToTestNow } from '../helpers/clock';
 import { addTags, excludedValue, tag } from '../helpers/tag-field';
+import { descriptionValue, expectEditorAttached, fillDescription } from '../helpers/editor';
 
 /**
  * A date and its time are two controls now that the date box carries a calendar picker, so
@@ -42,7 +43,7 @@ async function fillEventForm(
   },
 ) {
   await page.locator('input[name="title"]').fill(values.title);
-  await page.locator('textarea[name="description"]').fill(values.description ?? `${values.title} details`);
+  await fillDescription(page, 'description', values.description ?? `${values.title} details`);
   await page.locator('select[name="status"]').selectOption(values.status ?? 'live');
   await page.locator('select[name="region"]').selectOption(values.region ?? 'Sydney');
 
@@ -272,6 +273,87 @@ test.describe('admin event management', () => {
     const cells = await row.locator('td').allInnerTexts();
     // Troopers then wranglers, immediately after the start date.
     expect(cells).toContain('1');
+  });
+
+  test('the description box is the board\'s BBCode editor here too', async ({ page }) => {
+    await loginToAdminCp(page);
+    await gotoEventsAdmin(page, '&action=add');
+
+    // The Admin CP loads no theme and none of MyBB's posting pages, so the editor's
+    // stylesheet and scripts have to be put in the head by the plugin - which is easy to
+    // half-do and leaves an ordinary textarea behind with no error anywhere.
+    await expectEditorAttached(page, 'description');
+    await expect(page.locator('.sceditor-toolbar')).toBeVisible();
+  });
+
+  test('Preview renders the description without creating the event', async ({ page }) => {
+    await loginToAdminCp(page);
+    await gotoEventsAdmin(page, '&action=add');
+
+    await fillEventForm(page, {
+      title: 'Admin Previewed Troop',
+      description: '[b]Under review[/b]',
+      start: relativeToTestNow({ days: 14 }),
+      end: relativeToTestNow({ days: 14, hours: 6 }),
+    });
+    await page.locator('#events_preview_button').click();
+
+    await expect(page.locator('#event_description_preview_body .mycode_b')).toHaveText('Under review');
+
+    expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Admin Previewed Troop'`)).toHaveLength(0);
+    await expect(page.locator('.error')).toHaveCount(0);
+
+    // Back on the form as it was typed, the same way the front-end form comes back.
+    await expect(page.locator('input[name="title"]')).toHaveValue('Admin Previewed Troop');
+    expect(await descriptionValue(page, 'description')).toBe('[b]Under review[/b]');
+  });
+
+  test('the list narrows to one status when asked', async ({ page }) => {
+    const liveId = await createEvent({ title: 'Filtered Live Troop', status: 'live' });
+    const pendingId = await createEvent({ title: 'Filtered Pending Troop', status: 'pending' });
+    const archivedId = await createEvent({ title: 'Filtered Archived Troop', status: 'archived' });
+
+    await loginToAdminCp(page);
+    await gotoEventsAdmin(page, '&status=pending');
+
+    await expect(page.locator('body')).toContainText('Filtered Pending Troop');
+    await expect(page.locator('body')).not.toContainText('Filtered Live Troop');
+    await expect(page.locator('body')).not.toContainText('Filtered Archived Troop');
+
+    // A status that is not a status is ignored rather than filtering everything out.
+    await gotoEventsAdmin(page, '&status=nonsense');
+    for (const title of ['Filtered Live Troop', 'Filtered Pending Troop', 'Filtered Archived Troop']) {
+      await expect(page.locator('body')).toContainText(title);
+    }
+
+    expect([liveId, pendingId, archivedId].every((id) => id > 0)).toBe(true);
+  });
+
+  test('the list pages rather than growing without end', async ({ page }) => {
+    // Twenty to a page. Twenty-two events means the last two are on page two and nowhere
+    // else - a listing that quietly stopped paging would show the first twenty forever.
+    const titles: string[] = [];
+    for (let i = 0; i < 22; i++) {
+      // Ordered by start_date DESC, so the earliest dates land on the last page.
+      titles.push(`Paged Troop ${String(i).padStart(2, '0')}`);
+      await createEvent({
+        title: titles[i],
+        status: 'live',
+        start: relativeToTestNow({ days: 40 - i }),
+        end: relativeToTestNow({ days: 40 - i, hours: 4 }),
+      });
+    }
+
+    await loginToAdminCp(page);
+    await gotoEventsAdmin(page);
+
+    await expect(page.locator('body')).toContainText('Paged Troop 00');
+    await expect(page.locator('body')).not.toContainText('Paged Troop 21');
+
+    await gotoEventsAdmin(page, '&page=2');
+    await expect(page.locator('body')).toContainText('Paged Troop 21');
+    await expect(page.locator('body')).toContainText('Paged Troop 20');
+    await expect(page.locator('body')).not.toContainText('Paged Troop 00');
   });
 
   test('a coordinator without admin rights cannot reach the Admin CP', async ({ page }) => {

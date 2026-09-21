@@ -11,6 +11,7 @@ import {
   uid,
 } from '../helpers/db';
 import { relativeToTestNow } from '../helpers/clock';
+import { fillDescription } from '../helpers/editor';
 
 /**
  * An event is announced in the forums by the plugin, not by whoever created it: the post
@@ -47,7 +48,7 @@ async function fillDateTime(page: Page, id: string, value: string) {
 
 async function fillEventForm(page: Page, values: EventFormValues) {
   if (values.title !== undefined) await page.locator('#event_form_title').fill(values.title);
-  if (values.description !== undefined) await page.locator('#event_form_description').fill(values.description);
+  if (values.description !== undefined) await fillDescription(page, 'event_form_description', values.description);
   if (values.status !== undefined) await page.locator('#event_form_status').selectOption(values.status);
   if (values.region !== undefined) await page.locator('#event_form_region').selectOption(values.region);
   if (values.address !== undefined) await page.locator('#event_form_address').fill(values.address);
@@ -227,15 +228,15 @@ test.describe('event announcement threads', () => {
     await expect(page.locator('.post_body').first()).toContainText('not open for signups');
   });
 
-  test('neutralises BBCode in the description, all the way to the posted thread', async ({ page }) => {
+  test('carries the description BBCode into the posted thread as written', async ({ page }) => {
     await loginAs(page, 'gec');
 
-    // The description is rendered as plain text on the event page, so BBCode in it was
-    // never markup the coordinator meant to write - and the announcement is the one place
-    // it would otherwise be parsed.
+    // The description is written in the board's editor and rendered as BBCode on the
+    // event page, so the announcement has to parse it too - a description that reads one
+    // way on the event page and another in the thread is the failure this guards.
     const eventId = await createEventViaForm(page, {
-      title: 'Injected Announcement Troop',
-      description: 'Meet at [url=http://evil.test]the gate[/url].',
+      title: 'Formatted Announcement Troop',
+      description: '[b]Meet at the gate[/b] by [url=http://example.test]the map[/url].',
       status: 'live',
       region: 'Sydney',
     });
@@ -243,9 +244,37 @@ test.describe('event announcement threads', () => {
     const threadId = Number((await getEvent(eventId)).thread_id);
 
     await page.goto(`/showthread.php?tid=${threadId}`);
+    // The post's own labels are bold too, so the description's is picked out by what it
+    // says rather than by being the only one.
     const post = page.locator('.post_body').first();
-    await expect(post).toContainText('[url=http://evil.test]the gate[/url]');
-    await expect(post.locator('a[href*="evil.test"]')).toHaveCount(0);
+    await expect(post.locator('.mycode_b', { hasText: 'Meet at the gate' })).toHaveCount(1);
+    await expect(post.locator('a[href="http://example.test"]')).toHaveText('the map');
+    await expect(post).not.toContainText('[b]');
+  });
+
+  test('still neutralises BBCode in the values the plugin interpolates', async ({ page }) => {
+    await loginAs(page, 'gec');
+
+    // The description is the one field a coordinator writes markup in on purpose.
+    // Everything else the post is built from is data, and an address carrying "[url=...]"
+    // would otherwise rewrite the line it sits on.
+    const eventId = await createEventViaForm(page, {
+      title: 'Injected Address Troop',
+      address: '[url=http://evil.test]1 Nowhere St[/url]',
+      status: 'live',
+      region: 'Sydney',
+    });
+
+    const threadId = Number((await getEvent(eventId)).thread_id);
+
+    await page.goto(`/showthread.php?tid=${threadId}`);
+    // The address is still a link - to the map, with the whole string as its label. What
+    // must not exist is a link the address itself wrote, so this asks for one pointing
+    // at evil.test rather than for one merely mentioning it: the map URL carries the
+    // address percent-encoded in its query, evil.test and all.
+    const post = page.locator('.post_body').first();
+    await expect(post).toContainText('[url=http://evil.test]1 Nowhere St[/url]');
+    await expect(post.locator('a[href^="http://evil.test"]')).toHaveCount(0);
   });
 
   test('links the announcement from the event page', async ({ page }) => {

@@ -1,6 +1,10 @@
 import { test, expect } from "../helpers/fixtures";
 import { loginAs } from "../helpers/auth";
 import { relativeToTestNow, setClock } from "../helpers/clock";
+import { withSettings } from "../helpers/settings";
+// The report box is MyBB's BBCode editor, which hides the textarea it binds to - so
+// typing into it goes through the same helper the event description uses.
+import { expectEditorAttached, fillDescription } from "../helpers/editor";
 import {
   createEvent,
   createRsvp,
@@ -11,6 +15,8 @@ import {
   getTroopReport,
   setUserField,
   fixtures,
+  query,
+  T,
 } from "../helpers/db";
 
 const [TK, TD] = [0, 1].map((index) => fixtures().costumeOptions[index]);
@@ -115,6 +121,44 @@ test.describe("troop reports", () => {
     expect(draft.indexOf("newbie")).toBeGreaterThan(otherIndex);
   });
 
+  test("the report box is the board's BBCode editor", async ({ page }) => {
+    const eventId = await finishedEvent("Edited Troop");
+    await createRsvp(eventId, "trooper1", { costumes: [TK] });
+
+    await loginAs(page, "trooper1");
+    await page.goto(`/troop_report.php?id=${eventId}`);
+
+    // A report is BBCode posted into a forum, so it is written in the same editor a post
+    // is - not in a bare textarea whose tags the author has to know.
+    await expectEditorAttached(page, "troop_report_content");
+  });
+
+  test("rosters the attendees as a BBCode list, all the way to the thread", async ({
+    page,
+  }) => {
+    const eventId = await finishedEvent("Listed Troop");
+    await createRsvp(eventId, "trooper1", { costumes: [TK] });
+    await createRsvp(eventId, "trooper2", { costumes: [TD] });
+
+    await loginAs(page, "trooper1");
+    await page.goto(`/troop_report.php?id=${eventId}`);
+
+    const draft = await page.locator("#troop_report_content").inputValue();
+
+    expect(draft).toContain("[list]");
+    expect(draft).toContain("[/list]");
+    expect(draft).toContain("[*]trooper1 (TK-20001)");
+    expect(draft).not.toContain("- trooper1 (TK-20001)");
+
+    // Posted unchanged - which also takes the draft back out through the editor - the
+    // list tags have to arrive as a list rather than as visible markup.
+    await page.locator("#troop_report_submit").click();
+
+    const post = page.locator(".post_body").first();
+    await expect(post.locator("ul li").first()).toContainText("trooper1 (TK-20001)");
+    await expect(post).not.toContainText("[*]");
+  });
+
   test("lists wranglers in their own section, apart from the membership buckets", async ({
     page,
   }) => {
@@ -129,7 +173,7 @@ test.describe("troop reports", () => {
     const draft = await page.locator("#troop_report_content").inputValue();
 
     expect(draft).toContain("[b]Wranglers:[/b]");
-    expect(draft).toContain("- wrangler");
+    expect(draft).toContain("[*]wrangler");
 
     // Wranglers sit after the membership buckets, not inside them.
     expect(draft.indexOf("wrangler\n")).toBeGreaterThan(
@@ -222,9 +266,11 @@ test.describe("troop reports", () => {
     await loginAs(page, "trooper1");
     await page.goto(`/troop_report.php?id=${eventId}`);
 
-    await page
-      .locator("#troop_report_content")
-      .fill("We deployed and it went well.");
+    await fillDescription(
+      page,
+      "troop_report_content",
+      "We deployed and it went well.",
+    );
     await page.locator("#troop_report_submit").click();
 
     await expect(page.locator("body")).toContainText(
@@ -254,7 +300,7 @@ test.describe("troop reports", () => {
 
     await loginAs(page, "trooper1");
     await page.goto(`/troop_report.php?id=${eventId}`);
-    await page.locator("#troop_report_content").fill("First report.");
+    await fillDescription(page, "troop_report_content", "First report.");
     await page.locator("#troop_report_submit").click();
     await expect(page.locator("body")).toContainText("First report.");
 
@@ -263,6 +309,52 @@ test.describe("troop reports", () => {
     await expect(page.locator("body")).toContainText(
       "A troop report has already been posted",
     );
+  });
+
+  test("say so when the board has no troop report forum configured", async ({ page }) => {
+    // The forum is a setting, and a board that never set one would otherwise lose the
+    // report into a PostDataHandler error about forum 0 - after the attendee had written
+    // it out.
+    const restore = await withSettings({ events_troop_report_forum: "" });
+
+    try {
+      const eventId = await finishedEvent("Homeless Report Troop");
+      await createRsvp(eventId, "trooper1", { costumes: [TK] });
+
+      await loginAs(page, "trooper1");
+      await page.goto(`/troop_report.php?id=${eventId}`);
+      await fillDescription(page, "troop_report_content", "Nowhere to put this.");
+      await page.locator("#troop_report_submit").click();
+
+      await expect(page.locator("body")).toContainText(
+        "No troop report forum has been configured",
+      );
+      expect(
+        await query(
+          `SELECT id FROM ${T("event_plugin_troop_reports")} WHERE event_id = ?`,
+          [eventId],
+        ),
+      ).toHaveLength(0);
+    } finally {
+      await restore();
+    }
+  });
+
+  test("refuse an empty body rather than posting a blank thread", async ({ page }) => {
+    const eventId = await finishedEvent("Empty Report Troop");
+    await createRsvp(eventId, "trooper1", { costumes: [TK] });
+
+    await loginAs(page, "trooper1");
+    await page.goto(`/troop_report.php?id=${eventId}`);
+    await fillDescription(page, "troop_report_content", "");
+    await page.locator("#troop_report_submit").click();
+
+    // MyBB's own post validation, surfaced as the page's error rather than swallowed.
+    await expect(page.locator("body")).toContainText(/message|empty/i);
+    expect(await getTroopReport(eventId)).toBeNull();
+
+    // And the event is not closed out on the strength of a report that was never posted.
+    expect((await getEvent(eventId)).status).not.toBe("archived");
   });
 
   test("leaves a pointer on the linked discussion thread", async ({ page }) => {
@@ -280,7 +372,7 @@ test.describe("troop reports", () => {
 
     await loginAs(page, "trooper1");
     await page.goto(`/troop_report.php?id=${eventId}`);
-    await page.locator("#troop_report_content").fill("Linked report body.");
+    await fillDescription(page, "troop_report_content", "Linked report body.");
     await page.locator("#troop_report_submit").click();
     await expect(page.locator("body")).toContainText("Linked report body.");
 

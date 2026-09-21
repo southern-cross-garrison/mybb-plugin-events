@@ -237,7 +237,7 @@ $event_status = htmlspecialchars_uni($event['status']);
 $event_region = htmlspecialchars_uni($event['region']);
 $event_start_date = events_format_date($event['start_date']);
 $event_end_date = events_format_date($event['end_date']);
-$event_description = nl2br(htmlspecialchars_uni($event['description']));
+$event_description = events_parse_description($event['description']);
 $rsvp_count = events_rsvp_count($event_id, 'trooper');
 $wrangler_count = events_rsvp_count($event_id, 'wrangler');
 
@@ -256,7 +256,19 @@ if(!empty($event['signup_cutoff']) && $event['signup_cutoff'] !== '0000-00-00 00
     $event_cutoff_row = '<p><strong>Signups close:</strong> <span id="event_cutoff">' . events_format_date($event['signup_cutoff']) . '</span></p>';
 }
 
-$event_wrangler_row = '<p><strong>Wranglers:</strong> <span id="event_wrangler_count">' . $wrangler_count . '</span></p>';
+// Both counts as the listing's own lozenges, rather than a bold "Troopers:" row and a
+// bold "Wranglers:" row. The listing has room for "T 1 / W 0" and no room to say what
+// that means; this is where it gets said, in the same colours and the same order, so the
+// abbreviation is readable by the time anyone meets it.
+//
+// A tab across the card's top right corner rather than one more line in the meta list:
+// the turnout is the one fact on this page a member scans for before they read anything
+// else, and in the list it sat below the dates reading as another detail. It is written
+// here and placed by the template outside the table, because it is positioned against
+// the card rather than against a cell - see .event_counts_tab in the stylesheet.
+$event_counts_row = '<div id="event_signup_counts" class="event_counts event_counts_tab">'
+    . events_signup_counts($rsvp_count, $wrangler_count, true, true)
+    . '</div>';
 
 $event_wwcc_row = '';
 if(!empty($event['requires_wwcc']))

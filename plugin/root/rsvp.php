@@ -42,6 +42,15 @@ if(!$event)
     error("Event not found.");
 }
 
+// Checked before the lock below, which would otherwise answer an excluded member with
+// "you have been excluded from signing up to this event" - a sentence that tells them
+// there is an event and that they were kept off it. The event is hidden from them, so
+// the wizard answers the way it would for any page they cannot open.
+if(!events_can_view_event($event))
+{
+    error_no_permission();
+}
+
 // Holding a signup is not a lock: the wizard doubles as the edit form.
 $lock_reason = events_signup_lock_reason($event);
 if($lock_reason !== null)
@@ -461,9 +470,17 @@ if($rsvp_step === 'attendance')
     $rsvp_page_title = $is_update ? 'Update Your Signup' : 'Sign Up to Attend';
     $day_count = count($event_days);
 
+    // The single-day sentence names when it is, because a member arriving from a link or
+    // a reminder is often answering "can I make that?" and should not have to go back to
+    // the event page to find out. The multi-day one deliberately does not: it is already
+    // naming a span of days, and one start time out of several would read as the answer
+    // to a question it is not being asked.
+    $event_when = events_format_when($event['start_date']);
+
     $rsvp_intro .= $day_count > 1
         ? '<p>You are signing up for all <strong>' . $day_count . ' days</strong> of <strong>' . $event_title . '</strong>.</p>'
-        : '<p>You are signing up to <strong>' . $event_title . '</strong>.</p>';
+        : '<p>You are signing up to <strong>' . $event_title . '</strong>'
+          . ($event_when === '' ? '' : ' - ' . $event_when) . '.</p>';
 
     // The leading question, and for all but a handful of signups the only one. A div with
     // role="radiogroup" rather than a fieldset: a <legend> is lifted out of the fieldset's
@@ -479,9 +496,6 @@ if($rsvp_step === 'attendance')
                     'signup_role_radio'
                 )
                 . '</div>';
-
-    $rsvp_body .= '<p class="signup_role_help">A <strong>trooper</strong> turns out in costume. A <strong>wrangler</strong> is a '
-                . 'non-costumed helper - handling crowds, kit and queues - and does not need to be a full member.</p>';
 
     // One day, or none configured at all, and the answer above is the whole answer. The
     // grid only exists to say that one day differs from another.

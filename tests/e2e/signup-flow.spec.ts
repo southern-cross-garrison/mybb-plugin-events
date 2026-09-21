@@ -12,7 +12,11 @@ import {
   getUserField,
   setUserField,
   fixtures,
+  execute,
+  T,
 } from '../helpers/db';
+
+import { relativeToTestNow } from '../helpers/clock';
 
 const [TK, TD, TB] = [0, 1, 2].map((index) => fixtures().costumeOptions[index]);
 
@@ -454,6 +458,66 @@ test.describe('signup wizard', () => {
 
     await expect(page.locator('#rsvp_page')).toHaveAttribute('data-signup-mode', 'update');
     await expect(page.locator('#signup_role_wrangler')).toBeChecked();
+  });
+
+  test('a costume dropped from the profile is not carried into the edited signup', async ({ page }) => {
+    // The wizard pre-selects what the member already holds, intersected with what is
+    // still on their profile - so a costume retired from the profile leaves the signup
+    // the next time it is opened rather than being silently re-saved.
+    const eventId = await createEvent({ title: 'Retired Costume Troop' });
+    await createRsvp(eventId, 'trooper1', { costumes: [TK, TD] });
+
+    await setUserField('trooper1', 'costume', TK);
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+    await page.locator('#rsvp_submit').click();
+
+    // Only the costume still on file is offered, and it is the one already ticked.
+    await expect(page.locator('#rsvp_page[data-rsvp-step="costumes"]')).toBeVisible();
+    await expect(page.locator('input.costume_checkbox')).toHaveCount(1);
+    await expect(page.locator(`input.costume_checkbox[value="${TK}"]`)).toBeChecked();
+
+    await page.locator('#rsvp_submit').click();
+    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_success_message')).toBeVisible();
+
+    expect(await getRsvpCostumes(eventId, 'trooper1')).toEqual([TK]);
+  });
+
+  test('an event that gains days after a signup opens on every day, not on none', async ({ page }) => {
+    // A signup made before the event had days holds no day rows at all. Falling back to
+    // the leading answer is what stops the grid coming back with every day marked as
+    // being sat out - which would read as "you are attending nothing".
+    const eventId = await createEvent({ title: 'Grown Troop' });
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+
+    await execute(
+      `INSERT INTO ${T('event_plugin_event_days')} (event_id, date, start_time, end_time) VALUES (?, ?, ?, ?), (?, ?, ?, ?)`,
+      [
+        eventId, relativeToTestNow({ days: 7 }).slice(0, 10), '09:00:00', '17:00:00',
+        eventId, relativeToTestNow({ days: 8 }).slice(0, 10), '09:00:00', '17:00:00',
+      ],
+    );
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+
+    // The leading answer still speaks for the whole event, so the grid stays shut and no
+    // day is marked as skipped.
+    await expect(page.locator('#signup_per_day')).not.toBeChecked();
+    await expect(page.locator('input.day_role_radio[value="none"]:checked')).toHaveCount(0);
+
+    // attendance -> costumes (the signup is a trooper one) -> confirm -> done.
+    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_page[data-rsvp-step="costumes"]')).toBeVisible();
+    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_page[data-rsvp-step="confirm"]')).toBeVisible();
+    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_success_message')).toBeVisible();
+
+    const dayIds = (await getEventDays(eventId)).map((day) => Number(day.id));
+    expect(await getRsvpDayIds(eventId, 'trooper1')).toEqual(dayIds);
   });
 
   test('a second signup edits the first rather than adding one', async ({ page }) => {

@@ -2,12 +2,13 @@
 <head>
 <title>{$manage_page_title} - {$mybb->settings['bbname']}</title>
 {$headerinclude}
-{$manage_datepicker}
+{$manage_assets}
 </head>
 <body>
 {$header}
 <div id="manage_event_page" class="events_page_wrap" data-event-id="{$event_id}" data-manage-mode="{$manage_mode}">
 {$events_print_header}
+{$manage_preview}
 <form method="post" action="manage_event.php" id="manage_event_form">
 <input type="hidden" name="my_post_key" value="{$mybb->post_code}" />
 <input type="hidden" name="id" value="{$event_id}" />
@@ -19,6 +20,7 @@
 <tr><td class="trow1">{$manage_exclusions}</td></tr>
 <tr><td class="trow2">
 <input type="submit" class="button" id="manage_event_submit" value="{$manage_submit_label}" />
+<input type="submit" class="button" name="preview_description" id="manage_event_preview" value="Preview" formnovalidate="formnovalidate" />
 <a href="{$manage_cancel_url}" id="manage_event_cancel">Cancel</a>
 </td></tr>
 </table>

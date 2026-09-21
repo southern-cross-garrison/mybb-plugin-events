@@ -6,11 +6,15 @@
 define("IN_MYBB", 1);
 define("THIS_SCRIPT", "troop_report.php");
 
-$templatelist = "events_troop_report";
+// codebuttons is MyBB's own: build_mycode_inserter() renders it for the report box.
+$templatelist = "events_troop_report,codebuttons";
 
 require_once "./global.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
+// events_description_editor() lives here; the report is BBCode written into the same
+// editor an ordinary post is.
+require_once MYBB_ROOT . "inc/plugins/events/inc/events_form.php";
 
 if(!$mybb->user['uid'])
 {
@@ -23,6 +27,15 @@ $event = events_get_event($event_id);
 if(!$event)
 {
     error("Event not found.");
+}
+
+// A member excluded from an event cannot write its report, even if they hold a signup
+// made before they were excluded: this form is built from the event, and the event is
+// not one they can see. Reading the report once it is posted is another matter - it is
+// an ordinary thread in the troop report forum and is left alone.
+if(!events_can_view_event($event))
+{
+    error_no_permission();
 }
 
 if(!events_has_ended($event))
@@ -175,10 +188,13 @@ foreach($buckets as $bucket)
         continue;
     }
 
-    $draft_content .= "[b]" . $bucket['title'] . ":[/b]\n";
+    // A real [list] rather than hyphens: the report is BBCode posted into a forum, so the
+    // roster should come out as a list in the thread - and in the editor, which renders
+    // what it is given rather than showing the markup.
+    $draft_content .= "[b]" . $bucket['title'] . ":[/b]\n[list]\n";
     foreach($bucket['attendees'] as $attendee)
     {
-        $line = "- " . events_escape_bbcode($attendee['username']);
+        $line = "[*]" . events_escape_bbcode($attendee['username']);
         if($attendee['tk_id'] !== '')
         {
             $line .= " (" . events_escape_bbcode($attendee['tk_id']) . ")";
@@ -189,19 +205,19 @@ foreach($buckets as $bucket)
         }
         $draft_content .= $line . "\n";
     }
-    $draft_content .= "\n";
+    $draft_content .= "[/list]\n\n";
 }
 
 // Wranglers are not costumed and hold no Legion ID, so they get their own section
 // rather than being folded into the membership buckets above.
 if(!empty($wranglers))
 {
-    $draft_content .= "[b]Wranglers:[/b]\n";
+    $draft_content .= "[b]Wranglers:[/b]\n[list]\n";
     foreach($wranglers as $wrangler)
     {
-        $draft_content .= "- " . events_escape_bbcode($wrangler['username']) . "\n";
+        $draft_content .= "[*]" . events_escape_bbcode($wrangler['username']) . "\n";
     }
-    $draft_content .= "\n";
+    $draft_content .= "[/list]\n\n";
 }
 
 $draft_content .= "[b]Total attendees:[/b] " . count($troopers) . "\n";
@@ -213,6 +229,12 @@ if(!empty($wranglers))
 // Deliberately not htmlspecialchars_uni(): that preserves &#91;, which the browser would
 // decode back to "[" as the textarea's value and undo events_escape_bbcode() above.
 $draft_content = htmlspecialchars($draft_content, ENT_QUOTES, 'UTF-8');
+
+// The editor markup goes after the box it binds to, which is where MyBB puts
+// {$codebuttons} in its own posting templates. Empty when the board has the BBCode
+// inserter off or the member has turned it off in their options, which leaves the plain
+// textarea the form has always posted - the report is BBCode either way.
+$report_editor = events_description_editor('troop_report_content');
 
 $events_print_header = events_print_header('Troop Report', array($event['title']));
 

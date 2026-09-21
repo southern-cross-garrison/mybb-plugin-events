@@ -1,0 +1,56 @@
+/**
+ * The event form's description preview.
+ *
+ * Styled here rather than in events.css for the same reason the calendar and the tag
+ * field are: the Preview button is on the front-end form and the Admin CP one alike, and
+ * the Admin CP loads no theme stylesheet - so a panel styled only in events.css would be
+ * a heap of unstyled markup in half the places it appears. One sheet, both roots.
+ *
+ * The panel is server-rendered: it is only on the page at all when the form was posted
+ * with Preview, so nothing here depends on a script having run.
+ *
+ * Colours come from the plugin's --events-* custom properties where there is a theme to
+ * supply them, with fallbacks that sit comfortably on MyBB's default theme and on the
+ * Admin CP, which has no theme at all.
+ */
+.events_preview {
+	margin: 0 0 16px;
+	border: 1px solid #ccc;
+	border-radius: 4px;
+	background-color: #fff;
+	color: #333;
+	overflow: hidden;
+}
+
+/* A heading bar rather than a legend, so the panel reads as MyBB's own preview does:
+   a titled box above the form you were just filling in. */
+.events_preview_heading {
+	font-size: 1em;
+	font-weight: 600;
+	margin: 0;
+	padding: 8px 12px;
+	border-bottom: 1px solid #ddd;
+	background-color: var(--events-accent, #2f6f9f);
+	color: #fff;
+}
+
+.events_preview_body {
+	padding: 12px;
+	line-height: 1.5;
+	/* A pasted image or a long unbroken URL in the description must not stretch the
+	   panel past the form it sits above. */
+	overflow-wrap: break-word;
+}
+
+.events_preview_body img {
+	max-width: 100%;
+	height: auto;
+}
+
+/* Previewing nothing is a normal thing to do - the button is there before the box has
+   been filled in - so it says so rather than showing an empty box. */
+.events_preview_empty {
+	margin: 0;
+	font-style: italic;
+	opacity: 0.7;
+}

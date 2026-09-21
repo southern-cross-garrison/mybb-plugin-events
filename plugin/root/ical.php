@@ -8,6 +8,9 @@ define("THIS_SCRIPT", "ical.php");
 
 require_once "./global.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
+// events_description_text(): the feed carries no markup, so the description's BBCode
+// has to be flattened rather than rendered.
+require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
 
 if(!$mybb->user['uid'])
 {
@@ -82,7 +85,7 @@ foreach($days as $day)
     $lines[] = "DTSTART:" . gmdate('Ymd\THis\Z', $start);
     $lines[] = "DTEND:" . gmdate('Ymd\THis\Z', $end);
     $lines[] = "SUMMARY:" . events_ical_escape($event['title']);
-    $lines[] = "DESCRIPTION:" . events_ical_escape(strip_tags($event['description']));
+    $lines[] = "DESCRIPTION:" . events_ical_escape(events_description_text($event['description']));
     $lines[] = "LOCATION:" . events_ical_escape($location);
     $lines[] = "URL:" . $mybb->settings['bburl'] . "/event.php?id=" . $event_id;
     $lines[] = "END:VEVENT";

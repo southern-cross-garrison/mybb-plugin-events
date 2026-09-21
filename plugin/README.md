@@ -14,6 +14,8 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 - **Costume Selection**: Select from user's profile costumes during signup
 - **Region Filtering**: Filter events by region. The region list is the board's own -
   add, rename and delete regions in the Admin CP
+- **Archived Events Kept Aside**: The index shows what is coming; events that have been
+  closed out are one tick of **Show archived** away rather than gone
 - **Calendar & List Views**: View events in calendar or list format, switched with one
   button, and the board opens each member's index in whichever view they last used
 - **Attendance Sheets**: Generate print-friendly attendance sheets
@@ -96,6 +98,25 @@ genuinely happened in the old one should expect the change to move them.
 
 ## Usage
 
+### The Events Index
+
+`events.php` is the way in, and it has two views of the same schedule: a **list** and a
+**calendar**. The control that swaps between them names the view it goes to rather than
+marking the one you are already looking at, and sits at the far right of the toolbar,
+away from the filters - which view you are in is a property of the page, not a filter on
+it. Which one you chose is remembered per account, so the navigation link and a bookmark
+both open where you left off.
+
+The board draws the page's own heading from the breadcrumb, so the plugin does not add a
+second one. On the calendar the month is the label on the stepper that changes it -
+`« October 2026 »` - rather than a heading bar repeating what the page already says.
+
+**Filters apply as they are changed.** Picking a region or ticking Show archived reloads
+the listing there and then; there is no Filter button to press. The button still exists
+in the markup inside a `<noscript>`, so the page works with JavaScript turned off, and
+the server validates what arrives either way. Both filters travel across the view toggle
+and the calendar's month paging.
+
 ### Creating Events
 
 Coordinators run events but are not board administrators, so an event can be built from
@@ -119,6 +140,12 @@ render it.
 Either way the details are:
 
 - Title, description, region
+- The description is written in the board's own BBCode editor, on both forms, and rendered
+  the way a post is - on the event page and in the announcement thread alike. **Preview**
+  beside the save button shows what it will look like without saving anything. HTML is not
+  allowed; the board's own MyCode settings decide which tags are. A member who has turned
+  the BBCode editor off in their own options gets a plain box, and BBCode typed into it is
+  parsed the same way
 - Address (optional) - where the event happens. Wherever it is shown - the event page, the
   events listing, the calendar and the announcement thread - it is a link to a Google Maps
   search for it, opened in a new tab, and it is the `LOCATION` an attendee's downloaded
@@ -132,11 +159,35 @@ Either way the details are:
   and end dates rather than being typed, and a single-day event has none at all
 - Excluded users (optional) - a tag field: type part of a username, pick the member from
   the list it filters down, and they appear as a lozenge with an X to take them off again.
-  Only a member who exists can be added, and excluded members can see the event but cannot
-  sign up
+  Only a member who exists can be added, and an excluded member is not shown the event at
+  all - see below
 
 A new event starts as **Pending**, which is visible to coordinators only. Set it to Live
 when it is ready to take signups.
+
+### Event Statuses
+
+An event is **Pending**, **Live** or **Archived**, and the status decides who sees it on
+the events index and whether it takes signups.
+
+| Status | On the events index | Signups |
+|---|---|---|
+| Pending | Coordinators and admins only | Closed |
+| Live | Everybody, by default | Open, subject to the cutoff and the event's end |
+| Archived | Only when **Show archived** is ticked | Closed |
+
+Archiving is how an event is closed out, not how it is deleted. Posting its troop report
+archives it automatically, and a coordinator can set the status by hand from either form.
+An archived event keeps everything it had - its page, its announcement thread, its signup
+list and its troop report - and every link to it still works. It just stops crowding the
+index, which is a schedule of what is coming rather than a record of what has been.
+
+**Show archived** sits next to the region filter on both the list and the calendar, and
+it works alongside the region filter rather than replacing it. Ticking it applies
+immediately, like every other filter on the bar. It is per-visit:
+it travels across the view toggle and the calendar's month paging, so paging back through
+last year keeps showing them, but a fresh visit to Events opens on the upcoming schedule
+again. Unlike the list/calendar choice, it is not remembered between visits.
 
 ### Regions
 
@@ -180,6 +231,12 @@ region, address, coordinator, signup cutoff, WWCC requirement, the day-by-day sc
 the description and a link back to the event page - so there is nothing to write and
 nothing to keep in step by hand. Members discuss the event in the replies.
 
+The description is carried into the post as written, BBCode and all: it is the one field
+a coordinator writes markup in on purpose, and it renders the same way on the event page.
+Everything else the post is built from is data rather than markup, and is neutralised on
+the way in - a venue or a username containing `[url=...]` would otherwise rewrite the line
+it sits on.
+
 Which forum it lands in follows the event's region: Admin CP → Event Management → Settings
 holds one forum per region plus a **Default Event Forum** for the regions that have none
 of their own. A region with neither is not announced, and the coordinator is told so when
@@ -200,6 +257,33 @@ taking an event live, correcting a date or adding a day never needs Admin CP acc
 
 Deleting an event stays in the Admin CP.
 
+### Excluded Members
+
+Excluding somebody hides the event from them rather than locking the signup button. The
+event leaves their events listing and their calendar, its page, its calendar feed and its
+troop report form all answer the way any page that is not theirs does, and its
+announcement thread cannot be opened, printed, replied to, searched for, found in the
+forum it was posted into, or named as that forum's latest post on the board index. The
+alternative - the event in full view with "you have been excluded from signing up" beside
+the list of everybody who is going - is a worse way to be told than not being told.
+
+Two things are deliberately still visible:
+
+- **The troop report.** It is posted to the troop report forum as its own thread and is
+  left alone, so an excluded member can read the garrison's record of what happened. Its
+  subject names the event, which is how they find out the event took place - after it is
+  over, which is the point of a report.
+- **The event, to whoever runs it.** A coordinator is never hidden from their own event,
+  and neither are general coordinators or administrators: an event nobody can open is an
+  event nobody can put right. They still cannot sign up to it.
+
+MyBB has no per-thread permission, so hiding the announcement means telling each place
+that could name a thread separately. Two counters are left over, and both are numbers
+rather than subjects: the thread and post totals on the board index are cached columns on
+the forum, and the count behind a forum's page links is taken further up the page than any
+hook MyBB offers. A board running MyBB's portal should also know that its "latest
+discussions" list offers no hook at all, so an announcement can appear there.
+
 ### Signup Process
 
 There is one way in. Members sign up to _attend_, and choose how they are attending as part
@@ -211,7 +295,9 @@ of the same flow.
 4. **Attendance**: choose how each day is being attended - trooping, wrangling, or not at
    all. Every day starts on trooping, so the common case is one click past this step. A
    single-day event (one with no configured days) asks for one answer instead of one per
-   day.
+   day, and names when it is - "You are signing up to Anzac Day March - Oct 20 at 9am" -
+   because a member arriving from a reminder or a link is usually answering "can I make
+   that?". The step does not explain what a trooper or a wrangler is; members know.
 5. Complete any missing prerequisites (saved back to the user's profile)
 6. Select costumes
 7. Confirm

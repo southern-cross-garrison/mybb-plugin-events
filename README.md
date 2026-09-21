@@ -55,6 +55,32 @@ docker compose exec -T web php /dev/stdin < scripts/provision.php
 If the environment gets into a strange state, `./scripts/bootstrap.sh --fresh` rebuilds it
 from nothing.
 
+## Demo data
+
+The provisioned board has users and settings but no events, which is what the suite wants
+and a poor thing to look at. `scripts/seed-demo.php` fills it in with one event for every
+state the plugin can put an event in - an empty roster, a three-day convention with fifteen
+troopers and two wranglers across different days, WWCC-gated, excluded members, a pending
+draft, signups locked by a passed cutoff, a region announcing into its own forum, one
+finished event still owing a troop report and one that has posted its report, and an
+archived event - plus eighteen demo members to sign up as:
+
+```bash
+docker compose exec -T web php /dev/stdin < scripts/seed-demo.php
+```
+
+Everything is dated relative to the run and matched by title, so re-running moves the demo
+forward rather than duplicating it. Sign in as `gec` for the coordinator pages, or as any
+member it lists; the password is the fixtures' `testpass123`.
+
+The board administrator is rostered as a trooper on the finished event that still owes a
+report, because writing one needs a trooper signup on an event that has ended - so the
+report can be drafted and posted from the admin account without signing in as anybody else.
+Posting it archives that event, and re-running the seed puts it back.
+
+Do not run `./scripts/db-snapshot.sh` after seeding - it is a plain dump, and it would bake
+the demo into the baseline every later test run starts from. Restore first if you need one.
+
 ## The custom theme
 
 The test forum runs the garrison's live theme rather than MyBB's default, so the suite
@@ -185,9 +211,10 @@ All of them use the password `testpass123`.
 | `plugin-setup` | Templates installed, task registered, settings mapped, nav link, guest access, Admin CP module |
 | `admin-events` | Event create/edit/delete, validation, multi-day, exclusions, publish and archive, coordinator has no Admin CP access |
 | `manage-events` | The front-end event form: a coordinator creating and editing without the Admin CP, the pending default, multi-day round-trips, exclusions, validation, and who is turned away |
-| `events-listing` | List and calendar views, the view toggle and the remembered per-member view, region filter, attendance markers, pending visibility, multi-day spanning, month paging |
+| `events-listing` | List and calendar views, the view toggle (its toolbar position, icon and remembered per-member view), filters applying on change with a `<noscript>` button behind them, region filter, archived hidden until the filter asks and the filter surviving the toggle and the paging, the calendar's month stepper in place of a heading bar, attendance markers, pending visibility, multi-day spanning, month paging |
 | `signup-flow` | The whole wizard: attendance, prerequisites, costumes, confirmation; validation; state carried between steps; editing an existing signup; multiselect costume parsing |
 | `signup-locking` | **Clock travel:** cutoffs, event end, late signups during an event, pending/archived status, exclusions, guests, and that an existing signup survives the lock |
+| `exclusions` | What an exclusion hides: the listing and calendar, the event's own pages and feed, the announcement thread across every surface that could name it, the troop report staying readable, and the coordinator carve-out |
 | `signup-roles` | Choosing trooping or wrangling, mixing the two across days, what each role is asked for, the event page and listing, and how both roles reach the coordinator surfaces |
 | `coordinator` | RSVP list and filters, attendance sheet and its day filter, permissions |
 | `troop-report` | Availability after the event ends, draft segmentation by club, posting, archiving, duplicate prevention, announcement-thread comment |

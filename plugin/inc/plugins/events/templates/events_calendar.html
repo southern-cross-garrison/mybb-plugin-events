@@ -8,21 +8,22 @@
 <div id="events_page" class="events_page_wrap">
 {$events_print_header}
 <table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
-<tr><td class="thead"><strong>Events Calendar - {$calendar_month_name}</strong></td></tr>
 <tr class="no-print"><td class="trow1">
 <div class="events_toolbar">
-{$events_view_toggle}
-<span class="events_toolbar_group">
-<a href="events.php?view=calendar&amp;month={$calendar_prev}" id="events_calendar_prev">&laquo; Previous</a> |
-<a href="events.php?view=calendar&amp;month={$calendar_next}" id="events_calendar_next">Next &raquo;</a>
+<span class="events_month_nav">
+<a class="events_month_step" href="events.php?view=calendar&amp;month={$calendar_prev}{$calendar_filter_params}" id="events_calendar_prev" title="Previous month" aria-label="Previous month">&laquo;</a>
+<span class="events_month_name">{$calendar_month_name}</span>
+<a class="events_month_step" href="events.php?view=calendar&amp;month={$calendar_next}{$calendar_filter_params}" id="events_calendar_next" title="Next month" aria-label="Next month">&raquo;</a>
 </span>
-<form method="get" action="events.php" class="events_filter_form">
+<form method="get" action="events.php" class="events_filter_form" id="events_filter_form">
 <input type="hidden" name="view" value="calendar" />
 <input type="hidden" name="month" value="{$calendar_month}" />
 <select name="region" id="events_region_filter" class="events_select">{$region_options}</select>
-<input type="submit" class="button" value="Filter" />
+{$events_archived_filter}
+<noscript><input type="submit" class="button" value="Filter" /></noscript>
 </form>
 {$events_manage_link}
+{$events_view_toggle}
 </div>
 </td></tr>
 <tr><td class="trow1">
@@ -33,6 +34,7 @@
 </td></tr>
 </table>
 </div>
+{$events_filter_script}
 {$footer}
 </body>
 </html>

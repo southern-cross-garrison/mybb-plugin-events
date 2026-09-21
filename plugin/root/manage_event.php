@@ -16,7 +16,8 @@
 define("IN_MYBB", 1);
 define("THIS_SCRIPT", "manage_event.php");
 
-$templatelist = "events_event_form";
+// codebuttons is MyBB's own: build_mycode_inserter() renders it for the description box.
+$templatelist = "events_event_form,codebuttons";
 
 require_once "./global.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
@@ -55,28 +56,42 @@ elseif(!events_is_gec())
 
 $errors = array();
 $values = events_event_form_values($event);
+$manage_preview = '';
 
 if($mybb->request_method === 'post')
 {
     verify_post_check($mybb->get_input('my_post_key'));
 
     $values = events_event_form_input();
-    $errors = events_validate_event_input($values, $event);
 
-    if(empty($errors))
+    // Preview posts the form and comes straight back with it, the way MyBB's own Preview
+    // Post does. Nothing is validated, because nothing is being saved and a form half
+    // filled in is the normal state to preview a description from - reporting a missing
+    // start date to somebody checking their formatting answers a question they did not ask.
+    if(events_is_description_preview())
     {
-        $thread_error = null;
-        $saved_id = events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error);
+        $manage_preview = events_description_preview($values['description']);
+    }
+    else
+    {
+        $errors = events_validate_event_input($values, $event);
 
-        // The event is saved either way; a thread that could not be written is reported
-        // rather than swallowed, because nothing else on the page would show it.
-        $message = $is_edit ? "The event has been updated." : "The event has been created.";
-        if($thread_error !== null)
+        if(empty($errors))
         {
-            $message .= " " . $thread_error;
-        }
+            $thread_error = null;
+            $saved_id = events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error);
 
-        redirect("event.php?id=" . $saved_id, $message);
+            // The event is saved either way; a thread that could not be written is
+            // reported rather than swallowed, because nothing else on the page would
+            // show it.
+            $message = $is_edit ? "The event has been updated." : "The event has been created.";
+            if($thread_error !== null)
+            {
+                $message .= " " . $thread_error;
+            }
+
+            redirect("event.php?id=" . $saved_id, $message);
+        }
     }
 }
 
@@ -116,12 +131,16 @@ $manage_details = events_form_field(
     true
 );
 
+// The editor markup goes inside the field, right after the box it binds to, which is
+// where MyBB puts {$codebuttons} in its own posting templates.
 $manage_details .= events_form_field(
     'event_form_description',
     'Description',
     '<textarea class="events_input" name="description" id="event_form_description" rows="8"'
-        . ' aria-describedby="hint_event_form_description">' . htmlspecialchars_uni((string)$values['description']) . '</textarea>',
-    'Shown on the event page.'
+        . ' aria-describedby="hint_event_form_description">' . htmlspecialchars_uni((string)$values['description']) . '</textarea>'
+        . events_description_editor('event_form_description'),
+    'Shown on the event page and in the announcement thread. BBCode and smilies work here'
+        . ' the same way they do in a post.'
 );
 
 $manage_details .= events_form_field(
@@ -235,11 +254,14 @@ $manage_exclusions = events_form_field(
     'Start typing a username and pick from the list. These members can see the event but cannot sign up.'
 );
 
-// The calendar's stylesheet and library, and the tag field's stylesheet, loaded relative
-// to the web root this page is served from. events.css cannot carry either: it is
-// installed as a theme stylesheet, and the Admin CP form has neither the theme nor a
-// stylesheet of its own, but needs both controls to look the same way.
-$manage_datepicker = events_datepicker_assets('jscripts/events/') . events_tag_field_assets('jscripts/events/');
+// The calendar's stylesheet and library, and the tag field's and the preview's
+// stylesheets, loaded relative to the web root this page is served from. events.css
+// cannot carry any of them: it is installed as a theme stylesheet, and the Admin CP form
+// has neither the theme nor a stylesheet of its own, but needs the same controls to look
+// the same way. The editor brings its own - see events_description_editor().
+$manage_assets = events_datepicker_assets('jscripts/events/')
+               . events_tag_field_assets('jscripts/events/')
+               . events_preview_assets('jscripts/events/');
 
 $manage_days_script = events_datepicker_script() . events_event_days_script() . events_tag_field_script();
 

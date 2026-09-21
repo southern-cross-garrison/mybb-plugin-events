@@ -130,10 +130,15 @@ function events_announcement_forum_ids()
 /**
  * The BBCode body of an event's announcement post.
  *
- * Everything the event carries is interpolated through events_escape_bbcode(): the
- * description is rendered as plain text on the event page (see event.php), so BBCode in
- * it was never markup the coordinator meant to write, and a title containing "[/b]"
- * would otherwise rewrite the rest of the post.
+ * The values the plugin interpolates - the region, the address, the coordinator's name -
+ * go through events_escape_bbcode(): none of them is markup anybody wrote on purpose, and
+ * a username containing "[/b]" would otherwise rewrite the rest of the post.
+ *
+ * The description is the exception, and deliberately so. It is written in the board's own
+ * editor, in the board's own BBCode, and rendered as BBCode on the event page - so it is
+ * carried into the announcement as written. That is the same trust a coordinator already
+ * has when they post the thread by hand, and neutralising it here would mean a
+ * description that reads one way on the event page and another in the thread.
  *
  * @param array $event Event row
  * @return string
@@ -214,10 +219,11 @@ function events_event_post_content(array $event)
         $content .= "[/list]\n";
     }
 
+    // The description as written, BBCode and all.
     $description = trim((string)$event['description']);
     if($description !== '')
     {
-        $content .= "\n" . events_escape_bbcode($description) . "\n";
+        $content .= "\n" . $description . "\n";
     }
 
     $content .= "\n[url=" . $mybb->settings['bburl'] . "/event.php?id=" . $event_id . "]"
