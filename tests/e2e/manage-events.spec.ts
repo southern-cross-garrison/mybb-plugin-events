@@ -157,7 +157,7 @@ test.describe('front-end event management', () => {
       end: relativeToTestNow({ days: 21, hours: 6 }),
     });
     await submitEventForm(page);
-    await expect(page.locator('#event_status')).toHaveText('pending');
+    await expect(page.locator('#event_status')).toHaveText('Pending');
 
     const eventId = Number((await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Draft Troop'`))[0].id);
 
@@ -245,7 +245,7 @@ test.describe('front-end event management', () => {
     await fillEventForm(page, { title: 'Fixed Up Troop', status: 'live', region: 'Canberra' });
     await submitEventForm(page);
 
-    await expect(page.locator('#event_status')).toHaveText('live');
+    await expect(page.locator('#event_status')).toHaveText('Live');
 
     const event = await getEvent(eventId);
     expect(event.title).toBe('Fixed Up Troop');

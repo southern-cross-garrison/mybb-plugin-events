@@ -1383,6 +1383,46 @@ function events_get_troop_report($event_id)
 }
 
 /**
+ * Is this event waiting on its troop report?
+ *
+ * A live event whose end date has gone by and which has no posted report yet. The three
+ * clauses are the same ones events_send_reminders() selects on - the listing says what
+ * the weekly PM is about to nag about, and the two must not be able to disagree.
+ *
+ * Archived and pending events are excluded by the status test on purpose: archiving is
+ * how an event is closed out, so an archived event is not outstanding work whatever its
+ * report says, and a pending one never happened.
+ *
+ * A row in event_plugin_troop_reports is *not* a report. events_send_reminders() inserts
+ * one for an event that has none at all, purely to record when it last sent a reminder,
+ * so the column that says a report exists is posted_at - the same test
+ * events_can_create_troop_report() makes.
+ *
+ * Reads the report state off the event row when the caller has joined it on as
+ * report_posted_at, which is what keeps the events listing at one query for the whole
+ * page, and falls back to fetching it when they have not.
+ *
+ * @param array $event
+ * @return bool
+ */
+function events_needs_troop_report($event)
+{
+    if(empty($event) || $event['status'] !== 'live' || !events_has_ended($event))
+    {
+        return false;
+    }
+
+    if(array_key_exists('report_posted_at', $event))
+    {
+        return empty($event['report_posted_at']);
+    }
+
+    $report = events_get_troop_report($event['id']);
+
+    return !$report || empty($report['posted_at']);
+}
+
+/**
  * May this user draft/post the troop report for the event?
  *
  * The event must have ended, the user must have attended as a trooper, and no report

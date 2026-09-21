@@ -231,6 +231,33 @@ All of them use the password `testpass123`.
 `.github/workflows/e2e.yml` runs the same two commands on every push and pull request, and
 uploads the Playwright report, traces and container logs when something fails.
 
+### The `THEME_TOKEN` secret
+
+Bootstrapping clones two private sibling repos - the custom theme and Smart Thread Link
+(see `THEME_REPO` and `SMARTLINK_REPO` in `scripts/env.sh`). The `GITHUB_TOKEN` that
+`actions/checkout` installs is scoped to this repository alone, so the workflow needs a
+credential of its own or both clones fail with `could not read Username for
+'https://github.com'`.
+
+Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) with:
+
+- **Resource owner** `southern-cross-garrison`
+- **Repository access** only `mybb-custom-theme` and `mybb-plugin-smartlink`
+- **Permissions** Contents: read-only (nothing else)
+
+Store it as the repository secret `THEME_TOKEN`
+(`gh secret set THEME_TOKEN`). The workflow's *Authenticate to the private sibling repos*
+step turns it into a `url.<...>.insteadOf` rewrite for `https://github.com/`, so the
+scripts keep their plain URLs and run unchanged on a developer machine, where your own git
+credentials already cover both repos.
+
+The rewrite is transport-only: a clone records the original URL, so no token reaches
+`.devenv/cache` or the Actions cache built from it. The token does land in the runner's
+`~/.gitconfig`, which is discarded with the runner.
+
+Fine-grained PATs expire. When one does, every run fails at that step with an explicit
+message; mint a replacement and update the secret.
+
 ## Layout
 
 ```

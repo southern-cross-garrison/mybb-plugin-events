@@ -233,7 +233,13 @@ if($action === 'attendance')
 // ---------------------------------------------------------------------------
 // Event detail
 // ---------------------------------------------------------------------------
+// The stored value, for data-event-status on the wrapper - see events_status_label()
+// for why what the page *says* is not always this.
 $event_status = htmlspecialchars_uni($event['status']);
+$event_status_label = htmlspecialchars_uni(events_status_label($event));
+// The one label that is a job outstanding rather than a state, coloured the same way
+// the listing colours it.
+$event_status_class = events_needs_troop_report($event) ? 'event_status_needs_report' : '';
 $event_region = htmlspecialchars_uni($event['region']);
 $event_start_date = events_format_date($event['start_date']);
 $event_end_date = events_format_date($event['end_date']);

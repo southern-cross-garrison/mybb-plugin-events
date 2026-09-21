@@ -296,6 +296,32 @@ export async function getTroopReport(eventId: number): Promise<RowDataPacket | n
   return queryOne<RowDataPacket>(`SELECT * FROM ${T('event_plugin_troop_reports')} WHERE event_id = ?`, [eventId]);
 }
 
+/**
+ * Put a troop report row on an event without walking the form.
+ *
+ * `posted: false` is the row events_send_reminders() leaves behind for an event with no
+ * report at all, purely to record when it last nagged - the row exists and the report
+ * does not, which is the case anything reading "has this event been written up?" has to
+ * get right.
+ */
+export async function createTroopReport(
+  eventId: number,
+  options: { posted?: boolean; author?: string; threadId?: number } = {},
+): Promise<void> {
+  const now = relativeToTestNow({});
+  await execute(
+    `INSERT INTO ${T('event_plugin_troop_reports')} (event_id, thread_id, created_by, created_at, posted_at)
+     VALUES (?, ?, ?, ?, ?)`,
+    [
+      eventId,
+      options.threadId ?? null,
+      uid(options.author ?? 'trooper1'),
+      now,
+      options.posted === false ? null : now,
+    ],
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Board state used by the tests
 // ---------------------------------------------------------------------------

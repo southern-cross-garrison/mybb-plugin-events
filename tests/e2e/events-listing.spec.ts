@@ -1,6 +1,7 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from '../helpers/fixtures';
 import { loginAs } from '../helpers/auth';
-import { createEvent, createRsvp, fixtures } from '../helpers/db';
+import { createEvent, createRsvp, createTroopReport, fixtures } from '../helpers/db';
 import { relativeToTestNow, setClock } from '../helpers/clock';
 
 const TK = fixtures().costumeOptions[0];
@@ -23,7 +24,7 @@ test.describe('events listing', () => {
     await expect(row.locator('.event_region')).toHaveText('Canberra');
     await expect(row.locator('.event_start')).toHaveText('Oct 20 - 10AM');
     await expect(row.locator('.event_rsvp_count')).toHaveText('2');
-    await expect(row.locator('.event_status')).toHaveText('live');
+    await expect(row.locator('.event_status')).toHaveText('Live');
   });
 
   test('says so when there is nothing on', async ({ page }) => {
@@ -62,7 +63,7 @@ test.describe('events listing', () => {
 
     await page.locator('#events_show_archived').check();
 
-    await expect(page.locator(`tr[data-event-id="${archived}"] .event_status`)).toHaveText('archived');
+    await expect(page.locator(`tr[data-event-id="${archived}"] .event_status`)).toHaveText('Archived');
     await expect(page.locator(`tr[data-event-id="${live}"]`)).toBeVisible();
     await expect(page.locator('#events_show_archived')).toBeChecked();
 
@@ -153,7 +154,7 @@ test.describe('events listing', () => {
 
     await loginAs(page, 'gec');
     await page.goto('/events.php');
-    await expect(page.locator(`tr[data-event-id="${pending}"] .event_status`)).toHaveText('pending');
+    await expect(page.locator(`tr[data-event-id="${pending}"] .event_status`)).toHaveText('Pending');
   });
 
   test('an address is a map link on both views, and absent when the event has none', async ({ page }) => {
@@ -358,5 +359,169 @@ test.describe('events listing', () => {
 
     await expect(page).toHaveTitle(/^Clickable Troop - /);
     await expect(page.locator('#event_page')).toHaveAttribute('data-event-id', String(eventId));
+  });
+
+  test.describe('the status column', () => {
+    /** An event that ran and finished, with the clock already past its end date. */
+    const finished = (title: string, status?: 'live' | 'archived' | 'pending') =>
+      createEvent({
+        title,
+        status,
+        start: relativeToTestNow({ days: -2 }),
+        end: relativeToTestNow({ days: -1 }),
+        signupCutoff: relativeToTestNow({ days: -3 }),
+      });
+
+    const status = (page: Page, eventId: number) =>
+      page.locator(`tr[data-event-id="${eventId}"] .event_status`);
+
+    test('tells a finished event waiting on its troop report from one already written up', async ({ page }) => {
+      const unreported = await finished('Unreported Troop');
+      const reported = await finished('Reported Troop');
+      await createTroopReport(reported);
+      // A row with no posted_at is not a report: events_send_reminders() writes one for
+      // an event that has none at all, purely to record when it last nagged about it.
+      const nagged = await finished('Nagged Troop');
+      await createTroopReport(nagged, { posted: false });
+      // Still to come, so nobody owes a report on it yet.
+      const upcoming = await createEvent({ title: 'Upcoming Troop' });
+      // Archiving is how an event is closed out, so an archived one is not outstanding
+      // work whatever its report says.
+      const closed = await finished('Closed Troop', 'archived');
+      const draft = await createEvent({ title: 'Draft Troop', status: 'pending' });
+
+      await loginAs(page, 'gec');
+      await page.goto('/events.php?archived=1');
+
+      await expect(status(page, unreported)).toHaveText('Needs Troop Report');
+      await expect(status(page, nagged)).toHaveText('Needs Troop Report');
+      // Neither of the two labels the stored column cannot express is reachable by an
+      // event that has not happened yet.
+      await expect(status(page, reported)).toHaveText('Complete');
+      await expect(status(page, upcoming)).toHaveText('Live');
+      await expect(status(page, closed)).toHaveText('Archived');
+      await expect(status(page, draft)).toHaveText('Pending');
+    });
+
+    test('reads the same on the event page as it does in the list', async ({ page }) => {
+      const unreported = await finished('Unwritten Troop');
+      const reported = await finished('Written Up Troop');
+      await createTroopReport(reported);
+
+      await loginAs(page, 'gec');
+      await page.goto('/events.php');
+      await expect(status(page, unreported)).toHaveText('Needs Troop Report');
+      await expect(status(page, reported)).toHaveText('Complete');
+
+      await page.goto(`/event.php?id=${unreported}`);
+      await expect(page.locator('#event_status')).toHaveText('Needs Troop Report');
+      // And the stored value is still there for anything matching on it.
+      await expect(page.locator('#event_page')).toHaveAttribute('data-event-status', 'live');
+
+      await page.goto(`/event.php?id=${reported}`);
+      await expect(page.locator('#event_status')).toHaveText('Complete');
+    });
+
+    test('leaves the stored status on the row for anything matching on it', async ({ page }) => {
+      // The column reads as a label now, so the enum value the board filters and sorts
+      // by stays where it was rather than having to be parsed back out of the text.
+      const unreported = await finished('Machine Readable Troop');
+
+      await loginAs(page, 'trooper1');
+      await page.goto('/events.php');
+
+      const row = page.locator(`tr.event_row[data-event-id="${unreported}"]`);
+      await expect(row).toHaveAttribute('data-event-status', 'live');
+      await expect(row.locator('.event_status')).toHaveText('Needs Troop Report');
+    });
+  });
+
+  test.describe('on a narrow screen', () => {
+    // 390px is a phone held upright; the table gives way to cards below 992px, so this
+    // covers the tablet half of that range as well.
+    test.use({ viewport: { width: 390, height: 900 } });
+
+    test('lays each event out as a card', async ({ page }) => {
+      const eventId = await createEvent({
+        title: 'Pocket Troop',
+        address: '3 Flushcombe Rd, Blacktown NSW 2148',
+      });
+
+      await loginAs(page, 'trooper1');
+      await page.goto('/events.php');
+
+      const row = page.locator(`tr.event_row[data-event-id="${eventId}"]`);
+      await expect(row).toHaveCSS('display', 'grid');
+      // The headings name columns that no longer exist.
+      await expect(page.locator('.events_list_head')).toBeHidden();
+
+      // Every value the table shows is still on the card, and the address has the whole
+      // width of it rather than a column a third that wide.
+      await expect(row.locator('.event_link')).toHaveText('Pocket Troop');
+      await expect(row.locator('.event_address')).toBeVisible();
+      await expect(row.locator('.event_start')).toBeVisible();
+      await expect(row.locator('.event_region')).toHaveText('Sydney');
+      await expect(row.locator('.event_status')).toHaveText('Live');
+      await expect(row.locator('.event_signup_link')).toBeVisible();
+
+      // Nothing runs off the side of the screen, which is the whole point of the change.
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    });
+
+    test('folds the filters behind a Filter button so the view switch fits the row', async ({ page }) => {
+      await createEvent({ title: 'Filtered Troop' });
+
+      await loginAs(page, 'gec');
+      await page.goto('/events.php');
+
+      await expect(page.locator('.events_filter_button')).toBeVisible();
+      await expect(page.locator('#events_filter_form')).toBeHidden();
+      // The point of folding them away: these keep their place on the row.
+      await expect(page.locator('#events_view_calendar')).toBeVisible();
+      await expect(page.locator('#events_create')).toBeVisible();
+
+      await page.locator('.events_filter_button').click();
+      await expect(page.locator('#events_filter_form')).toBeVisible();
+      await expect(page.locator('#events_region_filter')).toBeVisible();
+      await expect(page.locator('#events_show_archived')).toBeVisible();
+
+      // And the filters still apply from inside the panel.
+      await page.locator('#events_region_filter').selectOption('Hunter');
+      await expect(page.locator('#events_region_filter')).toHaveValue('Hunter');
+    });
+
+    test('opens the panel already open when the page is filtered', async ({ page }) => {
+      // Otherwise a filtered listing looks like a listing that is simply missing events.
+      await loginAs(page, 'trooper1');
+      await page.goto('/events.php?region=Hunter');
+
+      await expect(page.locator('#events_filter_form')).toBeVisible();
+      await expect(page.locator('#events_region_filter')).toHaveValue('Hunter');
+    });
+
+    test('carries the panel onto the calendar too', async ({ page }) => {
+      await loginAs(page, 'trooper1');
+      await page.goto('/events.php?view=calendar');
+
+      await expect(page.locator('#events_calendar')).toBeVisible();
+      await expect(page.locator('.events_filter_button')).toBeVisible();
+      await expect(page.locator('#events_filter_form')).toBeHidden();
+
+      await page.locator('.events_filter_button').click();
+      await expect(page.locator('#events_region_filter')).toBeVisible();
+    });
+  });
+
+  test('stays a table with its filters on the row on a full-width screen', async ({ page }) => {
+    // The default viewport is 1280 wide, which is above the 992px the cards start at.
+    const eventId = await createEvent({ title: 'Desktop Troop' });
+
+    await loginAs(page, 'gec');
+    await page.goto('/events.php');
+
+    await expect(page.locator(`tr.event_row[data-event-id="${eventId}"]`)).toHaveCSS('display', 'table-row');
+    await expect(page.locator('.events_list_head')).toBeVisible();
+    await expect(page.locator('#events_filter_form')).toBeVisible();
+    await expect(page.locator('.events_filter_button')).toBeHidden();
   });
 });

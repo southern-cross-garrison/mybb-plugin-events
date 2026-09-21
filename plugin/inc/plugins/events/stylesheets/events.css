@@ -22,6 +22,11 @@
  * --events-tab is the surface the event page's turnout tab is cut out of, and wants to
  * be a tint the card's own background can be told apart from.
  *
+ * --events-card is the surface an event card is drawn on, which the listing swaps the
+ * table for below 992px. It defaults to a faint tint of the surrounding text colour
+ * rather than to the theme's row colour, because a card there is one box and the theme
+ * paints .trow1 on cells; a theme with a panel colour of its own names it once.
+ *
  * --events-accent-soft is the focus ring behind a form control, and wants to be the
  * accent at roughly 18% alpha. The form controls themselves are .events_input,
  * .events_select and .events_option, which a theme restyles the same way it restyles
@@ -129,7 +134,8 @@
  *
  * Written under .events_page_wrap so it out-specifies the theme's own .button rule; see
  * the note on .events_select for why equal specificity would lose. */
-.events_page_wrap .events_view_toggle {
+.events_page_wrap .events_view_toggle,
+.events_page_wrap .events_filter_button {
 	display: inline-flex; align-items: center; gap: 6px;
 	padding: 3px 11px;
 	background: transparent;
@@ -144,7 +150,78 @@
 	cursor: pointer;
 	opacity: 0.85;
 }
-.events_page_wrap .events_view_toggle:hover { opacity: 1; background: rgba(127, 127, 127, 0.18); }
+.events_page_wrap .events_view_toggle:hover,
+.events_page_wrap .events_filter_button:hover { opacity: 1; background: rgba(127, 127, 127, 0.18); }
+
+/* ---------------------------------------------------------------------------
+ * Filter disclosure
+ *
+ * The button that opens the filters on a phone, and the checkbox behind it. Both are
+ * rendered on every screen size by events_filter_disclosure() and the button is simply
+ * not displayed until the toolbar runs out of room - see the max-width block further
+ * down, which is the only place either of them does anything.
+ *
+ * The checkbox is painted out rather than hidden, so the disclosure keeps its place in
+ * the tab order and its accessible name; display: none would cost both, and there is no
+ * script here to put them back. Taken out of flow as well, or it would leave a 1px item
+ * and a gap in the toolbar's flex row.
+ * ------------------------------------------------------------------------ */
+.events_toolbar { position: relative; }
+.events_filter_disclosure {
+	position: absolute; top: 0; left: 0;
+	width: 1px; height: 1px;
+	margin: 0; padding: 0;
+	opacity: 0;
+	pointer-events: none;
+}
+/* Overridden in the max-width block below, which is the only screen size this button
+   has a job at. Written after the shared look above so it wins on load order. */
+.events_page_wrap .events_filter_button { display: none; }
+/* The ring belongs on the button, since the box it is on cannot be seen. */
+.events_filter_disclosure:focus-visible + .events_filter_button {
+	outline: 2px solid var(--events-accent, #2f6f9f);
+	outline-offset: 2px;
+	opacity: 1;
+}
+
+/* The toolbar is the filters, Create Event and the list/calendar switch, and on a phone
+ * the four of them will not sit on one row: the switch is the last item and wrapped onto
+ * a line of its own underneath, where it read as a stray button rather than as the
+ * control that says which view you are looking at.
+ *
+ * So the filters fold away behind the button and the row keeps the three controls that
+ * are about the page as a whole. The panel is the same form, laid out as a stack and
+ * ordered last so it opens underneath the row rather than in the middle of it.
+ *
+ * 700px and not the 992px the listing swaps to cards at, because these are two
+ * different questions. The table runs out of width long before the toolbar does: at
+ * 768px the filters, Create Event and the switch still sit on one row comfortably, and
+ * folding them away there would be hiding controls that had somewhere to be.
+ *
+ * `screen and` for the same reason the listing's cards use it - see that block for the
+ * note. Printing hides the whole toolbar anyway, but a max-width query that reached the
+ * print sheet would be one more thing to have to remember.
+ *
+ * #events_filter_form by id and not .events_filter_form: three forms in this toolbar
+ * carry that class - the filters, Create Event and the view switch all use it for the
+ * shared one-line-form layout - and only the first of them is the panel. */
+@media screen and (max-width: 700px) {
+	.events_page_wrap .events_filter_button { display: inline-flex; }
+
+	.events_toolbar #events_filter_form {
+		/* Last in the row, and wider than the row, so it takes a line of its own. */
+		order: 2;
+		flex: 0 0 100%;
+		flex-direction: column;
+		align-items: stretch;
+		gap: 12px;
+		padding: 12px;
+		border: 1px solid rgba(127, 127, 127, 0.28);
+		border-radius: 6px;
+	}
+
+	#events_filter_open:not(:checked) ~ #events_filter_form { display: none; }
+}
 
 /* Hard right, whatever else the toolbar is carrying. `margin-left: auto` on a flex item
    eats the free space to its left, which keeps the toggle on the same row as everything
@@ -155,7 +232,7 @@
    are, because those sit on a known light surface and this one has to take the heading
    bar's colour with it - a mask is painted in currentColor, a background image carries
    whatever colour was baked into the data URI. */
-.events_view_icon {
+.events_view_icon, .events_filter_icon {
 	width: 14px; height: 14px; flex: none;
 	background-color: currentColor;
 	-webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
@@ -163,8 +240,12 @@
 	-webkit-mask-size: 14px 14px; mask-size: 14px 14px;
 }
 
-/* Each icon names the view its button goes to: a month grid for the calendar, ruled
-   lines for the list. */
+/* A funnel for the filters, and for each view button an icon naming the view it goes
+   to: a month grid for the calendar, ruled lines for the list. */
+.events_filter_icon {
+	-webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23000' d='M1.6 2.5h12.8a.6.6 0 0 1 .46.98L10 9.6v3.6a.6.6 0 0 1-.33.54l-2.8 1.4a.6.6 0 0 1-.87-.54V9.6L1.14 3.48A.6.6 0 0 1 1.6 2.5z'/%3E%3C/svg%3E");
+	mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23000' d='M1.6 2.5h12.8a.6.6 0 0 1 .46.98L10 9.6v3.6a.6.6 0 0 1-.33.54l-2.8 1.4a.6.6 0 0 1-.87-.54V9.6L1.14 3.48A.6.6 0 0 1 1.6 2.5z'/%3E%3C/svg%3E");
+}
 #events_view_calendar .events_view_icon {
 	-webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.4'%3E%3Crect x='1.7' y='2.7' width='12.6' height='11.6' rx='1.6'/%3E%3Cpath d='M1.7 6.4h12.6M5.2 1.2v2.8M10.8 1.2v2.8'/%3E%3C/svg%3E");
 	mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.4'%3E%3Crect x='1.7' y='2.7' width='12.6' height='11.6' rx='1.6'/%3E%3Cpath d='M1.7 6.4h12.6M5.2 1.2v2.8M10.8 1.2v2.8'/%3E%3C/svg%3E");
@@ -293,6 +374,20 @@ textarea.events_input { resize: vertical; }
 .event_count_wrangler .event_count_dot { background: var(--events-wrangle, #c77700); }
 .event_count_key { font-size: 0.85em; opacity: 0.7; margin-left: 2px; }
 
+/* The one value in the Status column that is a job outstanding rather than a state the
+   event is in, so it is the one that is coloured - amber for "somebody still has to do
+   this", which is the colour the plugin already spends on that meaning. Its own class
+   rather than a rule keyed on the text, so a theme can restyle it and a translation
+   would not silently lose it. */
+.event_status_needs_report { color: #b36b00; font-weight: 600; }
+
+/* The last column is the one thing on the row the viewer can act on, and it holds either
+   a button, a pill or a sentence. Left aligned, each of those started at a different
+   place - the button under the "Y" of the heading, a lock message filling the column from
+   the same edge - so the button a member is reaching for moved row to row. Ranged right
+   it is always against the same edge, which is also the edge the cards put it on. */
+.event_you, .event_you_head { text-align: right; }
+
 /* ---------------------------------------------------------------------------
  * The event page's turnout tab
  *
@@ -406,6 +501,175 @@ a.event_action_secondary:hover, a.event_action_secondary:focus { color: #333; }
 .event_pill_trooper { background: #eaf2f8; border-color: #b8d4e8; color: #1f4e6e; }
 .event_pill_wrangler { background: #fdf3e3; border-color: #f0d5a8; color: #8a5300; }
 .event_pill_locked { background: #f2f2f2; border-color: #dedede; color: #767676; font-weight: normal; }
+
+/* ---------------------------------------------------------------------------
+ * Events list - cards on a phone and a tablet
+ *
+ * Six columns do not fit a narrow screen. Left as a table the listing either runs off
+ * the side of the viewport or squeezes every column down to a word a line, and the
+ * first thing to suffer is the Event column - the widest thing in the table, holding
+ * the title and the venue, which is what the list exists to be scanned by. On a tablet
+ * it was breaking a title across four lines and a street address across six.
+ *
+ * So below 992px each row stops being a row and becomes a card: the same six cells,
+ * relaid as a small grid. The address gets a row of its own across the bottom, because
+ * it is the one value long enough to need the card's full width, and ruled off, so the
+ * card reads as the event and then where it is.
+ *
+ *     Movie Premiere Red Carpet Escort            NEEDS TROOP REPORT
+ *     Sep 14 - 5PM  ·  Sydney
+ *     9 T   1 W                                            [Trooping]
+ *     ----------------------------------------------------------------
+ *     Event Cinemas, 505-525 George St, Sydney NSW 2000
+ *
+ * 992px because that is where the theme's content column steps up to 960px (see the
+ * page frame tiers at the top of this file) - below it the table is being asked to fit
+ * six columns into 720px or less, which is where it stops working.
+ *
+ * Same markup either way - the cells keep their classes, their ids and their order, and
+ * the row is still a <tr> - so nothing that reads the listing has two shapes to know
+ * about, and the card cannot drift from the table by saying something different.
+ *
+ * `screen and` is doing real work here. This is a max-width query and a printed page is
+ * measured in CSS pixels too: A4 comes out around 794px, so without it every printed
+ * listing would come off as cards.
+ * ------------------------------------------------------------------------ */
+@media screen and (max-width: 991px) {
+	/* The table's own frame goes with the columns: the cards separate themselves, and a
+	   panel border drawn around a stack of them reads as a second box. Dropping the
+	   background takes the gridlines with it too - those are the .tborder colour showing
+	   through the cellspacing, which a block-level table no longer honours anyway. */
+	#events_table,
+	#events_table > tbody { display: block; background: none; border: 0; }
+
+	/* The headings name columns that no longer exist. */
+	#events_table .events_list_head { display: none; }
+
+	tr.event_row {
+		display: grid;
+		/* Three tracks, and the widths are the whole trick. The first is sized by the
+		   start time and the turnout beneath it, both short and both wanting to line up
+		   down the list. The second takes the slack. The third is capped rather than
+		   left to size itself, because it holds the longest thing on the card - the
+		   "Signups for this event have closed." note - and an auto track would have
+		   taken the width that sentence wants and left the title wrapping three lines
+		   deep beside it. Capped, the note wraps instead, which is the right one of the
+		   two to break.
+		   minmax(0, ...) on both flexible tracks: a track's automatic minimum is its
+		   content, so a long unbroken venue name would otherwise push the card wider
+		   than the screen rather than wrapping inside it. */
+		grid-template-columns: auto minmax(0, 1fr) minmax(0, 40%);
+		grid-template-areas:
+			"title   title   status"
+			"start   region  region"
+			"counts  counts  you"
+			"address address address";
+		margin: 0 0 10px;
+		/* The card is painted here rather than left to the theme's .trow1 on each of the
+		   six cells: the cells no longer tile the card once the title and the address
+		   are in different rows of it, so a fill on them would leave the card in
+		   patches. A tint of the surrounding text colour rather than a colour of its
+		   own, so it lands the right way round on a dark theme as well as a light one,
+		   and a theme that wants a real surface says so once:
+		       :root { --events-card: #f7f9fb; }
+		   The border is currentColor for the same reason the view toggle's is. */
+		background: var(--events-card, rgba(127, 127, 127, 0.05));
+		border: 1px solid rgba(127, 127, 127, 0.28);
+		border-radius: 6px;
+	}
+
+	/* Each cell is a flex box inside the area it is placed in, which is what lets its
+	   content sit centred against the taller cell beside it. The theme's row colour
+	   comes off them, since the card carries its own. */
+	tr.event_row > td {
+		display: flex;
+		align-items: center;
+		padding: 2px 12px;
+		border: 0;
+		background: none;
+	}
+
+	/* The Event cell holds two things that belong in different rows of the card - the
+	   title at the top, the address across the bottom - and a single grid area cannot
+	   be in two places. So the cell steps out of the way with display: contents and
+	   hands both of them to the row's grid as items in their own right. Nothing is lost
+	   by it: the <tr> is a grid here, so the cell had no table semantics left to keep,
+	   and the card's fill is on the row rather than on the cell it gives up.
+	   It also means the padding below belongs to the two children, since a
+	   display: contents box draws nothing of its own. */
+	tr.event_row > .event_title { display: contents; }
+
+	/* The card has no column headings, so the hierarchy is carried by weight: the title,
+	   then when it starts, then the facts that only matter once you are reading it. */
+	tr.event_row .event_link {
+		grid-area: title;
+		padding: 11px 12px 0;
+		font-size: 1.05em;
+		font-weight: 600;
+		line-height: 1.3;
+		overflow-wrap: break-word;
+	}
+
+	/* The full width of the card, ruled off from the rest of it. An event with no
+	   address has no .event_address at all - events_address_link() returns '' - so the
+	   row simply is not there and the card ends at the turnout. */
+	tr.event_row .event_address {
+		grid-area: address;
+		margin: 0;
+		padding: 7px 12px 9px;
+		border-top: 1px solid rgba(127, 127, 127, 0.18);
+		line-height: 1.35;
+		overflow-wrap: break-word;
+	}
+
+	/* Top, not centre: beside a title that has wrapped to two lines a centred status
+	   floats in the middle of the card with nothing to line up against. */
+	tr.event_row > .event_status {
+		grid-area: status;
+		align-items: flex-start;
+		justify-content: flex-end;
+		padding-top: 12px;
+	}
+	tr.event_row > .event_start { grid-area: start; padding-top: 6px; }
+	tr.event_row > .event_region { grid-area: region; padding-top: 6px; }
+	tr.event_row > .event_counts { grid-area: counts; padding-bottom: 11px; }
+	tr.event_row > .event_you { grid-area: you; justify-content: flex-end; padding-bottom: 11px; }
+
+	tr.event_row > .event_start { font-weight: 600; }
+	tr.event_row > .event_region,
+	tr.event_row > .event_status { font-size: 0.85em; opacity: 0.75; }
+	/* Not dimmed with the rest of the column: the other values are states to glance
+	   past and this one is a job outstanding. The text itself is the same at every
+	   screen size - see events_status_label(), which title-cases it once for both. */
+	tr.event_row > .event_status_needs_report { opacity: 1; }
+
+	/* Start and region read as one line, so the separator between them is drawn rather
+	   than written into the markup - the two are separate cells, and on the table they
+	   are separate columns with nothing between them. */
+	tr.event_row > .event_region::before { content: "\00b7"; margin: 0 8px 0 0; opacity: 0.6; }
+
+	/* The lock message is the only thing on the card that has to wrap, and a pill that
+	   wraps is not a pill - four short lines inside a rounded box read as a speech
+	   bubble rather than as the note it is. So at this width it gives up the pill and
+	   becomes quiet text, which is all it ever was. It keeps the pill on the table,
+	   where the column is wide enough to hold it on one line. */
+	tr.event_row .event_pill_locked {
+		white-space: normal;
+		text-align: right;
+		line-height: 1.35;
+		padding: 0;
+		background: none;
+		border: 0;
+		font-size: 0.85em;
+	}
+
+	/* Sized for a thumb rather than a pointer. */
+	tr.event_row .event_btn { padding: 7px 16px; font-size: 0.95em; }
+
+	/* The empty state is one cell spanning six columns that are no longer there. */
+	#events_empty, #events_empty > td { display: block; }
+	#events_empty > td { padding: 12px; border: 0; border-radius: 6px; }
+}
 
 /* ---------------------------------------------------------------------------
  * Event page - the signup / coordinator action row

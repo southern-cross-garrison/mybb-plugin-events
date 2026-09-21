@@ -26,6 +26,28 @@ jobs:
       - name: Install Playwright browser
         run: npx playwright install --with-deps chromium
 
+      # scripts/fetch-theme.sh and scripts/install-smartlink.sh clone two private sibling
+      # repos. The GITHUB_TOKEN actions/checkout installs is scoped to this repo alone, so
+      # without a credential of our own those clones fall back to interactive auth and fail
+      # with "could not read Username". THEME_TOKEN is a fine-grained PAT with read-only
+      # Contents on mybb-custom-theme and mybb-plugin-smartlink; the rewrite below applies
+      # to every github.com https remote, so the scripts keep their plain URLs and work
+      # unchanged on a developer machine.
+      - name: Authenticate to the private sibling repos
+        env:
+          THEME_TOKEN: ${{ secrets.THEME_TOKEN }}
+        run: |
+          if [ -z "$THEME_TOKEN" ]; then
+            echo "::error::THEME_TOKEN is not set. The suite needs a fine-grained PAT with" \
+                 "read-only Contents access to southern-cross-garrison/mybb-custom-theme and" \
+                 "southern-cross-garrison/mybb-plugin-smartlink. See the README's" \
+                 "Continuous integration section."
+            exit 1
+          fi
+          git config --global \
+            url."https://x-access-token:${THEME_TOKEN}@github.com/".insteadOf \
+            "https://github.com/"
+
       - name: Cache the pinned MyBB release
         uses: actions/cache@v6
         with:

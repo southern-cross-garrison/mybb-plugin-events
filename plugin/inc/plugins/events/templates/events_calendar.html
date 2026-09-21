@@ -15,6 +15,7 @@
 <span class="events_month_name">{$calendar_month_name}</span>
 <a class="events_month_step" href="events.php?view=calendar&amp;month={$calendar_next}{$calendar_filter_params}" id="events_calendar_next" title="Next month" aria-label="Next month">&raquo;</a>
 </span>
+{$events_filter_disclosure}
 <form method="get" action="events.php" class="events_filter_form" id="events_filter_form">
 <input type="hidden" name="view" value="calendar" />
 <input type="hidden" name="month" value="{$calendar_month}" />

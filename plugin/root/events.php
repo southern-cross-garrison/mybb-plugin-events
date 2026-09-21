@@ -92,11 +92,17 @@ while($row = $db->fetch_array($rsvp_query))
 // The calendar only highlights "you are involved in this", so either role counts.
 $user_rsvps = array_keys($user_roles);
 
+// report_posted_at rides along so the listing can say which finished events are still
+// waiting on their troop report without a query per row - see events_needs_troop_report(),
+// which reads the column when it is there. Joined rather than sub-selected because
+// event_id is unique on that table, so there is exactly one row to find or none.
 $query = $db->query("
     SELECT e.*,
+           tr.posted_at AS report_posted_at,
            (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.role = 'trooper' AND r.status = 'attending') AS rsvp_count,
            (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.role = 'wrangler' AND r.status = 'attending') AS wrangler_count
     FROM " . TABLE_PREFIX . "event_plugin_events e
+    LEFT JOIN " . TABLE_PREFIX . "event_plugin_troop_reports tr ON tr.event_id = e.id
     WHERE {$where}
     ORDER BY e.start_date ASC
 ");
@@ -110,6 +116,7 @@ while($event = $db->fetch_array($query))
 $region_options = events_region_options($region_filter);
 $events_view_toggle = events_view_toggle($view, $region_filter, $show_archived);
 $events_archived_filter = events_archived_filter($show_archived);
+$events_filter_disclosure = events_filter_disclosure($region_filter, $show_archived);
 $events_filter_script = events_filter_script();
 
 // The calendar's month links are anchors rather than forms, so they have to carry the
@@ -192,7 +199,7 @@ foreach($events as $event)
     $address_link = events_address_link(isset($event['address']) ? $event['address'] : '', 'event_address_link');
     $address_line = $address_link === '' ? '' : '<span class="event_address">' . $address_link . '</span>';
 
-    $events_rows .= '<td class="trow1"><a class="event_link" href="event.php?id=' . (int)$event['id'] . '">'
+    $events_rows .= '<td class="trow1 event_title"><a class="event_link" href="event.php?id=' . (int)$event['id'] . '">'
         . htmlspecialchars_uni($event['title']) . '</a>' . $address_line . '</td>';
     $events_rows .= '<td class="trow1 event_region">' . htmlspecialchars_uni($event['region']) . '</td>';
     $events_rows .= '<td class="trow1 event_start">' . events_format_list_date($event['start_date']) . '</td>';
@@ -202,7 +209,12 @@ foreach($events as $event)
     $events_rows .= '<td class="trow1 event_counts">'
         . events_signup_counts($event['rsvp_count'], $event['wrangler_count'])
         . '</td>';
-    $events_rows .= '<td class="trow1 event_status">' . htmlspecialchars_uni($event['status']) . '</td>';
+    // events_status_label() owns what this reads, including the "Needs Troop Report" a
+    // finished event with no posted report shows instead of "Live". The class is what
+    // colours that one, since it is a job outstanding rather than a state.
+    $needs_report = events_needs_troop_report($event);
+    $events_rows .= '<td class="trow1 event_status' . ($needs_report ? ' event_status_needs_report' : '') . '">'
+        . htmlspecialchars_uni(events_status_label($event)) . '</td>';
     $events_rows .= '<td class="trow1 event_you">' . $you . '</td>';
     $events_rows .= '</tr>';
 }

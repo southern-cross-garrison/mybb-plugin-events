@@ -191,6 +191,89 @@ function events_archived_filter($show_archived)
 }
 
 /**
+ * How an event's status reads on screen.
+ *
+ * Title case, the same text on every page and at every screen size. The listing used to
+ * print the stored value as it stands - lower-case "live", "pending", "archived",
+ * because those are the enum's own spellings - and the phone cards then shouted them in
+ * capitals to sit them beside a title. Three registers for one value, and none of them
+ * a way a board would write it down.
+ *
+ * Two of the four labels are not stored anywhere, because the stored column cannot
+ * express them. A live event that has been and gone is not "Live" in any sense a member
+ * would recognise, and which of the two it is depends on whether its troop report has
+ * been posted:
+ *
+ *     Needs Troop Report - it finished and nobody has written it up
+ *     Complete           - it finished and somebody has
+ *
+ * Both only ever replace "Live". Pending and Archived are answers in their own right -
+ * a pending event never happened, and archiving is how an event is closed out, so an
+ * archived one is not outstanding work whatever its report says.
+ *
+ * The stored value stays on the page beside this, unchanged, as data-event-status - so
+ * anything that needs to match on the status rather than read it still can.
+ *
+ * @param array $event
+ * @return string
+ */
+function events_status_label($event)
+{
+    if(events_needs_troop_report($event))
+    {
+        return 'Needs Troop Report';
+    }
+
+    if($event['status'] === 'live' && events_has_ended($event))
+    {
+        return 'Complete';
+    }
+
+    return ucwords($event['status']);
+}
+
+/**
+ * The control that folds the index's filters away on a phone.
+ *
+ * The toolbar carries the filters, Create Event and the list/calendar switch, and on a
+ * phone all of that will not sit on one row - the switch wrapped onto a line of its own
+ * below everything else, which read as a stray button rather than as the view control
+ * it is. So on a narrow screen the filters go behind this button and the row has room
+ * for the three controls that say what the page *is*; from 700px up the button is not
+ * rendered at all (`display: none`) and the filters are the inline row they always were.
+ *
+ * A checkbox and its label rather than a <details>, which is what #rsvp_filter on the
+ * event page uses for the same job. A <details> holds its state in the DOM, and a closed
+ * one cannot be made to show its contents from CSS - modern engines hide the content with
+ * content-visibility on ::details-content, which no author rule reaches - so the desktop
+ * half would need the disclosure taken out of the markup. A checkbox keeps the state in
+ * CSS's reach, where a media query can simply ignore it, and the same sibling-selector
+ * trick the signup wizard's per-day drawer uses opens the panel with no script at all.
+ *
+ * It carries no name attribute, so it is not a field: it sits outside the filter form
+ * and nothing about it reaches the server either way.
+ *
+ * Rendered already open when something is filtered, so a member who arrives on a
+ * filtered page can see what it is filtered to without hunting for the button - the same
+ * reason event.php opens its RSVP filter panel when that page is filtered.
+ *
+ * @param string $region_filter
+ * @param bool $show_archived
+ * @return string
+ */
+function events_filter_disclosure($region_filter = '', $show_archived = false)
+{
+    $checked = ($region_filter !== '' || $show_archived) ? ' checked="checked"' : '';
+
+    // The funnel is decoration over a word that is already the label, so it is hidden
+    // from a screen reader rather than described twice - the same way the view toggle's
+    // icon is.
+    return '<input type="checkbox" id="events_filter_open" class="events_filter_disclosure"' . $checked . ' />'
+         . '<label class="events_filter_button" for="events_filter_open">'
+         . '<span class="events_filter_icon" aria-hidden="true"></span>Filter</label>';
+}
+
+/**
  * The index's filters as a query string fragment, for the links that are not forms.
  *
  * The calendar's Previous and Next are plain anchors, so paging October to November would
