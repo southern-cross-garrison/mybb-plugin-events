@@ -241,6 +241,7 @@ function demo_member($username, array $spec)
         'wwcc'              => (int)events_get_setting('wwcc_field'),
         'mobile'            => (int)events_get_setting('mobile_field'),
         'emergency_contact' => (int)events_get_setting('emergency_contact_field'),
+        'preferred_name'    => (int)events_get_setting('preferred_name_field'),
     );
 
     $values = array();
@@ -546,12 +547,42 @@ $WRANGLERS = array('RaySutton', 'TeganMoss');
 
 $NO_WWCC = array('MarcusHale', 'NadiaFarrow');
 
+// What each of them answers to at a staging area, which is the whole point of the column
+// the attendance sheet gives it: a username is a forum handle, and a coordinator calling
+// the roll needs the name the person turns around for.
+//
+// Deliberately not all the first half of the username. A demo where every preferred name
+// could be read straight off the handle beside it makes the column look like duplication,
+// so some here are shortenings and a couple are nicknames that share nothing with it -
+// which is what the real board's field is mostly full of.
+$PREFERRED_NAMES = array(
+    'AlexVoss'     => 'Alex',
+    'BriannaKade'  => 'Bri',
+    'CarloRen'     => 'Carlo',
+    'DanaOkoye'    => 'Dana',
+    'EliTanaka'    => 'Eli',
+    'FreyaLind'    => 'Freya',
+    'GusHolloway'  => 'Gus',
+    'HanaMorrow'   => 'Hana',
+    'IvanPetrov'   => 'Vanya',
+    'JadeNkemdi'   => 'Jade',
+    'KaiWhitfield' => 'Kai',
+    'LenaBauer'    => 'Lena',
+    'MarcusHale'   => 'Marc',
+    'NadiaFarrow'  => 'Nads',
+    'OscarBright'  => 'Oz',
+    'PiaSolano'    => 'Pia',
+    'RaySutton'    => 'Ray',
+    'TeganMoss'    => 'Teegs',
+);
+
 $uids = array();
 
 foreach($TROOPERS as $index => $username)
 {
     $fields = array(
         'tk_id'             => sprintf('TK-%05d', 31000 + $index),
+        'preferred_name'    => $PREFERRED_NAMES[$username],
         'mobile'            => sprintf('0400 %03d %03d', 200 + $index, 400 + $index),
         'emergency_contact' => 'Kin ' . $username . sprintf(' 0400 %03d %03d', 900 + $index, 100 + $index),
         // Every third member owns a second costume, so the wizard's costume step and the
@@ -577,6 +608,7 @@ foreach($WRANGLERS as $index => $username)
     $uids[$username] = demo_member($username, array(
         'groups' => array(),
         'fields' => array(
+            'preferred_name'    => $PREFERRED_NAMES[$username],
             'mobile'            => sprintf('0400 %03d %03d', 700 + $index, 700 + $index),
             'emergency_contact' => 'Kin ' . $username . sprintf(' 0400 %03d %03d', 800 + $index, 800 + $index),
         ),
@@ -608,6 +640,15 @@ if($admin)
 {
     $uids[$admin['username']] = (int)$admin['uid'];
     $ADMIN_USERNAME = $admin['username'];
+
+    // They are rostered onto the finished event below, so they appear on an attendance
+    // sheet and would otherwise be the one row on it with the preferred name column
+    // empty. Through the plugin's own writer rather than demo_member(), for two reasons:
+    // demo_member() rewrites usergroup and additionalgroups and would demote the only
+    // account that can reach the Admin CP, and the installer's account is the one that
+    // has no userfields row at all, which events_save_user_fields() knows to insert
+    // rather than update.
+    events_save_user_fields((int)$admin['uid'], array('preferred_name' => 'Admin'));
 }
 else
 {
