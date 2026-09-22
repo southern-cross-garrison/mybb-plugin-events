@@ -122,33 +122,53 @@ if($action === 'attendance')
             . '</form>';
     }
 
+    // Each attendee is two rows, not one. Ten columns of who-they-are and how-to-reach-them
+    // across a portrait A4 sheet leaves every one of them too narrow to read, let alone
+    // write in, so the identity half goes on the first row and the contact half on the
+    // second - the number and the tick box spanning both, because there is still only one
+    // person to count and one box to tick.
+    //
     // The Days column only exists for an event that has days to list, so the header is
     // built here rather than sitting static in the template.
-    $attendance_columns = array(
-        'attendee_num'       => '#',
-        'attendee_username'  => 'Username',
-        'attendee_role'      => 'Role',
-        'attendee_tkid'      => 'Legion ID',
-        'attendee_costumes'  => 'Costumes',
+    $attendance_identity_columns = array(
+        'attendee_username'       => 'Username',
+        'attendee_preferred_name' => 'Preferred Name',
+        'attendee_role'           => 'Role',
+        'attendee_tkid'           => 'Legion ID',
     );
 
     if(!empty($event_days))
     {
-        $attendance_columns['attendee_days'] = 'Days';
+        $attendance_identity_columns['attendee_days'] = 'Days';
     }
 
-    $attendance_columns['attendee_mobile'] = 'Mobile';
-    $attendance_columns['attendee_emergency'] = 'Emergency Contact';
-    $attendance_columns['attendee_attended'] = 'Attended';
+    // The second row says the same three things whatever the event, so it is laid over the
+    // first row's columns rather than having any of its own: costumes take two of them,
+    // the mobile one, and the emergency contact whatever is left - which is one column
+    // more on an event that has a Days column to absorb.
+    $attendance_contact_columns = array(
+        'attendee_costumes'  => array('label' => 'Costumes', 'span' => 2),
+        'attendee_mobile'    => array('label' => 'Mobile', 'span' => 1),
+        'attendee_emergency' => array('label' => 'Emergency Contact', 'span' => count($attendance_identity_columns) - 3),
+    );
 
-    $attendance_headers = '<tr>';
-    foreach($attendance_columns as $class => $label)
+    $attendance_headers = '<tr class="attendance_identity_head">'
+        . '<th class="attendee_num" rowspan="2">#</th>';
+    foreach($attendance_identity_columns as $class => $label)
     {
         $attendance_headers .= '<th class="' . $class . '">' . $label . '</th>';
     }
+    $attendance_headers .= '<th class="attendee_attended" rowspan="2">Attended</th></tr>';
+
+    $attendance_headers .= '<tr class="attendance_contact_head">';
+    foreach($attendance_contact_columns as $class => $column)
+    {
+        $attendance_headers .= '<th class="' . $class . '" colspan="' . $column['span'] . '">' . $column['label'] . '</th>';
+    }
     $attendance_headers .= '</tr>';
 
-    $attendance_colspan = count($attendance_columns);
+    // The number and the tick box either side of the identity columns.
+    $attendance_colspan = count($attendance_identity_columns) + 2;
     // Drives the column widths, which differ by one column between the two layouts.
     $attendance_table_class = !empty($event_days) ? 'has_days' : '';
 
@@ -157,13 +177,23 @@ if($action === 'attendance')
     foreach($attendees as $attendee)
     {
         $position++;
+
+        // One <tbody> per attendee, so the pair of rows is a thing the stylesheet can
+        // band, rule off and keep on one page - none of which is sayable about two
+        // sibling <tr>s that only happen to be next to each other.
+        $attendees_rows .= '<tbody class="attendee_group" data-uid="' . $attendee['uid'] . '">';
+
         $attendees_rows .= '<tr class="attendee_row" data-uid="' . $attendee['uid'] . '">';
-        $attendees_rows .= '<td class="attendee_num">' . $position . '</td>';
+        // A real checkbox rather than a drawn box, so a coordinator can tick people off on
+        // screen and print the sheet with those ticks already on it - the print comes off
+        // the live page, so its state goes with it. It spans both rows for the same reason
+        // the number does: one person, one tick.
+        $attendees_rows .= '<td class="attendee_num" rowspan="2">' . $position . '</td>';
         $attendees_rows .= '<td class="attendee_username">' . htmlspecialchars_uni($attendee['username']) . '</td>';
+        $attendees_rows .= '<td class="attendee_preferred_name">' . htmlspecialchars_uni($attendee['preferred_name']) . '</td>';
         $attendees_rows .= '<td class="attendee_role">'
             . htmlspecialchars_uni(implode(' / ', array_map('events_role_label', array_unique($attendee['roles'])))) . '</td>';
         $attendees_rows .= '<td class="attendee_tkid">' . htmlspecialchars_uni($attendee['tk_id']) . '</td>';
-        $attendees_rows .= '<td class="attendee_costumes">' . htmlspecialchars_uni(implode(', ', $attendee['costumes'])) . '</td>';
 
         if(!empty($event_days))
         {
@@ -193,20 +223,31 @@ if($action === 'attendance')
             $attendees_rows .= '<td class="attendee_days">' . $days_cell . '</td>';
         }
 
-        $attendees_rows .= '<td class="attendee_mobile">' . htmlspecialchars_uni($attendee['mobile']) . '</td>';
-        $attendees_rows .= '<td class="attendee_emergency">' . htmlspecialchars_uni($attendee['emergency_contact']) . '</td>';
-        // A real checkbox rather than a drawn box, so a coordinator can tick people off on
-        // screen and print the sheet with those ticks already on it - the print comes off
-        // the live page, so its state goes with it.
-        $attendees_rows .= '<td class="attendee_attended">'
+        $attendees_rows .= '<td class="attendee_attended" rowspan="2">'
             . '<input type="checkbox" class="attendee_tick" aria-label="Attended: '
             . htmlspecialchars_uni($attendee['username']) . '" /></td>';
         $attendees_rows .= '</tr>';
+
+        // The contact half, laid over the identity row's columns - the spans are the ones
+        // the header row was built with, or the two halves would not line up.
+        $contact_cells = array(
+            'attendee_costumes'  => implode(', ', $attendee['costumes']),
+            'attendee_mobile'    => $attendee['mobile'],
+            'attendee_emergency' => $attendee['emergency_contact'],
+        );
+
+        $attendees_rows .= '<tr class="attendee_row_contact">';
+        foreach($contact_cells as $class => $value)
+        {
+            $attendees_rows .= '<td class="' . $class . '" colspan="' . $attendance_contact_columns[$class]['span'] . '">'
+                . htmlspecialchars_uni($value) . '</td>';
+        }
+        $attendees_rows .= '</tr></tbody>';
     }
 
     if($attendees_rows === '')
     {
-        $attendees_rows = '<tr id="attendance_empty"><td colspan="' . $attendance_colspan . '">No attendees yet.</td></tr>';
+        $attendees_rows = '<tbody><tr id="attendance_empty"><td colspan="' . $attendance_colspan . '">No attendees yet.</td></tr></tbody>';
     }
 
     // The printed sheet leaves the board behind, so the facts a coordinator needs on the

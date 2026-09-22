@@ -18,6 +18,7 @@ const [TK, TD] = [0, 1].map((index) => fixtures().costumeOptions[index]);
 
 /** The prerequisites the `wrangler` fixture user already has on file. */
 const WRANGLER_CONTACT = {
+  preferred_name: 'Dev',
   mobile: '0400 000 006',
   emergency_contact: 'Kin Wrangler 0400 111 006',
 };
@@ -54,6 +55,9 @@ test.describe('choosing how to attend', () => {
 
     await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
     await expect(page.locator('#prereq_tk_id')).toHaveCount(0);
+    // A wrangler is on the attendance sheet too, so they are still asked how to be
+    // greeted and reached on the day.
+    await expect(page.locator('#prereq_preferred_name')).toBeVisible();
     await expect(page.locator('#prereq_mobile')).toBeVisible();
     await expect(page.locator('#prereq_emergency_contact')).toBeVisible();
   });
@@ -64,9 +68,14 @@ test.describe('choosing how to attend', () => {
     await loginAs(page, 'newbie');
     await signUpThroughWizard(page, eventId, {
       role: 'wrangler',
-      prerequisites: { mobile: '0400 999 111', emergency_contact: 'Next Of Kin 0400 999 222' },
+      prerequisites: {
+        preferred_name: 'Newt',
+        mobile: '0400 999 111',
+        emergency_contact: 'Next Of Kin 0400 999 222',
+      },
     });
 
+    expect(await getUserField('newbie', 'preferred_name')).toBe('Newt');
     expect(await getUserField('newbie', 'mobile')).toBe('0400 999 111');
     expect(await getUserField('newbie', 'emergency_contact')).toBe('Next Of Kin 0400 999 222');
     // Still no Legion ID: wranglers are not full members.
@@ -390,10 +399,11 @@ test.describe('wranglers on coordinator surfaces', () => {
 
     await expect(page.locator('tr.attendee_row')).toHaveCount(2);
 
-    const row = page.locator('tr.attendee_row').filter({ hasText: 'wrangler' });
+    const row = page.locator('tbody.attendee_group').filter({ hasText: 'wrangler' });
     await expect(row.locator('.attendee_role')).toHaveText('Wrangler');
     await expect(row.locator('.attendee_tkid')).toHaveText('');
     await expect(row.locator('.attendee_costumes')).toHaveText('');
+    await expect(row.locator('.attendee_preferred_name')).toHaveText(WRANGLER_CONTACT.preferred_name);
     await expect(row.locator('.attendee_mobile')).toHaveText(WRANGLER_CONTACT.mobile);
     await expect(row.locator('.attendee_emergency')).toHaveText(WRANGLER_CONTACT.emergency_contact);
   });

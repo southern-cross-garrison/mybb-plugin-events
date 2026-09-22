@@ -12,8 +12,15 @@ if(!defined("IN_MYBB"))
 
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
+require_once MYBB_ROOT . "inc/plugins/events/inc/events_form.php";
 
 $events_action = $mybb->get_input('action');
+
+// In the <head> rather than echoed into the body beside the controls it styles, because
+// one of the things it sets is the size of the description box - and sceditor builds the
+// editor at whatever size that box has resolved to by the time the page is ready. A
+// stylesheet still arriving further down the body is a race with that measurement.
+$page->extra_header .= events_admin_assets('../jscripts/events/');
 
 // The event form's description box is MyBB's BBCode editor and can be previewed above the
 // form, and both want something in the <head> - which output_header() below has already
@@ -21,8 +28,6 @@ $events_action = $mybb->get_input('action');
 // problem: its template is one string, and the head is still in it when the page is built.
 if($events_action === 'add' || $events_action === 'edit')
 {
-    require_once MYBB_ROOT . "inc/plugins/events/inc/events_form.php";
-
     $page->extra_header .= events_description_editor_assets()
                          . events_preview_assets('../jscripts/events/');
 }

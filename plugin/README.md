@@ -10,7 +10,7 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 - **Signup System**: One "Sign Up to Attend" flow with prerequisite validation
 - **Per-day Roles**: Troop some days and wrangle others in a single signup
 - **Wrangler Signups**: Non-costumed helpers can sign up without being full members
-- **Prerequisites**: TK ID, WWCC, mobile number, and emergency contact validation
+- **Prerequisites**: TK ID, WWCC, preferred name, mobile number, and emergency contact validation
 - **Costume Selection**: Select from user's profile costumes during signup
 - **Region Filtering**: Filter events by region. The region list is the board's own -
   add, rename and delete regions in the Admin CP
@@ -38,7 +38,7 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 4. Go to Admin CP → Event Management → Settings
 5. Configure the plugin settings:
    - Set the event timezone (see _Event Timezone_ below)
-   - Map custom profile fields (costume, TK ID, WWCC, mobile, emergency contact)
+   - Map custom profile fields (costume, TK ID, WWCC, preferred name, mobile, emergency contact)
    - Set GEC user groups
    - Set Garrison Members and 501st Members group IDs
    - Set troop report forum ID
@@ -62,6 +62,8 @@ Before using the plugin, create the following custom profile fields in MyBB:
 3. **WWCC Field** (text): Working With Children Check number
 4. **Mobile Number Field** (text, hidden): Mobile phone number
 5. **Emergency Contact Field** (text, hidden): Emergency contact information
+6. **Preferred Name Field** (text): The name a member goes by on the day, which is what the
+   attendance sheet greets them by - the username beside it is a forum handle
 
 The mobile and emergency contact fields should be configured as hidden fields (visible only to admins/GECs).
 

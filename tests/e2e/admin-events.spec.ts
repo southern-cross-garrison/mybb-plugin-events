@@ -286,6 +286,33 @@ test.describe('admin event management', () => {
     await expect(page.locator('.sceditor-toolbar')).toBeVisible();
   });
 
+  test('gives the description editor the width of the form, not MyBB\'s 400px textarea', async ({ page }) => {
+    await page.setViewportSize({ width: 1400, height: 1000 });
+    await loginToAdminCp(page);
+    await gotoEventsAdmin(page, '&action=add');
+    await expectEditorAttached(page, 'description');
+
+    // sceditor builds the editor at whatever size the textarea it binds to has resolved
+    // to, and the Admin CP's own stylesheet sets every textarea to a flat 400px. Left
+    // alone that is the whole editor: at 400px the toolbar wraps onto three rows and
+    // takes all but 7px of the height with it, so the box that holds the announcement
+    // text is unusable rather than merely small. Asserted as a share of the form it sits
+    // in rather than in pixels, because the point is that it follows the page.
+    const size = await page.evaluate(() => {
+      const container = document.querySelector('.sceditor-container') as HTMLElement;
+      const cell = container.closest('td') as HTMLElement;
+      const editing = container.querySelector('iframe, textarea:not([style*="display: none"])') as HTMLElement;
+      return {
+        widthShare: container.getBoundingClientRect().width / cell.getBoundingClientRect().width,
+        editingHeight: editing.getBoundingClientRect().height,
+      };
+    });
+
+    expect(size.widthShare).toBeGreaterThan(0.9);
+    // Room to write a description in, not a sliver under a wrapped toolbar.
+    expect(size.editingHeight).toBeGreaterThan(150);
+  });
+
   test('Preview renders the description without creating the event', async ({ page }) => {
     await loginToAdminCp(page);
     await gotoEventsAdmin(page, '&action=add');

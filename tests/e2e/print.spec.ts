@@ -112,8 +112,10 @@ test.describe('printing a plugin page', () => {
     await loginAs(page, 'gec');
     await page.goto(`/event.php?id=${eventId}&action=attendance`);
 
-    // The last column is a box to tick, not a line to sign.
-    await expect(page.locator('#attendance_table thead th').last()).toHaveText('Attended');
+    // The last column is a box to tick, not a line to sign. Named on the identity row,
+    // which is the one the grid is built from - the contact row below it is laid over
+    // those same columns and has no last column of its own.
+    await expect(page.locator('#attendance_table thead .attendance_identity_head th').last()).toHaveText('Attended');
     await expect(page.locator('tr.attendee_row .attendee_tick')).toHaveCount(2);
     await expect(page.locator('tr.attendee_row .attendee_tick').first()).not.toBeChecked();
 
@@ -145,11 +147,16 @@ test.describe('printing a plugin page', () => {
 
     const table = await page.evaluate(() => {
       const head = getComputedStyle(document.querySelector('#attendance_table thead')!);
+      // An attendee is a <tbody> holding two rows, and it is the pair that must not be
+      // broken: a page split between them puts somebody's phone number on the next sheet
+      // with nothing on it saying whose.
+      const group = getComputedStyle(document.querySelector('#attendance_table tbody.attendee_group')!);
       const row = getComputedStyle(document.querySelector('#attendance_table tbody tr')!);
-      return { head: head.display, rowBreak: row.breakInside };
+      return { head: head.display, groupBreak: group.breakInside, rowBreak: row.breakInside };
     });
 
     expect(table.head).toBe('table-header-group');
+    expect(table.groupBreak).toBe('avoid');
     expect(table.rowBreak).toBe('avoid');
   });
 

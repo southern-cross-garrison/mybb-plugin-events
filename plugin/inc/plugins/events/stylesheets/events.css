@@ -382,17 +382,19 @@ textarea.events_input { resize: vertical; }
 .event_status_needs_report { color: #b36b00; font-weight: 600; }
 
 /* The last column is the one thing on the row the viewer can act on, and it holds either
-   a button, a pill or a sentence. Left aligned, each of those started at a different
-   place - the button under the "Y" of the heading, a lock message filling the column from
-   the same edge - so the button a member is reaching for moved row to row. Centred, each
-   one is anchored to the same point however wide it is, and it keeps clear of the table's
-   outer border: ranged right the button sat hard against the edge of the board, which
-   read as belonging to the page rather than to the row it acts on.
+   a button or a pill. Left aligned, they all begin at the same place, which is the steady
+   thing to line a column of controls up on.
+
+   This wanted centring while the column could still hold a whole sentence - "Signups for
+   this event have closed." was as wide as the rest of the row, so it set the column's
+   width and left the button beside it starting somewhere else entirely. The states are one
+   word each now (events_signup_lock_label()), so every item is about as wide as the next
+   and there is no ragged edge left to hide.
 
    The cards at narrow widths still range this cell right, via justify-content on the grid
    area below - there it is the last thing in a stack rather than a column of its own, and
    the edge it is against is the card's, not the table's. */
-.event_you, .event_you_head { text-align: center; }
+.event_you, .event_you_head { text-align: left; }
 
 /* ---------------------------------------------------------------------------
  * The event page's turnout tab
@@ -795,6 +797,12 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
  * its place in the tab order, its arrow-key behaviour and its accessible name. Hiding it
  * with display: none would cost all three.
  * ------------------------------------------------------------------------ */
+/* The days the sentence above has just counted. Tight against it - it is the same
+   statement continued, not a new one - and the markers are pulled inside the cell, which
+   a default <ul> indents them out of. */
+.signup_intro_days { margin: -6px 0 12px; padding-left: 1.3em; }
+.signup_intro_days li { margin: 0; }
+
 .signup_primary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 12px; }
 .signup_primary_label { font-weight: 600; }
 
@@ -887,34 +895,49 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 #attendance_table { width: 100%; border-collapse: collapse; margin: 16px 0; }
 #attendance_table th, #attendance_table td { border: 1px solid #999; padding: 8px; text-align: left; vertical-align: top; }
 #attendance_table th { background: #f0f0f0; font-weight: bold; }
-#attendance_table tbody tr:nth-child(even) { background: #f7f7f7; }
+/* Banded by person, not by row: an attendee is a <tbody> holding the pair of rows, so the
+   stripe covers both halves of one person rather than alternating within them. */
+#attendance_table tbody.attendee_group:nth-of-type(even) td { background: #f7f7f7; }
 
 /* Fixed proportions rather than letting the content size the columns, so the sheet keeps
    the same shape whoever is on it - and so the tick column stays wide enough to aim a pen
    at even when nobody has a long costume list to push it open. Percentages of the
    printable width, adding to 100.
-   Keyed on the cells' classes rather than nth-child, because the Days column only exists
-   for an event that has days and every position after it would otherwise shift. */
+   Only the identity row is sized: with table-layout: fixed the first row of the table
+   fixes the grid, and the contact row's cells take their widths from the columns their
+   colspans cover. Keyed on the cells' classes rather than nth-child, because the Days
+   column only exists for an event that has days and every position after it would
+   otherwise shift. */
 #attendance_table { table-layout: fixed; }
-#attendance_table .attendee_num { width: 4%; }
-#attendance_table .attendee_username { width: 13%; }
-#attendance_table .attendee_role { width: 11%; }
-#attendance_table .attendee_tkid { width: 11%; }
-#attendance_table .attendee_costumes { width: 18%; }
-#attendance_table .attendee_mobile { width: 13%; }
-#attendance_table .attendee_emergency { width: 20%; }
-#attendance_table .attendee_attended { width: 10%; }
+#attendance_table .attendance_identity_head .attendee_num { width: 5%; }
+#attendance_table .attendance_identity_head .attendee_username { width: 22%; }
+#attendance_table .attendance_identity_head .attendee_preferred_name { width: 21%; }
+#attendance_table .attendance_identity_head .attendee_role { width: 18%; }
+#attendance_table .attendance_identity_head .attendee_tkid { width: 24%; }
+#attendance_table .attendance_identity_head .attendee_attended { width: 10%; }
 
-/* Nine columns instead of eight: everything gives a little back to make room for Days. */
-#attendance_table.has_days .attendee_num { width: 3%; }
-#attendance_table.has_days .attendee_username { width: 11%; }
-#attendance_table.has_days .attendee_role { width: 11%; }
-#attendance_table.has_days .attendee_tkid { width: 11%; }
-#attendance_table.has_days .attendee_costumes { width: 13%; }
-#attendance_table.has_days .attendee_days { width: 15%; }
-#attendance_table.has_days .attendee_mobile { width: 11%; }
-#attendance_table.has_days .attendee_emergency { width: 15%; }
-#attendance_table.has_days .attendee_attended { width: 10%; }
+/* Seven columns instead of six: everything gives a little back to make room for Days. */
+#attendance_table.has_days .attendance_identity_head .attendee_num { width: 4%; }
+#attendance_table.has_days .attendance_identity_head .attendee_username { width: 16%; }
+#attendance_table.has_days .attendance_identity_head .attendee_preferred_name { width: 16%; }
+#attendance_table.has_days .attendance_identity_head .attendee_role { width: 17%; }
+#attendance_table.has_days .attendance_identity_head .attendee_tkid { width: 15%; }
+#attendance_table.has_days .attendance_identity_head .attendee_days { width: 22%; }
+#attendance_table.has_days .attendance_identity_head .attendee_attended { width: 10%; }
+
+/* Where one person ends and the next begins. Without it the sheet reads as twice as many
+   people, half of them nameless. The rule goes along the bottom of the pair, which means
+   the contact row's cells *and* the two that span both rows - they end at the same line. */
+#attendance_table tbody.attendee_group > .attendee_row > td[rowspan],
+#attendance_table tbody.attendee_group > .attendee_row_contact > td { border-bottom-width: 3px; }
+
+/* The number and the tick sit against two rows of content, so they are centred in it
+   rather than pinned to the top of the first row. */
+#attendance_table .attendee_num { text-align: center; vertical-align: middle; }
+
+/* The contact row is supporting detail under the name, so it is labelled quietly rather
+   than repeating the header's weight down the sheet. */
+#attendance_table .attendance_contact_head th { font-weight: normal; font-style: italic; }
 
 /* Bullets pulled back inside the cell - a default <ul> indents its markers into the
    neighbouring column's border. */
@@ -923,15 +946,17 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 
 /* The tick box is the point of the last column, so centre it and give it something to
    aim at with a pen as well as with a mouse. */
-#attendance_table .attendee_attended { text-align: center; vertical-align: middle; }
+#attendance_table td.attendee_attended { text-align: center; vertical-align: middle; }
 #attendance_table .attendee_tick { width: 17px; height: 17px; margin: 0; cursor: pointer; }
 /* Nothing is held on one line by force: table-layout: fixed does not widen a column to
    fit, so a value told not to wrap - "Trooper / Wrangler" on a mixed signup, say - runs
    out over the cell beside it instead. Wrapping is the lesser of the two. */
 #attendance_table th, #attendance_table td { overflow-wrap: break-word; }
 /* The Legion ID is the one exception: a short value in a known format, whose column is
-   sized to hold it, and which reads badly broken over two lines. */
-#attendance_table .attendee_tkid { white-space: nowrap; }
+   sized to hold it, and which reads badly broken over two lines. The value only - the
+   heading has to be free to wrap, or at a narrow width "Legion ID" runs out over the
+   column beside it, which is the very thing the rule above is avoiding. */
+#attendance_table td.attendee_tkid { white-space: nowrap; }
 
 /* ---------------------------------------------------------------------------
  * Print
@@ -1046,13 +1071,20 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 	#attendance_table th, #attendance_table td { border: 1.5pt solid #000; padding: 4pt; }
 	/* Browsers print no backgrounds unless the reader opts into background graphics, so
 	   the header row and the banding are weighted with rules instead of fills. */
-	#attendance_table th { background: none; border-top-width: 2.25pt; border-bottom-width: 2.25pt; }
-	#attendance_table tbody tr:nth-child(even) { background: none; }
-	/* Repeat the header on every sheet, and never split a person across two of them. */
+	#attendance_table th { background: none; border-bottom-width: 2.25pt; }
+	#attendance_table .attendance_identity_head th { border-top-width: 2.25pt; }
+	#attendance_table tbody.attendee_group:nth-of-type(even) td { background: none; }
+	/* Repeat the header on every sheet, and never split a person across two of them - a
+	   <tbody> is the pair of rows, so avoiding a break inside it is what keeps somebody's
+	   phone number on the same page as their name. */
 	#attendance_table thead { display: table-header-group; }
-	#attendance_table tr { break-inside: avoid; page-break-inside: avoid; }
-	/* Room to run a pen down the column without the rows crowding each other. */
-	#attendance_table tbody td { height: 24pt; }
+	#attendance_table tbody, #attendance_table tr { break-inside: avoid; page-break-inside: avoid; }
+	/* Room to run a pen down the column without the rows crowding each other. Two rows a
+	   person now, so each is shorter than the single row was and the pair a little taller. */
+	#attendance_table tbody td { height: 15pt; }
+	/* Heavy enough to read as a divider at 9pt without looking like a second grid. */
+	#attendance_table tbody.attendee_group > .attendee_row > td[rowspan],
+	#attendance_table tbody.attendee_group > .attendee_row_contact > td { border-bottom-width: 2.25pt; }
 
 	/* Whatever was ticked on screen is ticked on paper - the print is taken from the live
 	   page, so the box only has to survive being printed. A browser draws the control but

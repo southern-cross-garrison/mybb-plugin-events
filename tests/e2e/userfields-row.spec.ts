@@ -32,6 +32,7 @@ test('a member with no userfields row can still complete a signup', async ({ pag
   // Deleting the row takes the costumes with it, and costumes are a trooper prerequisite,
   // so this step asks for them too.
   await page.locator('#prereq_costume').fill(`${TK}\n${TD}`);
+  await page.locator('#prereq_preferred_name').fill('Newt');
   await page.locator('#prereq_mobile').fill('0400 111 222');
   await page.locator('#prereq_emergency_contact').fill('Next Of Kin 0400 333 444');
   await page.locator('#rsvp_submit').click();
@@ -41,6 +42,7 @@ test('a member with no userfields row can still complete a signup', async ({ pag
   await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'costumes');
 
   expect(await getUserField('newbie', 'tk_id')).toBe('12345');
+  expect(await getUserField('newbie', 'preferred_name')).toBe('Newt');
   expect(await getUserField('newbie', 'mobile')).toBe('0400 111 222');
   expect(await getUserField('newbie', 'emergency_contact')).toBe('Next Of Kin 0400 333 444');
   expect(await countRsvps(eventId)).toBe(0);

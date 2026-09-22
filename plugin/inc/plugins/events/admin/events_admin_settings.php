@@ -85,6 +85,7 @@ function events_admin_settings()
                 'events_wwcc_field' => $mybb->input['wwcc_field'],
                 'events_mobile_field' => $mybb->input['mobile_field'],
                 'events_emergency_contact_field' => $mybb->input['emergency_contact_field'],
+                'events_preferred_name_field' => $mybb->input['preferred_name_field'],
                 'events_event_coordinator_groups' => implode(',', array_filter(array_map('intval', (array)$mybb->get_input('event_coordinator_groups', MyBB::INPUT_ARRAY)))),
                 'events_garrison_members_group' => $mybb->input['garrison_members_group'],
                 'events_501st_members_group' => $mybb->input['501st_members_group'],
@@ -153,8 +154,6 @@ function events_admin_settings()
         $forums[$forum['fid']] = $forum['name'];
     }
     
-    echo events_admin_assets('../jscripts/events/');
-
     $form = new Form("index.php?module=events&action=settings", "post");
     
     $form_container = new FormContainer("Event Management Settings");
@@ -203,6 +202,11 @@ function events_admin_settings()
         "Select the custom profile field that contains emergency contact information",
         $form->generate_select_box("emergency_contact_field", $profile_fields, events_admin_settings_value('emergency_contact_field', 'events_emergency_contact_field')));
     
+    // Preferred name field
+    $form_container->output_row("Preferred Name Profile Field",
+        "Select the custom profile field that contains the name a member goes by on the day",
+        $form->generate_select_box("preferred_name_field", $profile_fields, events_admin_settings_value('preferred_name_field', 'events_preferred_name_field')));
+
     // Event Coordinator groups
     $selected_coordinator_groups = $mybb->request_method == "post"
         ? array_filter(array_map('intval', (array)$mybb->get_input('event_coordinator_groups', MyBB::INPUT_ARRAY)))

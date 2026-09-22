@@ -476,17 +476,38 @@ if($rsvp_step === 'attendance')
     $rsvp_page_title = $is_update ? 'Update Your Signup' : 'Sign Up to Attend';
     $day_count = count($event_days);
 
-    // The single-day sentence names when it is, because a member arriving from a link or
-    // a reminder is often answering "can I make that?" and should not have to go back to
-    // the event page to find out. The multi-day one deliberately does not: it is already
-    // naming a span of days, and one start time out of several would read as the answer
-    // to a question it is not being asked.
-    $event_when = events_format_when($event['start_date']);
+    // Both sentences say when, because a member arriving from a link or a reminder is
+    // often answering "can I make that?" and should not have to go back to the event page
+    // to find out. A single day says it inline; several are listed under the sentence,
+    // where one line per day can be read down without the sentence itself growing into a
+    // run of dates.
+    if($day_count > 1)
+    {
+        $day_lines = '';
+        foreach($event_days as $day)
+        {
+            $day_lines .= '<li>' . events_day_label($day) . '</li>';
+        }
 
-    $rsvp_intro .= $day_count > 1
-        ? '<p>You are signing up for all <strong>' . $day_count . ' days</strong> of <strong>' . $event_title . '</strong>.</p>'
-        : '<p>You are signing up to <strong>' . $event_title . '</strong>'
-          . ($event_when === '' ? '' : ' - ' . $event_when) . '.</p>';
+        $rsvp_intro .= '<p>You are signing up for all <strong>' . $day_count . ' days</strong> of <strong>'
+                     . $event_title . '</strong>.</p>'
+                     . '<ul class="signup_intro_days">' . $day_lines . '</ul>';
+    }
+    elseif($day_count === 1)
+    {
+        $day = reset($event_days);
+
+        $rsvp_intro .= '<p>You are signing up for <strong>' . $event_title . '</strong> on <strong>'
+                     . events_day_label($day) . '</strong>.</p>';
+    }
+    else
+    {
+        // No day rows at all, so the event's own start is the only date there is to name.
+        $event_when = events_format_when($event['start_date']);
+
+        $rsvp_intro .= '<p>You are signing up for <strong>' . $event_title . '</strong>'
+                     . ($event_when === '' ? '' : ' on ' . $event_when) . '.</p>';
+    }
 
     // The leading question, and for all but a handful of signups the only one. A div with
     // role="radiogroup" rather than a fieldset: a <legend> is lifted out of the fieldset's

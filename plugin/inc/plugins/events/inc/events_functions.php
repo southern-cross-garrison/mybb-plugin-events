@@ -1101,7 +1101,9 @@ function events_get_user_costumes($user_id)
  * Which prerequisite profile fields is the user missing for this event?
  *
  * Wranglers are not required to be full members, so they are never asked for a TK ID.
- * They are still asked for the details a coordinator needs on the day.
+ * They are still asked for the details a coordinator needs on the day - a preferred name
+ * and the two contact numbers - because a wrangler is on the attendance sheet and has to
+ * be greeted and reached like anybody else on it.
  *
  * A signup can hold both roles at once (trooping one day, wrangling the next), so the
  * role argument is a set: the TK ID is asked for as soon as one day is being trooped.
@@ -1128,7 +1130,10 @@ function events_check_prerequisites($event, $user_id = null, $roles = 'trooper')
     // out before normalising, or events_rsvp_role() would turn '' into 'trooper'.
     $roles = array_map('events_rsvp_role', array_filter((array)$roles, 'strlen'));
 
-    $required = array('mobile', 'emergency_contact');
+    // Asked of a wrangler as well as a trooper: the username on the sheet is a forum
+    // handle, and a coordinator calling the roll at a staging area needs the name the
+    // person actually answers to.
+    $required = array('preferred_name', 'mobile', 'emergency_contact');
     if(in_array('trooper', $roles, true))
     {
         // Costumes belong here for the same reason the Legion ID does: they are asked of
@@ -1230,6 +1235,7 @@ function events_prerequisite_labels()
     return array(
         'tk_id'             => array('label' => 'Legion ID', 'hint' => 'Your 501st legion ID, e.g. if you are TK-12345 then type "12345" here.'),
         'costume'           => array('label' => 'Approved Costumes', 'hint' => 'One per line. These are saved to your profile, and you pick from them on the next step.', 'multiline' => true),
+        'preferred_name'    => array('label' => 'Preferred Name', 'hint' => 'What the coordinator should call you on the day. A first name is fine.'),
         'wwcc'              => array('label' => 'WWCC Number', 'hint' => 'This event requires a Working With Children Check.'),
         'mobile'            => array('label' => 'Mobile Number', 'hint' => 'So the coordinator can reach you on the day.'),
         'emergency_contact' => array('label' => 'Emergency Contact', 'hint' => 'Name and number of someone to call in an emergency.'),
@@ -1308,6 +1314,7 @@ function events_get_attendees($event_id, array $filters = array())
             'rsvp_date'         => $row['rsvp_date'],
             'costumes'          => $costumes,
             'days'              => $days,
+            'preferred_name'    => events_get_user_field($row['user_id'], 'preferred_name'),
             'tk_id'             => events_get_user_field($row['user_id'], 'tk_id'),
             'mobile'            => events_get_user_field($row['user_id'], 'mobile'),
             'emergency_contact' => events_get_user_field($row['user_id'], 'emergency_contact'),

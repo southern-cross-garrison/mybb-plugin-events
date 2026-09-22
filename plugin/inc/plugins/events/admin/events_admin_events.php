@@ -202,8 +202,14 @@ function events_admin_edit_event()
     $container->output_row(
         "Description",
         "Shown on the event page and in the announcement thread. BBCode and smilies work here the same way they do in a post.",
-        $form->generate_text_area("description", $values['description'], array("id" => "description", "rows" => 8))
-            . events_description_editor("description"),
+        $form->generate_text_area("description", $values['description'], array(
+            "id" => "description",
+            "class" => "events_admin_description",
+            // The height the editor is built at: sceditor takes the bound box's rendered
+            // size, so the rows are what say how tall it comes up, here and with the
+            // editor turned off alike.
+            "rows" => 18,
+        )) . events_description_editor("description"),
         "description"
     );
     $container->output_row("Status", "Pending events are only visible to coordinators; setting an event live posts its announcement thread", $form->generate_select_box("status", events_event_statuses(), $values['status'], array("id" => "status")), "status");

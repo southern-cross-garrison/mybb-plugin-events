@@ -60,6 +60,7 @@ function events_profile_field_settings()
         'events_wwcc_field',
         'events_mobile_field',
         'events_emergency_contact_field',
+        'events_preferred_name_field',
     );
 }
 
@@ -151,6 +152,11 @@ function events_install_settings()
         array("name" => "events_event_forums", "title" => "Event Forums by Region", "description" => "Which forum each region's events are announced in, as a comma separated list of Region=forum id pairs. Set it in Admin CP -> Event Management -> Settings rather than here.", "optionscode" => "text", "disporder" => 11),
         array("name" => "events_regions", "title" => "Regions", "description" => "The regions an event can belong to, as a comma separated list. Set it in Admin CP -> Event Management -> Settings rather than here - removing a region there also rehomes the events that were in it, and removing it here would leave them pointing at a region that no longer exists.", "optionscode" => "text", "disporder" => 13, "value" => EVENTS_DEFAULT_REGIONS),
         array("name" => "events_print_logo", "title" => "Print Logo", "description" => "Shown in the ribbon at the top of printed pages. A URL, or a path relative to the board root (e.g. images/logo.png). Leave blank to fall back to the theme's own logo.", "optionscode" => "text", "disporder" => 12),
+        // Numbered after the settings that shipped before it rather than beside the other
+        // profile-field pickers: the install loop leaves an existing setting alone, so
+        // renumbering the rest here would only ever reorder a fresh board's list and leave
+        // every board that already has these settings in the old order.
+        array("name" => "events_preferred_name_field", "title" => "Preferred Name Profile Field", "description" => "The custom profile field that holds the name a member goes by on the day", "optionscode" => "text", "disporder" => 15),
         array("name" => "events_timezone", "title" => "Event Timezone", "description" => "Where the garrison is, not where the forum is hosted: every event date is entered, stored and shown in this zone, and the server's own timezone is ignored. A PHP timezone identifier such as Australia/Sydney. Pick it from the list in Admin CP -> Event Management -> Settings rather than typing it here - a name PHP does not recognise falls back to UTC.", "optionscode" => "text", "disporder" => 14, "value" => EVENTS_DEFAULT_TIMEZONE),
     );
 

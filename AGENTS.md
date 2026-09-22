@@ -194,7 +194,19 @@ baseline picks the change up.
 - The Admin CP loads no theme stylesheet at all, so a control the plugin adds there has
   nowhere to be styled from except `plugin/root/jscripts/events/events-admin.css`, linked
   as `../jscripts/events/` the same way the datepicker's sheet is. `events.css` is a theme
-  stylesheet and never reaches the Admin CP.
+  stylesheet and never reaches the Admin CP. That sheet goes into `$page->extra_header`
+  from the module dispatcher, for every action - not echoed into the body beside the
+  controls it styles, the way the datepicker's and the tag field's are. It sizes the
+  description box, and sceditor builds the editor at whatever size that box has resolved
+  to when the page is ready, so a stylesheet still arriving further down the body is a
+  race with that measurement.
+
+- MyBB's Admin CP stylesheet sets every `textarea` to a flat `width: 400px`. Anything the
+  plugin renders there that has to be bigger than a signature box has to say so itself,
+  and where the box is bound to an editor, so does the editor: sceditor copies the
+  textarea's rendered size once, at init. At 400px its toolbar wrapped onto three rows
+  and left a 7px editing area - which reads as a broken editor rather than as a narrow
+  one. `tests/e2e/admin-events.spec.ts` asserts the editor fills its cell.
 
 - The region X and the Add Region button are ordinary links to a confirmation page that
   asks the same questions and posts the same fields; the dialog is an enhancement that

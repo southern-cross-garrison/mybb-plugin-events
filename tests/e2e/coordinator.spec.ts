@@ -194,7 +194,9 @@ test.describe('attendance sheet days', () => {
     await page.goto(`/event.php?id=${eventId}&action=attendance`);
 
     await expect(page.locator('#attendance_table .attendee_days')).toHaveCount(0);
-    await expect(page.locator('#attendance_table thead th')).toHaveCount(8);
+    // Six columns of identity plus the three the contact row lays over them.
+    await expect(page.locator('#attendance_table thead .attendance_identity_head th')).toHaveCount(6);
+    await expect(page.locator('#attendance_table thead .attendance_contact_head th')).toHaveCount(3);
     // The Legion ID column is named for the Legion, not for one costume's prefix.
     await expect(page.locator('#attendance_table thead th.attendee_tkid')).toHaveText('Legion ID');
   });
@@ -213,7 +215,10 @@ test.describe('attendance sheet', () => {
     await expect(page.locator('#attendance_event_title')).toHaveText('Attendance Troop');
     await expect(page.locator('tr.attendee_row')).toHaveCount(2);
 
-    const row = page.locator('tr.attendee_row').filter({ hasText: 'trooper1' });
+    // A person is two rows - who they are, then how to reach them - so the lookup is the
+    // <tbody> that holds the pair, not either row on its own.
+    const row = page.locator('tbody.attendee_group').filter({ hasText: 'trooper1' });
+    await expect(row.locator('.attendee_preferred_name')).toHaveText('Ash');
     await expect(row.locator('.attendee_tkid')).toHaveText('TK-20001');
     await expect(row.locator('.attendee_mobile')).toHaveText('0400 000 002');
     await expect(row.locator('.attendee_emergency')).toHaveText('Kin Trooper 0400 111 002');
@@ -260,7 +265,7 @@ test.describe('attendance sheet', () => {
     await loginAs(page, 'gec');
     await page.goto(`/event.php?id=${eventId}&action=attendance`);
 
-    await expect(page.locator('tr.attendee_row .attendee_mobile')).toHaveText('0411 111 111');
+    await expect(page.locator('tr.attendee_row_contact .attendee_mobile')).toHaveText('0411 111 111');
   });
 });
 

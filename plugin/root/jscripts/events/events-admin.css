@@ -166,3 +166,28 @@ a.events_region_add:focus {
 .events_modal_submit {
 	font-weight: bold;
 }
+
+/* ------------------------------------------------- the description box ----- */
+
+/* MyBB's Admin CP stylesheet gives every textarea a flat `width: 400px`, whatever it is
+   for and however wide the screen is. On a signature box that is a fair guess; on an
+   event's description - BBCode that becomes the announcement thread - it is a porthole.
+   It is also not just the box: sceditor builds the editor at whatever size the textarea
+   it binds to has resolved to, so those 400px were the whole editor, and at that width
+   the toolbar wrapped onto three rows and took all but 7px of the height with it.
+   Widening the box is therefore what widens the editor, and the rows attribute is what
+   sets its height - see events_admin_edit_event(). */
+textarea.events_admin_description {
+	box-sizing: border-box;
+	width: 100%;
+}
+
+/* The editor that replaces it. sceditor writes the measured width onto the container as
+   an inline style, which is right at the moment it is taken and wrong the moment the
+   window is resized - so the container is told to follow its cell instead. Width only:
+   the height is sceditor's to manage, and overriding it would fight the maximise button.
+   `auto` rather than 100%, because the container is a block and its cell is what it is
+   being asked to fill. */
+.sceditor-container {
+	width: auto !important;
+}

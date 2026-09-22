@@ -21,7 +21,7 @@
  * there is to show.
  *
  * Do not run scripts/db-snapshot.sh after seeding. The snapshot is a plain dump, so it
- * would bake fourteen demo events, eighteen demo members and their announcement threads
+ * would bake sixteen demo events, eighteen demo members and their announcement threads
  * into the baseline that every later e2e run starts from - where they are not fixtures the
  * suite knows about, but rows its assertions have to compete with. Run
  * scripts/db-restore.sh first if a snapshot is needed.
@@ -974,6 +974,52 @@ foreach(array('RaySutton', 'TeganMoss', 'wrangler') as $username)
     demo_signup($id, $username, array('roles' => array('wrangler')));
 }
 note('wranglers only, no troopers', $id);
+
+// 15. A second WWCC event, so the gate is not something the demo shows only once - and
+//     this one is open for signups now, where the ward visit is close enough to its date
+//     that it reads as already settled.
+$id = demo_event(array(
+    'title'         => 'Riverstone Public School Book Week Parade',
+    'region'        => 'Sydney',
+    'address'       => 'Elizabeth St, Riverstone NSW 2765',
+    'description'   => "Marching in the Book Week parade and posing for photos with the classes afterwards.\n\n"
+                     . "[b]A current WWCC is required[/b] - the school collects numbers before the day.\n\n"
+                     . "Assembly is on the oval, so expect grass and a bit of dust. Helmets off for the"
+                     . " classroom visits at the end.",
+    'start_date'    => demo_at(20, '09:00:00'),
+    'end_date'      => demo_at(20, '12:30:00'),
+    'requires_wwcc' => 1,
+    'days'          => demo_days(20, 20, '09:00:00', '12:30:00'),
+));
+foreach(array('CarloRen', 'EliTanaka', 'JadeNkemdi') as $username)
+{
+    demo_signup($id, $username);
+}
+demo_signup($id, 'RaySutton', array('roles' => array('wrangler')));
+note('WWCC required, signups open now', $id);
+
+// 16. The Easter Show's shape at a tenth of the size: multi-day, mixed day selection, a
+//     wrangler - but a roster small enough that the attendance sheet and the per-day
+//     counts can be read at a glance rather than scrolled through.
+$id = demo_event(array(
+    'title'       => 'Penrith Pop Culture Fair',
+    'region'      => 'Sydney',
+    'address'     => 'Penrith Panthers, 123 Mulgoa Rd, Penrith NSW 2750',
+    'description' => "A two day suburban con - one hall, one photo backdrop, and a much quieter weekend than"
+                   . " the Show.\n\n[b]Shift pattern:[/b] two hours on, one hour off, same as always.\n\n"
+                   . "Pick only the days you can actually make - the roster is built from what you select here.",
+    'start_date'  => demo_at(42, '10:00:00'),
+    'end_date'    => demo_at(43, '16:00:00'),
+    'days'        => demo_days(42, 43, '10:00:00', '16:00:00'),
+));
+demo_signup($id, 'GusHolloway');
+demo_signup($id, 'LenaBauer', array('days' => array(0)));
+demo_signup($id, 'MarcusHale', array('days' => array(1)));
+demo_signup($id, 'NadiaFarrow');
+demo_signup($id, 'OscarBright', array('days' => array(0)));
+demo_signup($id, 'PiaSolano', array('days' => array(1)));
+demo_signup($id, 'TeganMoss', array('roles' => array('wrangler')));
+note('6 troopers + 1 wrangler, mixed days', $id);
 
 // ---------------------------------------------------------------------------
 
