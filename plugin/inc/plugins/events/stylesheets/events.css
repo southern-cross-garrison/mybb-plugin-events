@@ -33,6 +33,10 @@
  * its own - see the note on .events_select below for why those rules need to be written
  * under .events_page_wrap.
  *
+ * --events-notice and --events-notice-border are the fill and the left rule of a caution
+ * box, defaulting to an amber a light theme reads as "check this" without the alarm of a
+ * red. A theme with a warning colour of its own names both.
+ *
  * The fallbacks are deliberately written at each use site rather than as defaults in a
  * :root block here. This stylesheet is installed last in the display order, so a :root
  * block would out-order the theme's own and the override would silently never apply.
@@ -288,6 +292,32 @@
 	background-size: 11px 11px;
 }
 .events_select:focus { border-color: var(--events-accent, #2f6f9f); outline: none; }
+
+/* ---------------------------------------------------------------------------
+ * Notice
+ *
+ * A caution that has to be read before the thing under it is acted on. The troop
+ * report's is the one that exists: the draft roster is built from the signup sheet, so
+ * it reads as a record of who was there when it is in fact a record of who said they
+ * would be.
+ *
+ * Tinted and rule-marked rather than set in a colour of its own: the theme owns the text
+ * colour on these pages, and a notice that named one would be the single element on the
+ * page that did not follow a retheme. Both tints are custom properties for the same
+ * reason every other colour here is.
+ * ------------------------------------------------------------------------ */
+.events_notice {
+	margin: 0;
+	padding: 10px 14px;
+	line-height: 1.45;
+	background: var(--events-notice, rgba(212, 160, 23, 0.13));
+	border-left: 4px solid var(--events-notice-border, #d4a017);
+	border-radius: 3px;
+}
+
+/* The sentence the notice sits under, which is ordinary instruction rather than part of
+   the box - so it keeps its own spacing and the notice does not inherit the gap. */
+.troop_report_intro { margin: 0 0 12px; }
 
 /* ---------------------------------------------------------------------------
  * Form controls
