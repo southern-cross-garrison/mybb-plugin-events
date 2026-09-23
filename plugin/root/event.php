@@ -58,7 +58,8 @@ if($action === 'attendance')
 
     // Fetched a role at a time rather than sorted in SQL: MySQL orders ENUMs by their
     // declaration ordinal, which only matches alphabetical order here by coincidence.
-    // Troopers first, then the people who are only wrangling.
+    // The order the two come back in does not matter here - the sheet is sorted by name
+    // below, once the two roles have been folded into one row per person.
     $signups = array_merge(
         events_get_attendees($event_id, array('day' => $filter_day, 'role' => 'trooper')),
         events_get_attendees($event_id, array('day' => $filter_day, 'role' => 'wrangler'))
@@ -97,6 +98,16 @@ if($action === 'attendance')
     }
     $attendees = array_values($attendees);
 
+    // Sorted by the name that will be called out rather than by the forum handle beside
+    // it: the sheet is read down while people are ticked off at a staging area, and a
+    // roll called in username order is a roll called in an order nobody present knows.
+    //
+    // Somebody with the field empty sorts under their username, which is the only other
+    // name the sheet has for them - blanks gathered at one end would be exactly the rows
+    // that are hardest to find. The username also breaks ties, so two people who go by
+    // the same name keep a stable order between loads rather than swapping places.
+    usort($attendees, 'events_compare_by_preferred_name');
+
     $attendance_day_heading = '';
     $attendance_day_filter = '';
 
@@ -131,8 +142,8 @@ if($action === 'attendance')
     // The Days column only exists for an event that has days to list, so the header is
     // built here rather than sitting static in the template.
     $attendance_identity_columns = array(
-        'attendee_username'       => 'Username',
         'attendee_preferred_name' => 'Preferred Name',
+        'attendee_username'       => 'Username',
         'attendee_role'           => 'Role',
         'attendee_tkid'           => 'Legion ID',
     );
@@ -189,8 +200,8 @@ if($action === 'attendance')
         // the live page, so its state goes with it. It spans both rows for the same reason
         // the number does: one person, one tick.
         $attendees_rows .= '<td class="attendee_num" rowspan="2">' . $position . '</td>';
-        $attendees_rows .= '<td class="attendee_username">' . htmlspecialchars_uni($attendee['username']) . '</td>';
         $attendees_rows .= '<td class="attendee_preferred_name">' . htmlspecialchars_uni($attendee['preferred_name']) . '</td>';
+        $attendees_rows .= '<td class="attendee_username">' . htmlspecialchars_uni($attendee['username']) . '</td>';
         $attendees_rows .= '<td class="attendee_role">'
             . htmlspecialchars_uni(implode(' / ', array_map('events_role_label', array_unique($attendee['roles'])))) . '</td>';
         $attendees_rows .= '<td class="attendee_tkid">' . htmlspecialchars_uni($attendee['tk_id']) . '</td>';

@@ -1326,6 +1326,28 @@ function events_get_attendees($event_id, array $filters = array())
 }
 
 /**
+ * usort() comparator putting attendees in the order a roll is called: by the name the
+ * person answers to, with their username standing in when they have not given one and
+ * breaking ties when two of them go by the same thing.
+ *
+ * Case-insensitive, because the field is free text and a member who typed their name in
+ * lower case should not sort into a block of their own below everybody else.
+ *
+ * @param array $a
+ * @param array $b
+ * @return int
+ */
+function events_compare_by_preferred_name(array $a, array $b)
+{
+    $a_name = trim($a['preferred_name']) !== '' ? $a['preferred_name'] : $a['username'];
+    $b_name = trim($b['preferred_name']) !== '' ? $b['preferred_name'] : $b['username'];
+
+    $compared = strcasecmp($a_name, $b_name);
+
+    return $compared !== 0 ? $compared : strcasecmp($a['username'], $b['username']);
+}
+
+/**
  * Format a stored datetime for display using the board's configured formats.
  *
  * @param string $date

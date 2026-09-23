@@ -940,16 +940,16 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
    otherwise shift. */
 #attendance_table { table-layout: fixed; }
 #attendance_table .attendance_identity_head .attendee_num { width: 5%; }
-#attendance_table .attendance_identity_head .attendee_username { width: 22%; }
-#attendance_table .attendance_identity_head .attendee_preferred_name { width: 21%; }
+#attendance_table .attendance_identity_head .attendee_preferred_name { width: 22%; }
+#attendance_table .attendance_identity_head .attendee_username { width: 21%; }
 #attendance_table .attendance_identity_head .attendee_role { width: 18%; }
 #attendance_table .attendance_identity_head .attendee_tkid { width: 24%; }
 #attendance_table .attendance_identity_head .attendee_attended { width: 10%; }
 
 /* Seven columns instead of six: everything gives a little back to make room for Days. */
 #attendance_table.has_days .attendance_identity_head .attendee_num { width: 4%; }
-#attendance_table.has_days .attendance_identity_head .attendee_username { width: 16%; }
 #attendance_table.has_days .attendance_identity_head .attendee_preferred_name { width: 16%; }
+#attendance_table.has_days .attendance_identity_head .attendee_username { width: 16%; }
 #attendance_table.has_days .attendance_identity_head .attendee_role { width: 17%; }
 #attendance_table.has_days .attendance_identity_head .attendee_tkid { width: 15%; }
 #attendance_table.has_days .attendance_identity_head .attendee_days { width: 22%; }
