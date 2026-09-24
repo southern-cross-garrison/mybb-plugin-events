@@ -11,8 +11,10 @@ test.describe('plugin installation', () => {
       'events_attendance',
       'events_calendar',
       'events_event',
+      'events_event_card',
       'events_event_form',
       'events_list',
+      'events_postbit',
       'events_rsvp_form',
       'events_rsvp_list',
       'events_rsvp_success',
@@ -27,7 +29,7 @@ test.describe('plugin installation', () => {
       `SELECT tid, attachedto FROM ${T('themestylesheets')} WHERE name = 'events.css'`,
     );
     expect(sheet?.tid).toBe(1);
-    expect(sheet?.attachedto).toBe('events.php|event.php|manage_event.php|rsvp.php|troop_report.php');
+    expect(sheet?.attachedto).toBe('events.php|event.php|manage_event.php|rsvp.php|troop_report.php|showthread.php');
 
     // A stylesheet missing from a theme's display order is silently never output, so
     // assert on the rendered page rather than just the row.

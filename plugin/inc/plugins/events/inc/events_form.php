@@ -423,6 +423,90 @@ function events_coordinator_choices($extra_uids = array())
 }
 
 /**
+ * Members who can be named as an event's point of contact.
+ *
+ * Anybody signed up to the event - in either role, since a wrangler is on the day as much
+ * as a trooper is - plus the extra user ids a form has to offer regardless: whoever is
+ * filling it in, who can always name themselves, and the event's existing point of contact,
+ * for the same reason events_coordinator_choices() keeps the existing coordinator. Somebody
+ * who has since withdrawn their signup stays named until the coordinator says otherwise,
+ * rather than being dropped by an unrelated edit.
+ *
+ * "Nobody" is not in the list; the forms offer it themselves as the first option.
+ *
+ * @param int $event_id 0 for an event not yet created, which has no signups
+ * @param array $extra_uids user ids to include whether or not they have signed up
+ * @return array uid => username, sorted by username
+ */
+function events_poc_choices($event_id, $extra_uids = array())
+{
+    global $db;
+
+    $conditions = array();
+
+    $event_id = (int)$event_id;
+    if($event_id)
+    {
+        $conditions[] = "uid IN (SELECT user_id FROM " . TABLE_PREFIX . "event_plugin_rsvps"
+            . " WHERE event_id = " . $event_id . " AND status = 'attending')";
+    }
+
+    $extra = array();
+    foreach((array)$extra_uids as $uid)
+    {
+        $uid = (int)$uid;
+        if($uid)
+        {
+            $extra[$uid] = $uid;
+        }
+    }
+
+    if(!empty($extra))
+    {
+        $conditions[] = "uid IN (" . implode(',', $extra) . ")";
+    }
+
+    if(empty($conditions))
+    {
+        return array();
+    }
+
+    $query = $db->simple_select("users", "uid, username", implode(' OR ', $conditions));
+
+    $users = array();
+    while($user = $db->fetch_array($query))
+    {
+        $users[(int)$user['uid']] = $user['username'];
+    }
+
+    // Sorted in PHP for the same collation reason as events_coordinator_choices().
+    uasort($users, 'strcasecmp');
+
+    return $users;
+}
+
+/**
+ * The point of contact select's options: nobody first, then everybody who may be named.
+ *
+ * Built here so both forms offer the same list under the same "nobody" value, which is
+ * what events_validate_event_input() reads as the field being left unset.
+ *
+ * @param array $event The event being edited, or empty when creating
+ * @return array uid => label, with 0 => 'None'
+ */
+function events_poc_options(array $event = array())
+{
+    global $mybb;
+
+    // The stored point of contact rather than the posted one, so a forged uid that failed
+    // validation does not earn itself a place on the list when the form comes back.
+    return array(0 => 'None') + events_poc_choices(
+        isset($event['id']) ? $event['id'] : 0,
+        array($mybb->user['uid'], isset($event['poc_user_id']) ? $event['poc_user_id'] : 0)
+    );
+}
+
+/**
  * Turn the exclusions field's comma separated list into a list of user ids.
  *
  * Accepts usernames and/or user ids. A token that matches nobody is reported through
@@ -557,6 +641,7 @@ function events_event_form_values(array $event = array())
             'signup_cutoff' => '',
             'requires_wwcc' => 0,
             'gec_user_id'   => (int)$mybb->user['uid'],
+            'poc_user_id'   => 0,
             'days'          => array(),
             'exclusions'    => '',
         );
@@ -595,6 +680,8 @@ function events_event_form_values(array $event = array())
         'signup_cutoff' => $cutoff,
         'requires_wwcc' => (int)$event['requires_wwcc'],
         'gec_user_id'   => (int)$event['gec_user_id'],
+        // Read defensively for the same reason as the address above.
+        'poc_user_id'   => isset($event['poc_user_id']) ? (int)$event['poc_user_id'] : 0,
         'days'          => $days,
         'exclusions'    => implode(', ', events_get_event_exclusion_names($event_id)),
     );
@@ -644,6 +731,7 @@ function events_event_form_input()
         'signup_cutoff' => events_posted_datetime('signup_cutoff'),
         'requires_wwcc' => $mybb->get_input('requires_wwcc', MyBB::INPUT_INT) ? 1 : 0,
         'gec_user_id'   => $mybb->get_input('gec_user_id', MyBB::INPUT_INT),
+        'poc_user_id'   => $mybb->get_input('poc_user_id', MyBB::INPUT_INT),
         'days'          => $days,
         'exclusions'    => $mybb->get_input('exclusions'),
     );
@@ -741,6 +829,15 @@ function events_validate_event_input(array $input, array $event = array())
         $errors[] = "Choose an event coordinator from the list.";
     }
 
+    // Optional, and a select box on both forms like the coordinator: 0 is "nobody", and
+    // anything else has to be somebody signed up to the event, the person saving it, or
+    // whoever it already names.
+    if((int)$input['poc_user_id'] !== 0
+        && !array_key_exists((int)$input['poc_user_id'], events_poc_options($event)))
+    {
+        $errors[] = "Choose a point of contact from the list: somebody signed up to the event, or yourself.";
+    }
+
     // The exclusions field only lets a real member be picked, so a name that matches
     // nobody has either been typed with the script off or mistyped into a form that was
     // then submitted without it. Either way the event is not saved excluding somebody who
@@ -807,6 +904,7 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
         'end_date'      => $db->escape_string(events_date('Y-m-d H:i:s', events_strtotime($input['end_date']))),
         'requires_wwcc' => $input['requires_wwcc'] ? 1 : 0,
         'gec_user_id'   => (int)$input['gec_user_id'],
+        'poc_user_id'   => (int)$input['poc_user_id'],
         'updated_at'    => $db->escape_string(events_date('Y-m-d H:i:s')),
     );
 

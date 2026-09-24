@@ -262,6 +262,23 @@ baseline picks the change up.
   need not have turned on - none of them is a subject line. If a fourth appears, check
   whether it leaks a subject before treating it the same way.
 
+- An announced event is read *in its thread*. `events_thread_postbit()` swaps the
+  `postbit`/`postbit_classic` templates for `events_postbit` while the thread's first post
+  is built and restores them straight after, because MyBB gives a plugin no way to replace
+  a post's output. Paging, anchors, quick reply and thread tools stay MyBB's own. The card
+  itself is `events_render_event_card()` (`events_event_card.php`), shared with `event.php`,
+  which now only renders it when `events_event_thread()` finds no thread the viewer can open
+  (pending drafts, no forum for the region, no forum access) and otherwise 302s to the thread.
+  Guests and anybody `events_can_view_event()` refuses get the generated first post, which
+  is also what Tapatalk shows, so that post must stay complete. Link to an event with
+  `events_event_url()`, not a hard-coded `event.php?id=`.
+
+- Because of that, `events.css` is attached to `showthread.php` and reaches *every* thread
+  on the board. Nothing in it may apply outside the plugin's own markup. The print rules
+  in particular are scoped to `body:has(.events_page_wrap)`: unscoped, they hide everything
+  that is not an event, so printing an ordinary thread would come out blank.
+  `event-threads.spec.ts` guards this.
+
 - Every date the plugin stores is a *wall clock* in the board's configured event timezone
   (the `events_timezone` setting, picked in Admin CP -> Event Management -> Settings). The
   columns carry no offset, so the zone is what gives them meaning, and the server's own

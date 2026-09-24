@@ -73,6 +73,20 @@
 @media (min-width: 1200px) { .events_page_wrap { max-width: var(--events-page-width, 1275px); } }
 
 /* ---------------------------------------------------------------------------
+ * In a thread
+ *
+ * An event thread's first post is the event card (see events_thread_postbit()), which
+ * sits in the theme's post list rather than on a page of its own. The post list already
+ * has the column's width and gutters, so the page frame's own are dropped, and the gap
+ * below it matches the space the theme leaves between posts.
+ * ------------------------------------------------------------------------ */
+.events_thread_event .events_page_wrap {
+	max-width: none;
+	padding: 0;
+	margin: 0 0 1.5rem;
+}
+
+/* ---------------------------------------------------------------------------
  * Filter toolbars
  *
  * The rows of links, dropdowns and submit buttons that sit above the list, the calendar
@@ -712,11 +726,12 @@ a.event_action_secondary:hover, a.event_action_secondary:focus { color: #333; }
 /* ---------------------------------------------------------------------------
  * Event page - the signup / coordinator action row
  * ------------------------------------------------------------------------ */
-#event_actions, #gec_controls .gec_actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#event_actions, #gec_controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 #event_actions { margin: 2px 0; }
 
-/* The coordinator block is a second table under the event's own, so it needs the gap. */
-#gec_controls { margin-top: 10px; }
+/* The coordinator's buttons share the bar, pushed to its far end so they never read as
+   part of signing up. */
+#gec_controls { margin-left: auto; }
 
 .event_action, a.event_action {
 	display: inline-block; padding: 8px 15px; border-radius: 4px; line-height: 1.2;
@@ -1001,28 +1016,34 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 @media print {
 	/* Hide everything that is neither the plugin's page nor an ancestor holding it in
 	 * the document. Naming a theme's own header, navigation and footer would not
-	 * survive the next theme - and this stylesheet is attached to the plugin's pages
-	 * only, so "everything except our page" is both exact and safe to say.
+	 * survive the next theme, so "everything except our page" is what gets said.
+	 *
+	 * Only on a page that has one. This sheet is also attached to showthread.php,
+	 * because an event is read in its thread, and there it reaches every thread on the
+	 * board: unscoped, printing any thread without an event on the page would come out
+	 * blank. The same goes for every rule in this block that names something other than
+	 * the plugin's own markup. On an event thread's first page it is the event that
+	 * prints - the replies are the thread's, and printthread.php is where those print.
 	 *
 	 * :has() is what makes the ancestor half of that expressible. A browser without it
 	 * throws the whole rule out as invalid and prints what it has always printed, so
 	 * the fallback is the old behaviour rather than a blank sheet.
 	 */
-	body *:not(:has(.events_page_wrap)):not(.events_page_wrap, .events_page_wrap *) {
+	body:has(.events_page_wrap) *:not(:has(.events_page_wrap)):not(.events_page_wrap, .events_page_wrap *) {
 		display: none !important;
 	}
 
 	/* The ancestors that survive are the theme's layout containers - a centred column,
 	   its padding, its background. Flattened, so the sheet starts at the paper's own
 	   margin instead of inside a 1275px column. */
-	body :has(.events_page_wrap) {
+	body:has(.events_page_wrap) :has(.events_page_wrap) {
 		display: block !important;
 		width: auto !important; max-width: none !important;
 		margin: 0 !important; padding: 0 !important;
 		border: 0 !important; background: none !important; box-shadow: none !important;
 	}
 
-	html, body { margin: 0; padding: 0; background: #fff; font-size: 10pt; }
+	html:has(.events_page_wrap), body:has(.events_page_wrap) { margin: 0; padding: 0; background: #fff; font-size: 10pt; }
 	.events_page_wrap { width: auto; max-width: none; margin: 0; padding: 0; }
 
 	/* Ink, not screen colour. !important because a theme's own sheet can load after this
@@ -1045,7 +1066,7 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 
 	/* Controls that can only do something in a browser. The status pills are not
 	   controls, so a printed event page still says what the reader signed up for. */
-	.no-print,
+	.events_page_wrap .no-print,
 	.events_toolbar,
 	.events_filter_form,
 	.event_action,
@@ -1130,9 +1151,9 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 
 	/* The plugin's other pages are built on MyBB's table classes, which carry the
 	   theme's panel colours. On paper they are just content. */
-	.tborder, .thead, .tcat, .trow1, .trow2 {
+	.events_page_wrap :is(.tborder, .thead, .tcat, .trow1, .trow2) {
 		background: none !important; color: #000 !important;
 		border-color: #000 !important;
 	}
-	table.tborder { border-collapse: collapse; width: 100%; }
+	.events_page_wrap table.tborder { border-collapse: collapse; width: 100%; }
 }

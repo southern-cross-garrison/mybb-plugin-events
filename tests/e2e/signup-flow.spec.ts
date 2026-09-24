@@ -84,6 +84,8 @@ test.describe('signup wizard', () => {
 
   test('asks a member with no profile details for every prerequisite and saves them', async ({ page }) => {
     const eventId = await createEvent({ title: 'Prerequisite Troop' });
+    // Two costumes, so there is a choice to make and the costumes step is not skipped.
+    await setUserField('newbie', 'costume', `${TK}\n${TD}`);
 
     await loginAs(page, 'newbie');
     await page.goto(`/rsvp.php?id=${eventId}`);
@@ -159,6 +161,8 @@ test.describe('signup wizard', () => {
   test('only asks for a WWCC when the event requires one', async ({ page }) => {
     const wwccEvent = await createEvent({ title: 'WWCC Troop', requiresWwcc: true });
     const openEvent = await createEvent({ title: 'Open Troop' });
+    // Two costumes, so there is a choice to make and the costumes step is not skipped.
+    await setUserField('nowwcc', 'costume', `${TK}\n${TD}`);
 
     await loginAs(page, 'nowwcc');
 
@@ -448,6 +452,43 @@ test.describe('signup wizard', () => {
     expect((await getUserField('trooper2', 'costume')).replace(/\r/g, '')).toBe(`${TK}\n${TD}`);
   });
 
+  test('skips the costumes step for a member with only one costume', async ({ page }) => {
+    const eventId = await createEvent({ title: 'One Costume Troop' });
+    await setUserField('trooper1', 'costume', TK);
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+    await page.locator('#rsvp_submit').click();
+
+    // Nothing to choose between, so straight to confirm with that costume already picked.
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'confirm');
+    await expect(page.locator('#confirm_costumes')).toHaveText(TK);
+
+    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_success_message')).toBeVisible();
+    expect(await getRsvpCostumes(eventId, 'trooper1')).toEqual([TK]);
+  });
+
+  test('skips the costumes step once a member enters a single costume as a prerequisite', async ({ page }) => {
+    const eventId = await createEvent({ title: 'First Costume Troop' });
+    await setUserField('trooper2', 'costume', '');
+
+    await loginAs(page, 'trooper2');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+    await page.locator('#rsvp_submit').click();
+
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
+    await page.locator('#prereq_costume').fill(TK);
+    await page.locator('#rsvp_submit').click();
+
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'confirm');
+    await expect(page.locator('#confirm_costumes')).toHaveText(TK);
+
+    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_success_message')).toBeVisible();
+    expect(await getRsvpCostumes(eventId, 'trooper2')).toEqual([TK]);
+  });
+
   test('falls back to the wrangle-instead way out when no costume field is mapped', async ({ page }) => {
     // With no profile field behind them, costumes cannot be asked for as a prerequisite -
     // there is nowhere to save the answer - so the costumes step is reached empty and the
@@ -506,16 +547,18 @@ test.describe('signup wizard', () => {
     const eventId = await createEvent({ title: 'Retired Costume Troop' });
     await createRsvp(eventId, 'trooper1', { costumes: [TK, TD] });
 
-    await setUserField('trooper1', 'costume', TK);
+    // TD retired, TB added - two left, so the costumes step is still shown.
+    await setUserField('trooper1', 'costume', `${TK}\n${TB}`);
 
     await loginAs(page, 'trooper1');
     await page.goto(`/rsvp.php?id=${eventId}`);
     await page.locator('#rsvp_submit').click();
 
-    // Only the costume still on file is offered, and it is the one already ticked.
+    // Only the costumes still on file are offered, and only the one held is ticked.
     await expect(page.locator('#rsvp_page[data-rsvp-step="costumes"]')).toBeVisible();
-    await expect(page.locator('input.costume_checkbox')).toHaveCount(1);
+    await expect(page.locator('input.costume_checkbox')).toHaveCount(2);
     await expect(page.locator(`input.costume_checkbox[value="${TK}"]`)).toBeChecked();
+    await expect(page.locator(`input.costume_checkbox[value="${TB}"]`)).not.toBeChecked();
 
     await page.locator('#rsvp_submit').click();
     await page.locator('#rsvp_submit').click();

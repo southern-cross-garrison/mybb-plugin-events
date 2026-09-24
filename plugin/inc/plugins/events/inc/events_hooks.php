@@ -18,8 +18,32 @@ function events_register_hooks()
 {
     global $plugins;
 
+    global $templatelist;
+
     $plugins->add_hook("pre_output_page", "events_nav_menu");
+
+    // An event is read in its announcement thread, with the event card standing in for the
+    // thread's first post - see events_thread_postbit().
     $plugins->add_hook("showthread_start", "events_thread_display");
+    $plugins->add_hook("postbit", "events_thread_postbit");
+    $plugins->add_hook("showthread_linear", "events_restore_postbit_templates");
+    $plugins->add_hook("showthread_threaded", "events_restore_postbit_templates");
+
+    // This runs while global.php is including plugins, which is before it caches the
+    // page's templates - so the card's templates can join showthread's own batch rather
+    // than costing a query each on every event thread.
+    if(defined('THIS_SCRIPT') && THIS_SCRIPT === 'showthread.php' && isset($templatelist))
+    {
+        $templatelist .= ',events_postbit,events_event_card,events_rsvp_list';
+    }
+
+    // Opening an event thread from a listing goes to the top of it, where the event is,
+    // rather than to the first unread reply. Priority 20 so it runs after Smart Thread
+    // Link, whose value it overrides.
+    $plugins->add_hook("forumdisplay_thread_end", "events_thread_link_to_start", 20);
+    $plugins->add_hook("search_results_thread", "events_thread_link_to_start", 20);
+    $plugins->add_hook("usercp_thread_subscriptions_thread", "events_thread_link_to_start", 20);
+    $plugins->add_hook("usercp_latest_threads_thread", "events_thread_link_to_start", 20);
 
     // Keeping an event's announcement thread away from a member excluded from that event.
     // MyBB has no per-thread permission, so there is no single place to say "not for you"
@@ -424,13 +448,170 @@ function events_nav_menu(&$page)
 }
 
 /**
- * Expose the linked event (if any) to threads, so other code/templates can use it.
+ * Find the event a thread announces, when this member may see it.
+ *
+ * $event_info stays exposed for templates, as it always has been. The event card is only
+ * rendered for a member who could open the event itself: a guest, or anybody else
+ * events_can_view_event() turns away, reads the thread's own first post - the generated
+ * announcement - which says the same things in BBCode. That post is also what Tapatalk
+ * and the other clients that read posts rather than pages keep showing, which is why it
+ * is still written and kept up to date.
+ *
+ * Hooks: showthread_start
  */
 function events_thread_display()
 {
     global $tid, $db, $event_info;
 
     $event_info = $db->fetch_array($db->simple_select("event_plugin_events", "*", "thread_id = " . (int)$tid));
+
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
+
+    events_thread_event(!empty($event_info) && events_can_view_event($event_info) ? $event_info : null);
+}
+
+/**
+ * The event whose card replaces this thread's first post, if any.
+ *
+ * @param array|null $event Set by events_thread_display(); omitted to read it back
+ * @return array|null
+ */
+function events_thread_event($event = false)
+{
+    static $current = null;
+
+    if($event !== false)
+    {
+        $current = $event;
+    }
+
+    return $current;
+}
+
+/**
+ * Render an event thread's first post as the event card.
+ *
+ * MyBB builds each post from the postbit template (or postbit_classic) after this hook
+ * has run, and gives a plugin no way to replace what comes out. So for the one post that
+ * is the announcement, the two postbit templates are swapped for events_postbit - which
+ * is the card and the post's #pid anchor, and none of the post furniture around it - and
+ * swapped back before the next post is built. Everything else about the thread is MyBB's
+ * own: the replies, the paging (the card counts as the first post, the way the
+ * announcement it stands in for does), quick reply and the thread tools.
+ *
+ * Only in showthread.php, and only for the post that is the thread's first. A first post
+ * that is unapproved or soft-deleted keeps MyBB's own treatment, so a moderator still
+ * sees it for what it is.
+ *
+ * Hooks: postbit
+ *
+ * @param array $post
+ * @return array
+ */
+function events_thread_postbit(&$post)
+{
+    global $thread, $templates;
+
+    events_restore_postbit_templates();
+
+    $event = events_thread_event();
+    if(empty($event) || !defined('THIS_SCRIPT') || THIS_SCRIPT !== 'showthread.php' || empty($thread['firstpost']))
+    {
+        return $post;
+    }
+
+    if((int)$post['pid'] !== (int)$thread['firstpost'] || (isset($post['visible']) && (int)$post['visible'] !== 1))
+    {
+        return $post;
+    }
+
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_event_card.php";
+
+    $post['events_card'] = events_render_event_card($event, (int)$thread['tid']);
+
+    // get() fills the cache as a side effect; the cache holds the raw template, which is
+    // what get() reads back for postbit below.
+    $templates->get('events_postbit');
+    events_swap_postbit_templates($templates->cache['events_postbit']);
+
+    return $post;
+}
+
+/**
+ * Stand a template in for postbit and postbit_classic, remembering what was there.
+ *
+ * @param string $template Raw template body
+ */
+function events_swap_postbit_templates($template)
+{
+    global $templates, $events_postbit_saved;
+
+    $events_postbit_saved = array();
+    foreach(array('postbit', 'postbit_classic') as $title)
+    {
+        $events_postbit_saved[$title] = isset($templates->cache[$title]) ? $templates->cache[$title] : null;
+        $templates->cache[$title] = $template;
+    }
+}
+
+/**
+ * Put postbit and postbit_classic back after events_swap_postbit_templates().
+ *
+ * A template that had not been cached before the swap is dropped rather than set, so the
+ * next get() fetches the real one.
+ *
+ * Hooks: showthread_linear, showthread_threaded (and called from events_thread_postbit())
+ */
+function events_restore_postbit_templates()
+{
+    global $templates, $events_postbit_saved;
+
+    if(empty($events_postbit_saved))
+    {
+        return;
+    }
+
+    foreach($events_postbit_saved as $title => $template)
+    {
+        if($template === null)
+        {
+            unset($templates->cache[$title]);
+        }
+        else
+        {
+            $templates->cache[$title] = $template;
+        }
+    }
+
+    $events_postbit_saved = null;
+}
+
+/**
+ * Link an event thread to its start rather than to the first unread post.
+ *
+ * The event is the thread's first post, so that is what a member opening the thread
+ * from a listing is after - somebody checking who is going or signing up should not land
+ * three pages in on the latest reply. The garrison theme links threads through Smart
+ * Thread Link's {$thread['smartlink']}, which is the value this overrides.
+ *
+ * Hooks: forumdisplay_thread_end, search_results_thread,
+ *        usercp_thread_subscriptions_thread, usercp_latest_threads_thread
+ */
+function events_thread_link_to_start()
+{
+    global $thread;
+
+    if(empty($thread['tid']))
+    {
+        return;
+    }
+
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
+
+    if(in_array((int)$thread['tid'], events_announcement_thread_ids(), true))
+    {
+        $thread['smartlink'] = get_thread_link((int)$thread['tid']);
+    }
 }
 
 /**

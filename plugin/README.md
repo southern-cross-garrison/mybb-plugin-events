@@ -26,6 +26,10 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 - **iCal Export**: Export events to calendar applications
 - **Forum Announcements**: Every live event gets a generated thread in the forums, in the
   forum configured for its region, rewritten whenever the event changes
+- **Events Are Threads**: An announced event is read in its thread - members see the event
+  card in place of the first post, with the discussion as ordinary replies beneath it. The
+  list, the calendar and `event.php` all lead there; guests and Tapatalk see the generated
+  post instead
 - **Board Navigation**: Takes over MyBB's Calendar menu item, and only shows the Events
   link to members who can open the events page
 
@@ -252,8 +256,8 @@ archived event keeps its thread.
 
 ### Editing an Event
 
-The same form edits. From the front end it is "Edit Event" under Coordinator Controls on
-the event page (`manage_event.php?id=N`); from the Admin CP it is the Edit action on the
+The same form edits. From the front end it is "Edit Event" on the action bar at the
+foot of the event (`manage_event.php?id=N`); from the Admin CP it is the Edit action on the
 event list. A coordinator can change anything about an event including its status, so
 taking an event live, correcting a date or adding a day never needs Admin CP access.
 
@@ -429,13 +433,13 @@ GECs can manage events and RSVPs directly from the event page (no Admin CP acces
    - Filter by costume or day as needed
 
 2. **Attendance Sheets**:
-   - Click "View Attendance Sheet" in the Coordinator Controls section
+   - Click "View Attendance Sheet" on the action bar at the foot of the event
    - A print-friendly page will display with all attendee information
    - Use browser print function (Ctrl+P / Cmd+P) to print or save as PDF
 
 3. **Event Management**:
    - Create an event from the "Create Event" button on the events listing
-   - Edit one, including its status, from "Edit Event" in the Coordinator Controls
+   - Edit one, including its status, from "Edit Event" on the same bar
    - Admins can do the same in Admin CP → Event Management → Events, which additionally
      deletes events
 

@@ -212,6 +212,14 @@ $manage_details .= events_form_field(
     true
 );
 
+$manage_details .= events_form_field(
+    'event_form_poc_user_id',
+    'Point of Contact',
+    events_form_select('poc_user_id', 'event_form_poc_user_id', events_poc_options($event), $values['poc_user_id'], true),
+    'Optional. Who attendees should contact about the event - yourself, or anybody signed up to it.'
+        . ' Shown on the event page.'
+);
+
 // ---------------------------------------------------------------------------
 // Event days
 //

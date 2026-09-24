@@ -67,6 +67,8 @@ test.describe('coordinator controls on the event page', () => {
     await loginAs(page, 'gec');
     await page.goto(`/event.php?id=${eventId}`);
     await expect(page.locator('#gec_controls')).toBeVisible();
+    // On the card's own action bar, not a block of their own under it.
+    await expect(page.locator('#event_actions #gec_controls')).toBeVisible();
 
     await expect(page.locator('li.rsvp_row')).toHaveCount(2);
     const trooper1Row = page.locator('li.rsvp_row').filter({ hasText: 'trooper1' });
@@ -174,6 +176,22 @@ test.describe('attendance sheet days', () => {
       'Saturday (Trooping)',
       'Sunday (Wrangling)',
     ]);
+  });
+
+  test('labels the point of contact by that rather than by their signup role', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Contact Sheet Troop', pointOfContact: 'trooper1' });
+    await createRsvp(eventId, 'trooper1');
+    await createRsvp(eventId, 'trooper1', { role: 'wrangler' });
+    await createRsvp(eventId, 'trooper2');
+
+    await loginAs(page, 'gec');
+    await page.goto(`/event.php?id=${eventId}&action=attendance`);
+
+    // Replaces the role outright, mixed signup or not; everybody else keeps theirs.
+    const role = (username: string) =>
+      page.locator(`tr.attendee_row:has(.attendee_username:text-is("${username}")) .attendee_role`);
+    await expect(role('trooper1')).toHaveText('Point of Contact');
+    await expect(role('trooper2')).toHaveText('Trooper');
   });
 
   test('answers the day filter with that day, not the rest of the signup', async ({ page }) => {

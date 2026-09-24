@@ -11,9 +11,9 @@
  * Steps: attendance -> prerequisites -> costumes -> confirm. Attendance comes first
  * because it decides the rest of the sequence: the TK ID is only a prerequisite once a
  * day is being trooped, and the costumes step does not exist for a signup that is
- * wrangling throughout. Each step POSTs the accumulated selections forward as hidden
- * inputs, so nothing is lost between steps and the flow survives a refresh or a back
- * button.
+ * wrangling throughout, or for a member with only one costume to pick. Each step POSTs
+ * the accumulated selections forward as hidden inputs, so nothing is lost between steps
+ * and the flow survives a refresh or a back button.
  *
  * The same wizard is the edit form. Re-opening it pre-selects whatever the member
  * already holds, and confirming rewrites it - which is how somebody adds wrangling to a
@@ -276,10 +276,19 @@ if(!in_array('trooper', $roles, true))
     $selected_costumes = array();
 }
 
+// A member with a single costume has no choice to make, so the costumes step is skipped
+// and that costume is simply what they are trooping in. Worked out again once the
+// prerequisites step has saved, since that is where a member with none types theirs in.
+$costume_choice = count($user_costumes) !== 1;
+if(!$costume_choice && in_array('trooper', $roles, true))
+{
+    $selected_costumes = $user_costumes;
+}
+
 $errors = array();
 $render = 'attendance';
 $missing = events_check_prerequisites($event, null, $roles);
-$steps = events_signup_steps($roles, $missing);
+$steps = events_signup_steps($roles, $missing, $costume_choice);
 
 if($mybb->request_method === 'post')
 {
@@ -307,7 +316,7 @@ if($mybb->request_method === 'post')
         }
         else
         {
-            $render = events_signup_next_step('attendance', $roles, $missing);
+            $render = events_signup_next_step('attendance', $roles, $missing, $costume_choice);
         }
     }
     elseif($submitted === 'prerequisites')
@@ -328,6 +337,11 @@ if($mybb->request_method === 'post')
         // step that follows would be built from the empty list the member arrived with and
         // send them to the User CP for costumes they have just this moment typed in.
         $user_costumes = events_get_user_costumes($mybb->user['uid']);
+        $costume_choice = count($user_costumes) !== 1;
+        if(!$costume_choice && in_array('trooper', $roles, true))
+        {
+            $selected_costumes = $user_costumes;
+        }
 
         $missing = events_check_prerequisites($event, null, $roles);
         if(!empty($missing))
@@ -339,7 +353,7 @@ if($mybb->request_method === 'post')
         {
             // Saving the values is what removed this step from the sequence, so the
             // question is what follows attendance now, not what follows prerequisites.
-            $render = events_signup_next_step('attendance', $roles, $missing);
+            $render = events_signup_next_step('attendance', $roles, $missing, $costume_choice);
         }
     }
     elseif($submitted === 'costumes')
@@ -351,7 +365,7 @@ if($mybb->request_method === 'post')
         }
         else
         {
-            $render = events_signup_next_step('costumes', $roles, $missing);
+            $render = events_signup_next_step('costumes', $roles, $missing, $costume_choice);
         }
     }
     elseif($submitted === 'confirm')
@@ -390,7 +404,7 @@ if($mybb->request_method === 'post')
         }
     }
 
-    $steps = events_signup_steps($roles, $missing);
+    $steps = events_signup_steps($roles, $missing, $costume_choice);
 }
 
 // ---------------------------------------------------------------------------

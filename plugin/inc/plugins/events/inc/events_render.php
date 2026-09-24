@@ -684,7 +684,7 @@ function events_calendar_grid($month_start, array $events, array $user_rsvps)
             foreach($by_date[$date] as $event)
             {
                 $class = in_array($event['id'], $user_rsvps) ? 'calendar_event rsvped' : 'calendar_event';
-                $content .= '<a class="' . $class . '" data-event-id="' . (int)$event['id'] . '" href="event.php?id=' . (int)$event['id'] . '">'
+                $content .= '<a class="' . $class . '" data-event-id="' . (int)$event['id'] . '" href="' . events_event_url($event) . '">'
                           . htmlspecialchars_uni($event['title']) . '</a>';
 
                 // The address sits under the event rather than inside its link, because a
@@ -723,11 +723,17 @@ function events_calendar_grid($month_start, array $events, array $user_rsvps)
  * being trooped. Attendance therefore always comes first and is always shown - it is
  * where the member chooses what they are signing up to.
  *
+ * A member with exactly one costume on file has nothing to choose, so the costumes step
+ * is dropped for them too - the wizard selects that costume itself and the confirm step
+ * shows it. A member with none still gets the step, because that is where they are told
+ * how to get past having no costume.
+ *
  * @param array $roles The roles the signup currently holds
  * @param array $missing Prerequisite fields still missing for those roles
+ * @param bool $costume_choice Whether the member has more than one costume to pick from
  * @return array
  */
-function events_signup_steps(array $roles, array $missing)
+function events_signup_steps(array $roles, array $missing, $costume_choice = true)
 {
     $steps = array('attendance');
 
@@ -736,7 +742,7 @@ function events_signup_steps(array $roles, array $missing)
         $steps[] = 'prerequisites';
     }
 
-    if(in_array('trooper', $roles, true))
+    if(in_array('trooper', $roles, true) && $costume_choice)
     {
         $steps[] = 'costumes';
     }
@@ -757,12 +763,13 @@ function events_signup_steps(array $roles, array $missing)
  * @param string $step
  * @param array $roles
  * @param array $missing
+ * @param bool $costume_choice
  * @return string
  */
-function events_signup_next_step($step, array $roles, array $missing)
+function events_signup_next_step($step, array $roles, array $missing, $costume_choice = true)
 {
     $order = array('attendance', 'prerequisites', 'costumes', 'confirm');
-    $applicable = events_signup_steps($roles, $missing);
+    $applicable = events_signup_steps($roles, $missing, $costume_choice);
 
     $index = array_search($step, $order, true);
     if($index === false)

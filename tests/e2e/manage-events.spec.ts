@@ -124,7 +124,9 @@ test.describe('front-end event management', () => {
     await submitEventForm(page);
 
     await expect(page.locator('#event_page')).toBeVisible();
-    const eventId = Number(new URL(page.url()).searchParams.get('id'));
+    // Off the card rather than the URL, which names the announcement thread once the
+    // event is live.
+    const eventId = Number(await page.locator('#event_page').getAttribute('data-event-id'));
     expect((await getEvent(eventId)).address).toBe('1 Showground Rd, Sydney Olympic Park NSW 2127');
 
     const link = page.locator('#event_address a');
@@ -735,6 +737,83 @@ test.describe('front-end event management', () => {
       await button.hover();
       await expect(button).toHaveCSS('color', expected);
     }
+  });
+
+  test('the point of contact is chosen from the event\'s signups or the coordinator themselves', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Contact Troop', coordinator: 'gec' });
+    await createRsvp(eventId, 'trooper1');
+    await createRsvp(eventId, 'wrangler', { role: 'wrangler' });
+
+    await loginAs(page, 'gec');
+    await page.goto(`/event.php?id=${eventId}`);
+
+    // Optional, and unset: the page says nothing about it rather than naming nobody.
+    await expect(page.locator('#event_page')).toBeVisible();
+    await expect(page.locator('#event_poc')).toHaveCount(0);
+    await expect(page.locator('#event_meta')).not.toContainText('Point of Contact');
+
+    await page.goto(`/manage_event.php?id=${eventId}`);
+
+    // Both roles are on the day, so both are offered. Members who have not signed up -
+    // trooper2, newbie - are not, and neither is anybody else from the coordinator groups.
+    const select = page.locator('#event_form_poc_user_id');
+    await expect(select.locator('option')).toHaveText(['None', 'gec', 'trooper1', 'wrangler']);
+    await expect(select).toHaveValue('0');
+
+    await select.selectOption({ label: 'trooper1' });
+    await submitEventForm(page);
+
+    await expect(page.locator('#event_poc')).toHaveText('trooper1');
+    await expect(page.locator('#event_poc a')).toHaveAttribute('href', new RegExp(`uid=${uid('trooper1')}`));
+    expect(Number((await getEvent(eventId)).poc_user_id)).toBe(uid('trooper1'));
+
+    // A new event has nobody signed up yet, so there is nobody to offer but the author.
+    await page.goto('/manage_event.php');
+    await expect(page.locator('#event_form_poc_user_id option')).toHaveText(['None', 'gec']);
+  });
+
+  test('the point of contact stays on the list after withdrawing, and clearing it removes the row', async ({ page }) => {
+    // trooper1 was named and has since withdrawn their signup. An unrelated edit is not
+    // the moment to quietly unname them, so they stay selectable until somebody says so.
+    const eventId = await createEvent({ title: 'Withdrawn Contact Troop', coordinator: 'gec', pointOfContact: 'trooper1' });
+
+    await loginAs(page, 'gec');
+    await page.goto(`/event.php?id=${eventId}`);
+    await expect(page.locator('#event_poc')).toHaveText('trooper1');
+
+    await page.goto(`/manage_event.php?id=${eventId}`);
+    const select = page.locator('#event_form_poc_user_id');
+    await expect(select.locator('option')).toHaveText(['None', 'gec', 'trooper1']);
+    await expect(select).toHaveValue(String(uid('trooper1')));
+
+    await select.selectOption('0');
+    await submitEventForm(page);
+
+    // The form has no #event_poc either, so wait for the event page before asserting it
+    // is absent - otherwise the check passes against the page being left.
+    await expect(page.locator('#event_page')).toBeVisible();
+    await expect(page.locator('#event_poc')).toHaveCount(0);
+    expect(Number((await getEvent(eventId)).poc_user_id)).toBe(0);
+  });
+
+  test('refuses a point of contact who has not signed up to the event', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Forged Contact Troop', coordinator: 'gec' });
+
+    await loginAs(page, 'gec');
+    await page.goto(`/manage_event.php?id=${eventId}`);
+
+    // The list is the rule on screen; the server has to enforce it too, because anything
+    // can be posted. Add an option for somebody who is not signed up, and pick it.
+    await page.locator('#event_form_poc_user_id').evaluate((select: HTMLSelectElement, id: number) => {
+      select.add(new Option('trooper2', String(id)));
+    }, uid('trooper2'));
+    await page.locator('#event_form_poc_user_id').selectOption(String(uid('trooper2')));
+    await submitEventForm(page);
+
+    await expect(page.locator('#manage_event_errors')).toContainText('Choose a point of contact from the list');
+    // And the forged uid does not earn itself a place on the list the form comes back with.
+    await expect(page.locator('#event_form_poc_user_id option')).toHaveText(['None', 'gec']);
+    expect(Number((await getEvent(eventId)).poc_user_id)).toBe(0);
   });
 
   test('an admin can edit an event they do not coordinate', async ({ page }) => {

@@ -172,6 +172,25 @@ test.describe('admin event management', () => {
     await expect(page.locator('[data-events-day-date="2026-10-18"] input[type="time"]').first()).toHaveValue('10:00');
   });
 
+  test('sets the point of contact from the event\'s signups', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Admin Contact Troop', coordinator: 'gec' });
+    await createRsvp(eventId, 'trooper1');
+
+    await loginToAdminCp(page);
+    await gotoEventsAdmin(page, `&action=edit&id=${eventId}`);
+
+    // The same list as the front-end form: nobody, the admin filling it in, and the
+    // event's signups - not the coordinator, who is not signed up.
+    const select = page.locator('select[name="poc_user_id"]');
+    await expect(select.locator('option')).toHaveText(['None', 'admin', 'trooper1']);
+
+    await select.selectOption({ label: 'trooper1' });
+    await page.locator('input[type="submit"][value="Update Event"]').click();
+    await expect(page.locator('#flash_message')).toContainText('Event updated successfully');
+
+    expect(Number((await getEvent(eventId)).poc_user_id)).toBe(uid('trooper1'));
+  });
+
   test('saves excluded members by username', async ({ page }) => {
     await loginToAdminCp(page);
     await gotoEventsAdmin(page, '&action=add');

@@ -1,6 +1,6 @@
 import { Page } from '@playwright/test';
 import { test, expect } from '../helpers/fixtures';
-import { loginAs } from '../helpers/auth';
+import { loginAs, logout } from '../helpers/auth';
 import {
   getEvent,
   getThread,
@@ -68,7 +68,19 @@ async function createEventViaForm(page: Page, values: EventFormValues): Promise<
   await page.locator('#manage_event_submit').click();
   await expect(page.locator('#event_page')).toBeVisible();
 
-  return Number(new URL(page.url()).searchParams.get('id'));
+  // Read off the card rather than the URL: a live event lands in its announcement thread,
+  // whose address names the thread and not the event.
+  return Number(await page.locator('#event_page').getAttribute('data-event-id'));
+}
+
+/**
+ * Open the announcement post the way it is read by everybody who is not shown the event
+ * card in its place: guests, and clients such as Tapatalk that read posts rather than
+ * pages. A member who can see the event gets the card instead - see event-threads.spec.ts.
+ */
+async function viewAnnouncementPost(page: Page, threadId: number) {
+  await logout(page);
+  await page.goto(`/showthread.php?tid=${threadId}`);
 }
 
 test.describe('event announcement threads', () => {
@@ -103,7 +115,7 @@ test.describe('event announcement threads', () => {
     expect(post.message).toContain(`event.php?id=${eventId}`);
 
     // And it has to read as a post, not as raw markup.
-    await page.goto(`/showthread.php?tid=${threadId}`);
+    await viewAnnouncementPost(page, threadId);
     await expect(page.locator('.post_body').first()).toContainText('Bring white armour.');
     await expect(page.locator(`.post_body a[href*="event.php?id=${eventId}"]`).first()).toBeVisible();
     // The region is the reader's way to the rest of that region's schedule, so it is a
@@ -224,7 +236,7 @@ test.describe('event announcement threads', () => {
 
     // The thread outlives the event going back to pending, so it has to stop reading as
     // an open call for troopers.
-    await page.goto(`/showthread.php?tid=${threadId}`);
+    await viewAnnouncementPost(page, threadId);
     await expect(page.locator('.post_body').first()).toContainText('not open for signups');
   });
 
@@ -243,7 +255,7 @@ test.describe('event announcement threads', () => {
 
     const threadId = Number((await getEvent(eventId)).thread_id);
 
-    await page.goto(`/showthread.php?tid=${threadId}`);
+    await viewAnnouncementPost(page, threadId);
     // The post's own labels are bold too, so the description's is picked out by what it
     // says rather than by being the only one.
     const post = page.locator('.post_body').first();
@@ -267,7 +279,7 @@ test.describe('event announcement threads', () => {
 
     const threadId = Number((await getEvent(eventId)).thread_id);
 
-    await page.goto(`/showthread.php?tid=${threadId}`);
+    await viewAnnouncementPost(page, threadId);
     // The address is still a link - to the map, with the whole string as its label. What
     // must not exist is a link the address itself wrote, so this asks for one pointing
     // at evil.test rather than for one merely mentioning it: the map URL carries the
@@ -277,7 +289,7 @@ test.describe('event announcement threads', () => {
     await expect(post.locator('a[href^="http://evil.test"]')).toHaveCount(0);
   });
 
-  test('links the announcement from the event page', async ({ page }) => {
+  test('opening the event goes to its announcement thread', async ({ page }) => {
     await loginAs(page, 'gec');
 
     const eventId = await createEventViaForm(page, {
@@ -290,7 +302,8 @@ test.describe('event announcement threads', () => {
     expect(thread).not.toBeNull();
 
     await page.goto(`/event.php?id=${eventId}`);
-    await expect(page.locator('#event_thread')).toHaveAttribute('href', `showthread.php?tid=${thread!.tid}`);
+    await expect(page).toHaveURL(new RegExp(`showthread\\.php\\?tid=${thread!.tid}$`));
+    await expect(page.locator('#event_page')).toHaveAttribute('data-event-id', String(eventId));
   });
 
   // The announcement only does its job if a member browsing the forum can open it. The

@@ -133,6 +133,8 @@ export interface EventInput {
   signupCutoff?: string | { days?: number; hours?: number } | null;
   requiresWwcc?: boolean;
   coordinator?: string;
+  /** Username of the event's point of contact; nobody when omitted. */
+  pointOfContact?: string;
   threadId?: number | null;
   /** Dates (YYYY-MM-DD) for a multi-day event. */
   days?: Array<{ date: string; start?: string; end?: string }>;
@@ -160,8 +162,8 @@ export async function createEvent(input: EventInput): Promise<number> {
   const result = await execute(
     `INSERT INTO ${T('event_plugin_events')}
        (title, description, status, region, address, start_date, end_date, signup_cutoff,
-        requires_wwcc, gec_user_id, created_by, thread_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        requires_wwcc, gec_user_id, poc_user_id, created_by, thread_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.title,
       input.description ?? `${input.title} description`,
@@ -173,6 +175,7 @@ export async function createEvent(input: EventInput): Promise<number> {
       cutoff,
       input.requiresWwcc ? 1 : 0,
       uid(input.coordinator ?? 'gec'),
+      input.pointOfContact ? uid(input.pointOfContact) : 0,
       uid('gec'),
       input.threadId ?? null,
       now,

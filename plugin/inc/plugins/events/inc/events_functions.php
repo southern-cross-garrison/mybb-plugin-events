@@ -692,6 +692,161 @@ function events_hidden_thread_ids($user_id = null)
 }
 
 /**
+ * Every thread that is some event's announcement thread.
+ *
+ * One query for the whole request, since the thread listings ask it once per row.
+ *
+ * @return array of int thread id
+ */
+function events_announcement_thread_ids()
+{
+    global $db;
+
+    static $thread_ids = null;
+
+    if($thread_ids === null)
+    {
+        $thread_ids = array();
+
+        $query = $db->simple_select("event_plugin_events", "thread_id", "thread_id > 0");
+        while($row = $db->fetch_array($query))
+        {
+            $thread_ids[] = (int)$row['thread_id'];
+        }
+    }
+
+    return $thread_ids;
+}
+
+/**
+ * Look the given threads up, remembering them for the rest of the request.
+ *
+ * The listing and the calendar ask after every event they show, so they hand the whole
+ * page's thread ids over at once rather than paying a query per event.
+ *
+ * @param array $thread_ids
+ * @return array tid => thread row, holding only the threads that exist
+ */
+function events_thread_rows(array $thread_ids)
+{
+    global $db;
+
+    static $cache = array();
+
+    $missing = array();
+    foreach($thread_ids as $thread_id)
+    {
+        $thread_id = (int)$thread_id;
+        if($thread_id > 0 && !array_key_exists($thread_id, $cache))
+        {
+            $missing[$thread_id] = $thread_id;
+        }
+    }
+
+    if(!empty($missing))
+    {
+        $query = $db->simple_select("threads", "tid, fid, uid, firstpost, visible, closed",
+            "tid IN (" . implode(',', $missing) . ")");
+        while($row = $db->fetch_array($query))
+        {
+            $cache[(int)$row['tid']] = $row;
+            unset($missing[(int)$row['tid']]);
+        }
+
+        // Remembered as absent too, so a thread that has been deleted is not looked for
+        // again on every row that names it.
+        foreach($missing as $thread_id)
+        {
+            $cache[$thread_id] = null;
+        }
+    }
+
+    $rows = array();
+    foreach($thread_ids as $thread_id)
+    {
+        $thread_id = (int)$thread_id;
+        if(!empty($cache[$thread_id]))
+        {
+            $rows[$thread_id] = $cache[$thread_id];
+        }
+    }
+
+    return $rows;
+}
+
+/**
+ * The event's announcement thread, when there is one this member can open.
+ *
+ * This is what decides whether an event is read in its thread or on event.php, so it asks
+ * everything showthread.php would before rendering the thread: that it still exists, has
+ * a first post, is approved, is not a moved-thread stub, and sits in a forum this member
+ * may read threads in. Anything short of that and the event stays on event.php, because a
+ * link that ends on "you do not have permission" loses the event along with the thread.
+ *
+ * Whether the member may see the *event* is not asked here; everything that calls this has
+ * already checked events_can_view_event().
+ *
+ * @param array $event Event row
+ * @return array|null thread row
+ */
+function events_event_thread(array $event)
+{
+    global $mybb;
+
+    $thread_id = empty($event['thread_id']) ? 0 : (int)$event['thread_id'];
+    if(!$thread_id)
+    {
+        return null;
+    }
+
+    $rows = events_thread_rows(array($thread_id));
+    if(empty($rows[$thread_id]))
+    {
+        return null;
+    }
+
+    $thread = $rows[$thread_id];
+    if((int)$thread['visible'] !== 1 || !(int)$thread['firstpost'] || strpos((string)$thread['closed'], 'moved|') === 0)
+    {
+        return null;
+    }
+
+    $permissions = forum_permissions((int)$thread['fid']);
+    if(empty($permissions['canview']) || empty($permissions['canviewthreads']))
+    {
+        return null;
+    }
+
+    if(!empty($permissions['canonlyviewownthreads']) && (int)$thread['uid'] !== (int)$mybb->user['uid'])
+    {
+        return null;
+    }
+
+    return $thread;
+}
+
+/**
+ * Where a link to this event should go: its thread when there is one to read it in,
+ * event.php otherwise.
+ *
+ * event.php would forward the member to the thread anyway; linking there directly saves
+ * the hop, and puts the address the member actually lands on under their cursor.
+ *
+ * @param array $event Event row
+ * @return string URL relative to the board root
+ */
+function events_event_url(array $event)
+{
+    $thread = events_event_thread($event);
+    if($thread)
+    {
+        return 'showthread.php?tid=' . (int)$thread['tid'];
+    }
+
+    return 'event.php?id=' . (int)$event['id'];
+}
+
+/**
  * Can the user see this event at all?
  *
  * Pending events are only visible to coordinators and admins; live and archived

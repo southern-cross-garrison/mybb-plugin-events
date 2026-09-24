@@ -4,12 +4,12 @@
 <h3 id="rsvp_list_heading" class="events_section_heading">Who is Attending <span id="rsvp_list_count">({$rsvp_list_count})</span></h3>
 <span class="rsvp_filter_funnel">Filter</span>
 </summary>
-<form method="get" action="event.php" id="rsvp_filter_form" class="events_filter_form no-print">
-<input type="hidden" name="id" value="{$event_id}" />
+<form method="get" action="{$event_card_action}" id="rsvp_filter_form" class="events_filter_form no-print">
+{$event_card_hidden}
 <label>Costume: <input type="text" class="textbox" name="filter_costume" id="filter_costume" value="{$filter_costume}" /></label>
 {$filter_day_select}
 <input type="submit" class="button" value="Filter" />
-<a href="event.php?id={$event_id}#rsvp_list" id="rsvp_filter_reset">Reset</a>
+<a href="{$event_card_url}#rsvp_list" id="rsvp_filter_reset">Reset</a>
 </form>
 </details>
 <ul id="rsvp_rows">

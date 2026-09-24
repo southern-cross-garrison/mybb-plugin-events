@@ -27,6 +27,7 @@ function events_install_database()
         `signup_cutoff` datetime DEFAULT NULL,
         `requires_wwcc` tinyint(1) NOT NULL DEFAULT 0,
         `gec_user_id` int(11) NOT NULL,
+        `poc_user_id` int(11) NOT NULL DEFAULT 0,
         `created_by` int(11) NOT NULL,
         `thread_id` int(11) DEFAULT NULL,
         `created_at` datetime NOT NULL,
@@ -204,5 +205,14 @@ function events_upgrade_database()
     {
         $db->write_query("ALTER TABLE `" . TABLE_PREFIX . "event_plugin_events`
             ADD `address` varchar(255) NOT NULL DEFAULT '' AFTER `region`");
+    }
+
+    // 1.5 - an event can name a point of contact from among its signups. 0 rather than
+    // NULL for "nobody", for the same reason the address is an empty string: MyBB's query
+    // helpers cannot write a NULL, and every reader would have to guard for one.
+    if(!$db->field_exists('poc_user_id', 'event_plugin_events'))
+    {
+        $db->write_query("ALTER TABLE `" . TABLE_PREFIX . "event_plugin_events`
+            ADD `poc_user_id` int(11) NOT NULL DEFAULT 0 AFTER `gec_user_id`");
     }
 }

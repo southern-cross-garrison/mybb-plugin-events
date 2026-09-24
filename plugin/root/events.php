@@ -108,10 +108,16 @@ $query = $db->query("
 ");
 
 $events = array();
+$thread_ids = array();
 while($event = $db->fetch_array($query))
 {
     $events[] = $event;
+    $thread_ids[] = (int)$event['thread_id'];
 }
+
+// Each event links to its thread when it has one - see events_event_url() - so the whole
+// page's threads are looked up in one go rather than once per row.
+events_thread_rows($thread_ids);
 
 $region_options = events_region_options($region_filter);
 $events_view_toggle = events_view_toggle($view, $region_filter, $show_archived);
@@ -203,7 +209,7 @@ foreach($events as $event)
     $address_link = events_address_link(isset($event['address']) ? $event['address'] : '', 'event_address_link');
     $address_line = $address_link === '' ? '' : '<span class="event_address">' . $address_link . '</span>';
 
-    $events_rows .= '<td class="trow1 event_title"><a class="event_link" href="event.php?id=' . (int)$event['id'] . '">'
+    $events_rows .= '<td class="trow1 event_title"><a class="event_link" href="' . events_event_url($event) . '">'
         . htmlspecialchars_uni($event['title']) . '</a>' . $address_line . '</td>';
     $events_rows .= '<td class="trow1 event_region">' . htmlspecialchars_uni($event['region']) . '</td>';
     $events_rows .= '<td class="trow1 event_start">'
