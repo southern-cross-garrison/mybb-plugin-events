@@ -140,6 +140,7 @@ function events_admin_edit_event()
     $errors = array();
     $values = events_event_form_values($event);
     $preview = '';
+    $day_change = null;
 
     if($mybb->request_method === "post")
     {
@@ -158,12 +159,22 @@ function events_admin_edit_event()
         {
             $errors = events_validate_event_input($values, $event);
 
-            if(empty($errors))
+            // Removing days that members are signed up for cancels their signups, so the
+            // form comes back once to say who, and saves only when that is confirmed.
+            $day_change = empty($errors) ? events_day_change_to_confirm($is_edit ? $event_id : 0, $values) : null;
+
+            if(empty($errors) && $day_change === null)
             {
                 $thread_error = null;
-                events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error);
+                $cancelled = 0;
+                events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error, $cancelled);
 
                 $message = $is_edit ? "Event updated successfully." : "Event created successfully.";
+                if($cancelled > 0)
+                {
+                    $message .= " " . $cancelled . ($cancelled === 1 ? " signup was" : " signups were")
+                        . " cancelled and the members sent a PM.";
+                }
                 if($thread_error !== null)
                 {
                     // The event saved; only its announcement did not.
@@ -193,6 +204,13 @@ function events_admin_edit_event()
     ));
 
     $form = new Form("index.php?module=events&amp;action=" . ($is_edit ? "edit&amp;id=" . $event_id : "add"), "post");
+
+    // After the form has opened, because its button is a submit of the whole form.
+    if($day_change !== null)
+    {
+        echo '<div class="alert" id="event_day_change_warning">'
+            . events_day_change_warning($day_change, 'submit_button') . '</div>';
+    }
 
     $container = new FormContainer($is_edit ? "Edit Event" : "Add Event");
     $container->output_row("Title", "The event's name", $form->generate_text_box("title", $values['title'], array("id" => "title")), "title");

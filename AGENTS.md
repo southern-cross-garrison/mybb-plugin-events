@@ -245,8 +245,10 @@ baseline picks the change up.
   ratethread, polls, report, moderation, attachment), `xmlhttp` and `archive_start` for
   the two entry points that never load `global.php`'s furniture,
   `forumdisplay_get_threads` for the thread list, `build_forumbits_forum` for the "last
-  post" a forum row advertises, `search_do_search_process` for the search log and
-  `syndication_get_posts` for the feeds. Adding a surface means another hook - there is no
+  post" a forum row advertises, `search_do_search_process` for the search log,
+  `search_results_start` for the saved query that View New Posts, Today's Posts and "Find
+  threads by user" re-run instead of reading that log, and `syndication_get_posts` for the
+  feeds. Adding a surface means another hook - there is no
   central place to put this, and a missed one is a thread the excluded member can read.
 
 - Two of those surfaces do not identify their thread the way the rest do, and a hook
@@ -303,6 +305,14 @@ baseline picks the change up.
   validating it and writing the rows all live in `events_form.php`, which both require.
   Anything added to the event form has to go in there, or the two forms start disagreeing
   about what a valid event is, which shows up as an event the Admin CP would have rejected.
+
+- Removing a day from an event cancels every signup that held it, whole, and PMs those
+  members from whoever saved. Removing only the claim on the day used to leave a signup
+  with no days, which the event page reads as "every day" and the attendance sheet as
+  none. Both forms stop at `events_day_change_to_confirm()` first and save only when its
+  button is clicked. The button posts a token of the days and members it listed, so a
+  form changed in between is warned about again. When an event goes back to one day, the
+  day it still runs on doesn't count as removed, even though its row is deleted.
 
 - A new front-end page needs three things beyond the file itself: a template file (synced
   on activate), its `THIS_SCRIPT` added to `EVENTS_STYLESHEET_ATTACHEDTO` in

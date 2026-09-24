@@ -2,7 +2,7 @@ import { test, expect, expectMyBBError } from '../helpers/fixtures';
 import { loginAs } from '../helpers/auth';
 import { relativeToTestNow } from '../helpers/clock';
 import { runPhp } from '../helpers/container';
-import { createEvent, createRsvp, execute, fixtures, getThreadFirstPost, getTroopReport, T } from '../helpers/db';
+import { createEvent, createRsvp, execute, fixtures, getThread, getThreadFirstPost, getTroopReport, T } from '../helpers/db';
 
 /**
  * Being excluded from an event used to mean seeing the whole thing with the signup button
@@ -161,6 +161,59 @@ test.describe('per-event exclusions', () => {
     // above is not passing because nothing was searched.
     await loginAs(page, 'trooper1');
     expect(await search()).toContain(title);
+  });
+
+  test("View New Posts, Today's Posts and a member's threads do not list it", async ({ page }) => {
+    // These three are links rather than searches, and they do not work the way a search
+    // does: they file a WHERE clause alongside the hits, and the results page re-runs the
+    // clause and never reads the hits. Filtering the hits - which is what keeps the
+    // search above clean - left all three listing the announcement, and View New Posts
+    // is the busiest link on the board and exactly where a new announcement turns up.
+    const title = announcementTitle('Newly Posted Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    const threadId = await announce(eventId);
+
+    // The results are paged by last post, and the specs before this one leave threads
+    // behind with the clock moved forwards. Put this one at the top, so the control
+    // below is looking at a page it could be on.
+    await execute(
+      `UPDATE ${T('threads')} t
+         JOIN (SELECT MAX(lastpost) + 1 AS top FROM ${T('threads')}) m
+          SET t.lastpost = m.top
+        WHERE t.tid = ?`,
+      [threadId],
+    );
+
+    const author = Number((await getThread(threadId)).uid);
+    const links = [
+      '/search.php?action=getnew',
+      '/search.php?action=getdaily',
+      `/search.php?action=finduserthreads&uid=${author}`,
+    ];
+
+    // Each link files its search and answers with MyBB's "redirecting" page, and the
+    // results are rendered from the log afterwards - which is where the filtering now is.
+    const listed = async (): Promise<string[]> => {
+      await execute(`TRUNCATE TABLE ${T('searchlog')}`, []);
+      const found: string[] = [];
+      for (const link of links) {
+        const filed = await page.request.get(link, { maxRedirects: 0 });
+        const sid = ((filed.headers()['location'] ?? '') + (await filed.text())).match(/sid=([a-f0-9]+)/)?.[1];
+        expect(sid, `${link} filed no search`).toBeTruthy();
+
+        const results = await page.request.get(`/search.php?action=results&sid=${sid}`);
+        if ((await results.text()).includes(title)) {
+          found.push(link);
+        }
+      }
+      return found;
+    };
+
+    await loginAs(page, 'excluded');
+    expect(await listed()).toEqual([]);
+
+    await loginAs(page, 'trooper1');
+    expect(await listed()).toEqual(links);
   });
 
   test('the announcement stays out of the forum feeds', async ({ page }) => {

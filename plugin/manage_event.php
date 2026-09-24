@@ -57,6 +57,7 @@ elseif(!events_is_gec())
 $errors = array();
 $values = events_event_form_values($event);
 $manage_preview = '';
+$day_change = null;
 
 if($mybb->request_method === 'post')
 {
@@ -76,15 +77,25 @@ if($mybb->request_method === 'post')
     {
         $errors = events_validate_event_input($values, $event);
 
-        if(empty($errors))
+        // Removing days that members are signed up for cancels their signups, so the form
+        // comes back once to say who, and saves only when that warning is confirmed.
+        $day_change = empty($errors) ? events_day_change_to_confirm($is_edit ? $event_id : 0, $values) : null;
+
+        if(empty($errors) && $day_change === null)
         {
             $thread_error = null;
-            $saved_id = events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error);
+            $cancelled = 0;
+            $saved_id = events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error, $cancelled);
 
             // The event is saved either way; a thread that could not be written is
             // reported rather than swallowed, because nothing else on the page would
             // show it.
             $message = $is_edit ? "The event has been updated." : "The event has been created.";
+            if($cancelled > 0)
+            {
+                $message .= " " . $cancelled . ($cancelled === 1 ? " signup was" : " signups were")
+                    . " cancelled and the members sent a PM.";
+            }
             if($thread_error !== null)
             {
                 $message .= " " . $thread_error;
@@ -112,6 +123,12 @@ else
 }
 
 $manage_errors = events_form_errors($errors, 'manage_event_errors');
+if($day_change !== null)
+{
+    // Inside the form, because its button is a submit of the whole form.
+    $manage_errors .= '<div class="error" id="event_day_change_warning">'
+        . events_day_change_warning($day_change, 'button') . '</div>';
+}
 
 // ---------------------------------------------------------------------------
 // Details

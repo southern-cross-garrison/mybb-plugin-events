@@ -55,6 +55,7 @@ function events_register_hooks()
     $plugins->add_hook("forumdisplay_get_threads", "events_hide_threads_in_forum");
     $plugins->add_hook("build_forumbits_forum", "events_hide_thread_in_forumbit");
     $plugins->add_hook("search_do_search_process", "events_hide_threads_in_search");
+    $plugins->add_hook("search_results_start", "events_hide_threads_in_saved_search");
     $plugins->add_hook("syndication_get_posts", "events_hide_threads_in_feed");
 }
 
@@ -291,6 +292,38 @@ function events_hide_threads_in_search()
 
         $searcharray['posts'] = implode(',', array_diff(events_id_list($searcharray['posts']), $hidden_posts));
     }
+}
+
+/**
+ * Keep hidden threads out of a search that is re-run every time its results are shown.
+ *
+ * View New Posts, Today's Posts and "Find threads by user" file a WHERE clause in the
+ * search log's querycache as well as a list of hits, and the results page runs that
+ * clause again and ignores the list - so events_hide_threads_in_search() trims a list
+ * nothing reads. The clause is narrowed here, as the page loads it, rather than when it
+ * is filed: it is re-run on every page of the results, and an announcement posted after
+ * the member clicked the link would match it.
+ *
+ * Hooks: search_results_start
+ */
+function events_hide_threads_in_saved_search()
+{
+    global $search;
+
+    if(empty($search['querycache']) || $search['resulttype'] != 'threads')
+    {
+        return;
+    }
+
+    $hidden = events_request_hidden_threads();
+    if(empty($hidden))
+    {
+        return;
+    }
+
+    // The saved clause is written against the threads table unqualified, and the results
+    // page runs it as "threads t", so a bare tid reads the same either way.
+    $search['querycache'] = "(" . $search['querycache'] . ") AND tid NOT IN (" . implode(',', array_map('intval', $hidden)) . ")";
 }
 
 /**

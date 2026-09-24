@@ -10,6 +10,8 @@ import {
   createRsvp,
   fixtures,
   setAdditionalGroups,
+  getSignupRoles,
+  countPrivateMessages,
 } from '../helpers/db';
 import { relativeToTestNow } from '../helpers/clock';
 import { addTags, excludedValue, tag } from '../helpers/tag-field';
@@ -192,6 +194,38 @@ test.describe('admin event management', () => {
     await expect(page.locator('[data-events-day-date]')).toHaveCount(2);
     await expect(page.locator('[data-events-day-date="2026-10-17"] input[type="time"]').first()).toHaveValue('09:00');
     await expect(page.locator('[data-events-day-date="2026-10-18"] input[type="time"]').first()).toHaveValue('10:00');
+  });
+
+  test('warns before removing a day members hold, then cancels their signups and PMs them', async ({ page }) => {
+    const eventId = await createEvent({
+      title: 'Admin Trimmed Troop',
+      coordinator: 'gec',
+      start: '2026-10-17 09:00:00',
+      end: '2026-10-18 17:00:00',
+      days: [{ date: '2026-10-17' }, { date: '2026-10-18' }],
+    });
+    const [saturday, sunday] = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+    await createRsvp(eventId, 'trooper1', { dayIds: [saturday] });
+    await createRsvp(eventId, 'trooper2', { dayIds: [sunday] });
+
+    await loginToAdminCp(page);
+    await gotoEventsAdmin(page, `&action=edit&id=${eventId}`);
+    await fillDateTime(page, 'end_date', '2026-10-17 17:00:00');
+    await page.locator('input[type="submit"][value="Update Event"]').click();
+
+    await expect(page.locator('#event_day_change_members li')).toHaveText(['trooper2']);
+    expect(await getEventDays(eventId)).toHaveLength(2);
+
+    await page.locator('#event_day_change_confirm').click();
+    await expect(page.locator('#flash_message')).toContainText('1 signup was cancelled');
+
+    // Down to one day, which the plugin keeps as no day rows at all. Saturday is still
+    // on, so trooper1 keeps their signup: with no day rows it is for the one day there is.
+    expect(await getEventDays(eventId)).toHaveLength(0);
+    expect(await getSignupRoles(eventId, 'trooper1')).toEqual(['trooper']);
+    expect(await getSignupRoles(eventId, 'trooper2')).toEqual([]);
+    expect(await countPrivateMessages('trooper2', 'Event changed: Admin Trimmed Troop')).toBe(1);
+    expect(await countPrivateMessages('trooper1', 'Event changed:%')).toBe(0);
   });
 
   test('sets the point of contact from the event\'s signups', async ({ page }) => {

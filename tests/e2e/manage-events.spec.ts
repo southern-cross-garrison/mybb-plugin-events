@@ -11,6 +11,10 @@ import {
   createRsvp,
   fixtures,
   getRsvpDayIds,
+  getSignupRoles,
+  countRsvps,
+  countPrivateMessages,
+  getPrivateMessages,
   setAdditionalGroups,
 } from '../helpers/db';
 import { relativeToTestNow } from '../helpers/clock';
@@ -337,12 +341,12 @@ test.describe('front-end event management', () => {
         { date: '2026-10-25', start: '09:00:00', end: '17:00:00' },
       ],
     });
-    const [friday, saturday, sunday] = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+    const [, saturday, sunday] = (await getEventDays(eventId)).map((day: any) => Number(day.id));
     await createRsvp(eventId, 'trooper1', { dayIds: [saturday] });
     await createRsvp(eventId, 'trooper1', { role: 'wrangler', dayIds: [sunday] });
-    await createRsvp(eventId, 'trooper2', { dayIds: [friday, saturday] });
 
-    // Drop the Friday and move Saturday's hours.
+    // Drop the Friday, which nobody holds, and move Saturday's hours. Nobody loses a day,
+    // so there is nothing to warn about and it saves straight away.
     await loginAs(page, 'gec');
     await page.goto(`/manage_event.php?id=${eventId}`);
     await fillEventForm(page, {
@@ -359,8 +363,65 @@ test.describe('front-end event management', () => {
 
     expect(await getRsvpDayIds(eventId, 'trooper1')).toEqual([saturday]);
     expect(await getRsvpDayIds(eventId, 'trooper1', 'wrangler')).toEqual([sunday]);
-    // Nobody can be coming to a day the event no longer has, so Friday's claim goes with it.
-    expect(await getRsvpDayIds(eventId, 'trooper2')).toEqual([saturday]);
+    expect(await countPrivateMessages('trooper1', 'Event changed:%')).toBe(0);
+  });
+
+  test('removing a day members hold warns first, then cancels their signups and PMs them', async ({ page }) => {
+    // Removing a day used to drop the signups' claims on it and keep the signups, so a
+    // member could be left signed up for no days at all - which the event page reads as
+    // every day and the attendance sheet as none.
+    const eventId = await createEvent({
+      title: 'Trimmed Weekend Troop',
+      status: 'live',
+      coordinator: 'gec',
+      start: '2026-10-23 09:00:00',
+      end: '2026-10-25 17:00:00',
+      days: [
+        { date: '2026-10-23', start: '09:00:00', end: '17:00:00' },
+        { date: '2026-10-24', start: '09:00:00', end: '17:00:00' },
+        { date: '2026-10-25', start: '09:00:00', end: '17:00:00' },
+      ],
+    });
+    const [friday, saturday, sunday] = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+    await createRsvp(eventId, 'trooper1', { dayIds: [saturday, sunday] });
+    // Friday and Saturday: losing Friday cancels the whole signup, Saturday included.
+    await createRsvp(eventId, 'trooper2', { dayIds: [friday, saturday] });
+    await createRsvp(eventId, 'trooper2', { role: 'wrangler', dayIds: [sunday] });
+    await createRsvp(eventId, 'wrangler', { role: 'wrangler', dayIds: [friday] });
+
+    await loginAs(page, 'gec');
+    await page.goto(`/manage_event.php?id=${eventId}`);
+    await fillEventForm(page, { start: '2026-10-24 09:00:00' });
+    await submitEventForm(page);
+
+    // The form comes back with the warning, and nothing has been touched yet.
+    const warning = page.locator('#event_day_change_warning');
+    await expect(warning).toContainText('Fri 23 Oct 2026');
+    await expect(page.locator('#event_day_change_members li')).toHaveText(['trooper2', 'wrangler']);
+    expect(await getEventDays(eventId)).toHaveLength(3);
+    expect(await getSignupRoles(eventId, 'trooper2')).toEqual(['trooper', 'wrangler']);
+
+    // Saving normally again is not agreeing to it.
+    await submitEventForm(page);
+    await expect(page.locator('#event_day_change_warning')).toBeVisible();
+    expect(await getEventDays(eventId)).toHaveLength(3);
+
+    await page.locator('#event_day_change_confirm').click();
+    await expect(page.locator('#event_days li.event_day')).toHaveCount(2);
+
+    expect((await getEventDays(eventId)).map((day: any) => Number(day.id))).toEqual([saturday, sunday]);
+    expect(await getSignupRoles(eventId, 'trooper2')).toEqual([]);
+    expect(await getSignupRoles(eventId, 'wrangler')).toEqual([]);
+    expect(await getRsvpDayIds(eventId, 'trooper1')).toEqual([saturday, sunday]);
+
+    const [pm] = await getPrivateMessages('trooper2', 'Event changed: Trimmed Weekend Troop');
+    expect(pm).toBeTruthy();
+    expect(Number(pm.fromid)).toBe(uid('gec'));
+    expect(String(pm.message)).toContain('Fri 23 Oct 2026');
+    expect(String(pm.message)).toContain('Sat 24 Oct 2026');
+    expect(String(pm.message)).toMatch(/sign up again/);
+    expect(await countPrivateMessages('wrangler', 'Event changed:%')).toBe(1);
+    expect(await countPrivateMessages('trooper1', 'Event changed:%')).toBe(0);
 
     const orphans = await query(
       `SELECT rd.event_day_id
@@ -369,6 +430,35 @@ test.describe('front-end event management', () => {
         WHERE ed.id IS NULL`,
     );
     expect(orphans).toHaveLength(0);
+  });
+
+  test('moving an event by a week cancels every signup on it', async ({ page }) => {
+    const eventId = await createEvent({
+      title: 'Moved Weekend Troop',
+      status: 'live',
+      coordinator: 'gec',
+      start: '2026-10-24 09:00:00',
+      end: '2026-10-25 17:00:00',
+      days: [{ date: '2026-10-24' }, { date: '2026-10-25' }],
+    });
+    const [saturday, sunday] = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+    await createRsvp(eventId, 'trooper1', { dayIds: [saturday] });
+    await createRsvp(eventId, 'trooper2', { dayIds: [saturday, sunday] });
+
+    await loginAs(page, 'gec');
+    await page.goto(`/manage_event.php?id=${eventId}`);
+    await fillEventForm(page, { start: '2026-10-31 09:00:00', end: '2026-11-01 17:00:00' });
+    await submitEventForm(page);
+
+    await expect(page.locator('#event_day_change_members li')).toHaveText(['trooper1', 'trooper2']);
+    await expect(page.locator('#event_day_change_confirm')).toHaveText('Save and cancel 2 signups');
+    await page.locator('#event_day_change_confirm').click();
+    await expect(page.locator('#event_days li.event_day')).toHaveCount(2);
+
+    expect(await countRsvps(eventId)).toBe(0);
+    const [pm] = await getPrivateMessages('trooper2', 'Event changed:%');
+    expect(String(pm.message)).toContain('Sat 31 Oct 2026');
+    expect(await countPrivateMessages('trooper1', 'Event changed:%')).toBe(1);
   });
 
   test('the date boxes carry a calendar, and picking from it drives the day grid', async ({ page }) => {

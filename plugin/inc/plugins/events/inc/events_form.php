@@ -910,8 +910,9 @@ function events_validate_event_input(array $input, array $event = array())
  * once did - gave every day a new id on every save and cut each signup off from the days
  * it was for, without a word to anybody. Days are matched on their date instead, which is
  * what the form draws a row for: a date still on the event keeps its row and has its times
- * updated, a new date gets a new row, and a date that has gone is deleted along with the
- * signups' claims on it, since nobody can be coming to a day the event no longer has.
+ * updated, a new date gets a new row, and a date that has gone is deleted along with any
+ * claim still on it. events_save_event() has already cancelled the signups holding one:
+ * dropping only the claim left a signup with no days, which reads as "every day".
  *
  * @param int $event_id
  * @param array $days From events_event_form_input(), already validated
@@ -967,20 +968,293 @@ function events_save_event_days($event_id, array $days)
 }
 
 /**
+ * The event's days that saving this form takes away from it.
+ *
+ * Matched on date the same way events_save_event_days() matches them: a date that is no
+ * longer among the posted days. Moving an event loses every one of them.
+ *
+ * Turning an event back into a single-day one posts no days at all, and every row is then
+ * deleted - but the day it now runs on has not gone anywhere. A signup for that day is
+ * left with no day rows, which for a single-day event is exactly right, so it is not
+ * counted here.
+ *
+ * @param int $event_id
+ * @param array $input From events_event_form_input(), already validated
+ * @return array of event_day rows
+ */
+function events_removed_event_days($event_id, array $input)
+{
+    $posted = array();
+    foreach($input['days'] as $day)
+    {
+        $posted[events_date('Y-m-d', events_strtotime($day['date']))] = true;
+    }
+    if(empty($posted))
+    {
+        $posted[events_date('Y-m-d', events_strtotime($input['start_date']))] = true;
+    }
+
+    $removed = array();
+    foreach(events_get_event_days($event_id) as $day)
+    {
+        if(!isset($posted[$day['date']]))
+        {
+            $removed[] = $day;
+        }
+    }
+
+    return $removed;
+}
+
+/**
+ * The members signed up for any of these days, and which of them each one holds.
+ *
+ * @param int $event_id
+ * @param array $removed_days event_day rows, from events_removed_event_days()
+ * @return array uid => array('uid', 'username', 'day_ids'), ordered by username
+ */
+function events_day_change_signups($event_id, array $removed_days)
+{
+    global $db;
+
+    if(empty($removed_days))
+    {
+        return array();
+    }
+
+    $ids = implode(',', array_map(function($day) { return (int)$day['id']; }, $removed_days));
+
+    $members = array();
+    $query = $db->query("
+        SELECT r.user_id, u.username, d.event_day_id
+        FROM " . TABLE_PREFIX . "event_plugin_rsvps r
+        INNER JOIN " . TABLE_PREFIX . "event_plugin_rsvp_days d ON d.rsvp_id = r.id
+        LEFT JOIN " . TABLE_PREFIX . "users u ON u.uid = r.user_id
+        WHERE r.event_id = " . (int)$event_id . "
+          AND r.status = 'attending'
+          AND d.event_day_id IN (" . $ids . ")
+        ORDER BY u.username ASC, d.event_day_id ASC
+    ");
+    while($row = $db->fetch_array($query))
+    {
+        $uid = (int)$row['user_id'];
+        if(!isset($members[$uid]))
+        {
+            $members[$uid] = array('uid' => $uid, 'username' => (string)$row['username'], 'day_ids' => array());
+        }
+
+        $day_id = (int)$row['event_day_id'];
+        if(!in_array($day_id, $members[$uid]['day_ids'], true))
+        {
+            $members[$uid]['day_ids'][] = $day_id;
+        }
+    }
+
+    return $members;
+}
+
+/**
+ * The signups a save would cancel, when the person saving has not yet agreed to it.
+ *
+ * Removing a day used to delete the signups' claims on it and keep the signups, so moving
+ * an event left every signup with no days - which the event page reads as "all days" and
+ * the attendance sheet as none. Saving now cancels those signups outright (see
+ * events_save_event()), and because that is somebody else's signup going, both forms stop
+ * and say who first. The confirm button posts a token of exactly what was shown, so a
+ * form edited again before confirming - or a signup that arrives in between - is warned
+ * about afresh rather than carried through on the earlier answer.
+ *
+ * @param int $event_id 0 for a new event, which has nothing to cancel
+ * @param array $input From events_event_form_input(), already validated
+ * @return array|null array('removed', 'members', 'token'), or null when the save can go ahead
+ */
+function events_day_change_to_confirm($event_id, array $input)
+{
+    global $mybb;
+
+    if((int)$event_id <= 0)
+    {
+        return null;
+    }
+
+    $removed = events_removed_event_days($event_id, $input);
+    $members = events_day_change_signups($event_id, $removed);
+    if(empty($members))
+    {
+        return null;
+    }
+
+    $day_ids = array_map(function($day) { return (int)$day['id']; }, $removed);
+    $token = md5(implode(',', $day_ids) . '|' . implode(',', array_keys($members)));
+
+    if($mybb->get_input('confirm_day_changes') === $token)
+    {
+        return null;
+    }
+
+    return array('removed' => $removed, 'members' => $members, 'token' => $token);
+}
+
+/**
+ * The warning both forms show above themselves before cancelling signups.
+ *
+ * It has to sit inside the form: its button is a submit of the whole form, carrying the
+ * token events_day_change_to_confirm() asked for, so what is confirmed is what is on the
+ * screen. Anything else - saving normally again - is warned about again.
+ *
+ * @param array $change From events_day_change_to_confirm()
+ * @param string $button_class The submit class of the form it sits in
+ * @return string
+ */
+function events_day_change_warning(array $change, $button_class)
+{
+    $dates = array();
+    foreach($change['removed'] as $day)
+    {
+        $dates[] = htmlspecialchars_uni(events_day_label($day));
+    }
+
+    $names = '';
+    foreach($change['members'] as $member)
+    {
+        $names .= '<li>' . htmlspecialchars_uni($member['username']) . '</li>';
+    }
+
+    $count = count($change['members']);
+    $noun = $count === 1 ? 'member is' : 'members are';
+
+    return '<p><strong>These changes remove ' . implode(', ', $dates) . ' from the event, and '
+        . $count . ' ' . $noun . ' signed up for ' . (count($dates) === 1 ? 'it' : 'them') . ':</strong></p>'
+        . '<ul id="event_day_change_members">' . $names . '</ul>'
+        . '<p>Saving will cancel ' . ($count === 1 ? 'that signup' : 'those signups')
+        . ' and send each of them a PM asking them to sign up again if the new times work for them.'
+        . ' To keep them, change the dates below and save again.</p>'
+        . '<p><button type="submit" class="' . htmlspecialchars_uni($button_class) . '" name="confirm_day_changes"'
+        . ' id="event_day_change_confirm" value="' . htmlspecialchars_uni($change['token']) . '">'
+        . 'Save and cancel ' . $count . ' ' . ($count === 1 ? 'signup' : 'signups') . '</button></p>';
+}
+
+/**
+ * PM each member whose signup a day change cancelled.
+ *
+ * Sent after the event is saved, so the dates it gives are the new ones. It comes from
+ * whoever made the change, so a reply reaches somebody who can answer it. A member who is
+ * excluded from the event is not told - the event is hidden from them, and a PM inviting
+ * them to sign up again would be the one place it was still announced - and neither is
+ * the person making the change, who has just been shown the list.
+ *
+ * @param int $event_id
+ * @param array $removed_days event_day rows, read before they were deleted
+ * @param array $members From events_day_change_signups()
+ * @param int $from_uid
+ * @return void
+ */
+function events_send_day_change_pms($event_id, array $removed_days, array $members, $from_uid)
+{
+    global $db, $mybb;
+
+    require_once MYBB_ROOT . "inc/datahandlers/pm.php";
+
+    $event = events_get_event($event_id);
+    if(!$event || empty($members))
+    {
+        return;
+    }
+
+    $excluded = array();
+    $query = $db->simple_select("event_plugin_event_exclusions", "user_id", "event_id = " . (int)$event_id);
+    while($row = $db->fetch_array($query))
+    {
+        $excluded[] = (int)$row['user_id'];
+    }
+
+    $labels = array();
+    foreach($removed_days as $day)
+    {
+        $labels[(int)$day['id']] = events_day_label($day);
+    }
+
+    $now_runs = '';
+    foreach(events_get_event_days($event_id) as $day)
+    {
+        $now_runs .= "[*]" . events_day_label($day) . "\n";
+    }
+    if($now_runs === '')
+    {
+        $now_runs = "[*]" . events_format_date($event['start_date']) . " - " . events_format_date($event['end_date']) . "\n";
+    }
+
+    $title = events_escape_bbcode($event['title']);
+    $url = $mybb->settings['bburl'] . '/' . events_event_url($event);
+
+    $subject = "Event changed: " . $event['title'];
+    if(my_strlen($subject) > 85)
+    {
+        $subject = my_substr($subject, 0, 82) . "...";
+    }
+
+    foreach($members as $member)
+    {
+        if(in_array($member['uid'], $excluded, true) || $member['uid'] === (int)$from_uid)
+        {
+            continue;
+        }
+
+        $held = '';
+        foreach($member['day_ids'] as $day_id)
+        {
+            if(isset($labels[$day_id]))
+            {
+                $held .= "[*]" . $labels[$day_id] . "\n";
+            }
+        }
+
+        $pmhandler = new PMDataHandler();
+        $pmhandler->admin_override = true;
+        $pmhandler->set_data(array(
+            'subject'   => $subject,
+            'message'   => "[b]" . $title . "[/b] has been edited, and it no longer runs on "
+                . (count($member['day_ids']) === 1 ? "this day" : "these days") . " you were signed up for:\n"
+                . "[list]\n" . $held . "[/list]\n"
+                . "Because of that, your signup for the event has been cancelled.\n\n"
+                . "The event now runs:\n"
+                . "[list]\n" . $now_runs . "[/list]\n"
+                . "If the new times work for you, please sign up again: [url=" . $url . "]" . $title . "[/url]",
+            'fromid'    => (int)$from_uid,
+            'toid'      => array($member['uid']),
+            'ipaddress' => my_inet_pton(get_ip()),
+            'options'   => array('savecopy' => 0),
+        ));
+
+        // A PM that cannot be delivered does not undo the save: the signup has already
+        // gone, and failing the event over one full inbox would be worse.
+        if($pmhandler->validate_pm())
+        {
+            $pmhandler->insert_pm();
+        }
+    }
+}
+
+/**
  * Write a validated event, its days and its exclusions.
  *
  * Exclusions are replaced wholesale: they carry nothing of their own worth keeping, and
  * the form posts the complete set every time. Days are reconciled instead, because
  * signups point at them by id - see events_save_event_days().
  *
+ * A day that is removed takes every signup on it with it, whole: see
+ * events_day_change_to_confirm(), which both forms ask before they get here. The members
+ * are PMed once the event is saved, so the PM gives its new dates.
+ *
  * @param int $event_id 0 to create, otherwise the event to update
  * @param array $input From events_event_form_input(), already validated
  * @param int $user_id Who is saving, recorded as created_by on a new event
  * @param string|null $thread_error Set to why the announcement thread could not be
  *                                  written, for a caller that can pass it on
+ * @param int $cancelled Set to how many members' signups a removed day cancelled
  * @return int the event's id
  */
-function events_save_event($event_id, array $input, $user_id, &$thread_error = null)
+function events_save_event($event_id, array $input, $user_id, &$thread_error = null, &$cancelled = 0)
 {
     global $db;
 
@@ -1033,6 +1307,17 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
             WHERE id = " . $event_id);
     }
 
+    // Read before the days are reconciled, which deletes the rows this needs to name.
+    $removed_days = $is_edit ? events_removed_event_days($event_id, $input) : array();
+    $cancelled_members = events_day_change_signups($event_id, $removed_days);
+    foreach($cancelled_members as $member)
+    {
+        // An empty intent drops every role, with its days and costumes - the same write
+        // as the member withdrawing themselves.
+        events_save_signup($event_id, $member['uid'], array(), array());
+    }
+    $cancelled = count($cancelled_members);
+
     events_save_event_days($event_id, $input['days']);
 
     $db->delete_query("event_plugin_event_exclusions", "event_id = " . $event_id);
@@ -1048,6 +1333,8 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
     // the database and losing it over a misconfigured forum would be worse than an
     // announcement the caller can report as missing.
     events_sync_event_thread($event_id, $thread_error);
+
+    events_send_day_change_pms($event_id, $removed_days, $cancelled_members, $user_id);
 
     return $event_id;
 }

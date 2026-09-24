@@ -378,6 +378,14 @@ export async function countPrivateMessages(username: string, subjectLike: string
   return Number(row?.total ?? 0);
 }
 
+/** The PMs in a member's inbox whose subject matches, oldest first. */
+export async function getPrivateMessages(username: string, subjectLike: string): Promise<RowDataPacket[]> {
+  return query<RowDataPacket>(
+    `SELECT subject, message, fromid FROM ${T('privatemessages')} WHERE uid = ? AND folder = 1 AND subject LIKE ? ORDER BY pmid ASC`,
+    [uid(username), subjectLike],
+  );
+}
+
 export async function deletePrivateMessages(): Promise<void> {
   await execute(`DELETE FROM ${T('privatemessages')}`, []);
 }
