@@ -35,8 +35,11 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 
 ## Installation
 
-1. Upload all files to your MyBB installation maintaining the directory structure shown
-   under _File Structure_ below (the front-end pages go at the web root)
+1. Upload the contents of the `plugin/` directory to your forum's root directory (the one
+   holding `global.php`), merging into the existing `inc/`, `jscripts/` and `admin/`
+   folders. `plugin/` mirrors a forum root, so nothing needs moving by hand. If your board's
+   Admin CP directory has been renamed from `admin`, put `admin/modules/events/` under that
+   directory instead
 2. Go to Admin CP → Plugins
 3. Find "Event Management" and click "Activate"
 4. Go to Admin CP → Event Management → Settings
@@ -505,8 +508,9 @@ GECs can manage events and RSVPs directly from the event page (no Admin CP acces
   index.php                       # Admin CP entry point
 ```
 
-The front-end pages live at the web root because MyBB pages `require ./global.php`. In this
-repository they are kept under `plugin/root/` and copied into place by `scripts/deploy.sh`.
+The front-end pages live at the web root because MyBB pages `require ./global.php`. The
+repository's `plugin/` directory is laid out exactly like this, so it can be uploaded over a
+forum root as-is; `scripts/deploy.sh` does the same thing for the test forum.
 
 ## Styling and Theming
 
@@ -587,7 +591,7 @@ All tables use the `mybb_event_plugin_` prefix:
 
 ## Development
 
-See the [repository README](../README.md) for the Docker development environment and the
+See the [repository README](README.md) for the Docker development environment and the
 end-to-end test suite.
 
 ## Support

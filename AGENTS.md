@@ -3,14 +3,21 @@
 ## Layout
 
 - `plugin/` is the source of truth for the plugin. Nothing is edited inside `test-forum/`.
+  It mirrors a MyBB forum root, which is how MyBB expects a plugin package to be laid out:
+  deploying to real hosting is copying the contents of `plugin/` over the forum's root
+  directory, and `scripts/deploy.sh` does exactly that. Anything that must not be uploaded
+  to a web root (docs, tooling) stays out of `plugin/` - the plugin's documentation is
+  `PLUGIN.md` for that reason.
   - `plugin/inc/plugins/events.php` - plugin metadata, install/activate/uninstall.
   - `plugin/inc/plugins/events/inc/` - shared functions, hooks, installers, render helpers.
   - `plugin/inc/plugins/events/admin/` - Admin CP module.
   - `plugin/inc/plugins/events/templates/` - templates as `.html` files; they are synced
     into MyBB's `templates` table on install/activate.
   - `plugin/inc/tasks/` - MyBB scheduled task entry points (MyBB requires a real file here).
-  - `plugin/root/` - front-end pages. MyBB pages `require ./global.php`, so these must be
-    deployed to the web root, not left under `inc/`.
+  - `plugin/*.php` - front-end pages. MyBB pages `require ./global.php`, so these sit at
+    the forum root, not under `inc/`.
+  - `plugin/jscripts/events/` - assets the front end and the Admin CP share.
+  - `plugin/admin/modules/events/` - Admin CP module registration.
 - `test-forum/` is a disposable MyBB tree (gitignored). `scripts/bootstrap.sh` downloads the
   pinned MyBB release into it, `scripts/deploy.sh` copies the plugin in, and
   `scripts/install-theme.sh` imports the garrison's custom theme and makes it the default.
@@ -84,7 +91,7 @@ baseline picks the change up.
   description is being previewed.
 - Styling for a control that appears on both forms cannot live in `events.css`: that is a
   theme stylesheet, and the Admin CP loads no theme at all. Those go in
-  `plugin/root/jscripts/events/` as a sheet both roots link
+  `plugin/jscripts/events/` as a sheet both roots link
   (`events-datepicker.css`, `events-tags.css`), tinted from the same `--events-*` custom
   properties so a theme still controls them.
 - Test helpers must not probe the page with `count()` or `all()` straight after a click
@@ -192,7 +199,7 @@ baseline picks the change up.
   reason, and restores the list the same way in its teardown.
 
 - The Admin CP loads no theme stylesheet at all, so a control the plugin adds there has
-  nowhere to be styled from except `plugin/root/jscripts/events/events-admin.css`, linked
+  nowhere to be styled from except `plugin/jscripts/events/events-admin.css`, linked
   as `../jscripts/events/` the same way the datepicker's sheet is. `events.css` is a theme
   stylesheet and never reaches the Admin CP. That sheet goes into `$page->extra_header`
   from the module dispatcher, for every action - not echoed into the body beside the

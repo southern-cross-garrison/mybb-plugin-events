@@ -1,7 +1,7 @@
 # MyBB Event Management plugin
 
 Event management for MyBB 1.8: events with per-day trooper and wrangler signups, prerequisite checks, multi-day support,
-attendance sheets, troop reports and iCal export. See [plugin/README.md](plugin/README.md)
+attendance sheets, troop reports and iCal export. See [PLUGIN.md](PLUGIN.md)
 for what the plugin does; this file covers the development environment and the test suite.
 
 ## Quick start
@@ -261,16 +261,19 @@ message; mint a replacement and update the secret.
 ## Layout
 
 ```
-plugin/                     the plugin (source of truth)
+plugin/                     the plugin (source of truth), laid out as a forum root:
+                            copy its contents over a MyBB install to deploy it
+  *.php                     front-end pages (events.php, event.php, manage_event.php,
+                            rsvp.php, troop_report.php, ical.php)
   inc/plugins/events.php    metadata, install/activate/uninstall
   inc/plugins/events/inc/   functions, hooks, installers, render helpers
   inc/plugins/events/admin/ Admin CP module
   inc/plugins/events/templates/  templates, synced into MyBB on activate
   inc/tasks/                MyBB scheduled task entry points
-  root/                     front-end pages, deployed to the web root
-                            (events.php, event.php, manage_event.php, rsvp.php,
-                             troop_report.php, ical.php)
-  admin_modules/events/     Admin CP module registration
+  jscripts/events/          assets shared by the front end and the Admin CP
+  admin/modules/events/     Admin CP module registration
+PLUGIN.md                   the plugin's own documentation (kept out of plugin/ so it
+                            is not uploaded to the web root)
 scripts/                    environment tooling (bootstrap, install, deploy, provision, snapshot)
 tests/                      Playwright suite
 docker/                     web image and PHP config
