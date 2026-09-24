@@ -18,6 +18,8 @@
  * The same wizard is the edit form. Re-opening it pre-selects whatever the member
  * already holds, and confirming rewrites it - which is how somebody adds wrangling to a
  * signup they made as a trooper, now that there is no separate wrangler button to press.
+ * It is also how somebody pulls out: the edit form's leading question has a third answer,
+ * "Not attending", which goes straight to a confirm step that deletes the signup.
  */
 
 define("IN_MYBB", 1);
@@ -72,7 +74,7 @@ $is_update = !empty($existing_signup);
 $signup_mode = $is_update ? 'update' : 'create';
 
 add_breadcrumb("Events", "events.php");
-add_breadcrumb($event['title'], "event.php?id=" . $event_id);
+add_breadcrumb(htmlspecialchars_uni($event['title']), "event.php?id=" . $event_id);
 add_breadcrumb($is_update ? "Update Signup" : "Sign Up", "rsvp.php?id=" . $event_id);
 
 $user_costumes = events_get_user_costumes($mybb->user['uid']);
@@ -101,6 +103,10 @@ $posted_solo_role = $mybb->get_input('signup_role');
 // form came from is what proves the attendance answers were carried - not their presence.
 $attendance_posted = !empty($posted_day_roles) || $posted_solo_role !== '' || $submitted_step === 'attendance';
 
+// "Not attending" is only offered once there is a signup to withdraw. On a first signup it
+// would be a way to sign up to nothing, so there it is ignored like any other junk value.
+$withdraw_chosen = $is_update && $posted_solo_role === 'none';
+
 // The attendance step asks one question - trooping or wrangling - and applies the answer
 // to the whole event, because all but a handful of signups are the same the whole way
 // through. Three values hold that shape:
@@ -123,7 +129,7 @@ $solo_role = '';
 
 if($attendance_posted)
 {
-    $signup_role = events_rsvp_role($posted_solo_role);
+    $signup_role = $withdraw_chosen ? 'none' : events_rsvp_role($posted_solo_role);
     $per_day = $mybb->get_input('per_day', MyBB::INPUT_INT) === 1;
 
     foreach($valid_day_ids as $day_id)
@@ -217,14 +223,15 @@ else
 // next render would show anyway, which is what keeps the two honest with each other.)
 $day_values = array_values($day_choices);
 $uniform_choice = (count($day_values) > 0 && count(array_unique($day_values)) === 1) ? $day_values[0] : '';
+$primary_choices = $is_update ? array_merge(events_rsvp_roles(), array('none')) : events_rsvp_roles();
 $primary_choice = $per_day
-    ? (in_array($uniform_choice, events_rsvp_roles(), true) ? $uniform_choice : '')
-    : $solo_role;
+    ? (in_array($uniform_choice, $primary_choices, true) ? $uniform_choice : '')
+    : ($withdraw_chosen ? 'none' : $solo_role);
 
 // Closing the grid makes the leading answer the only one on the page, so a member who
 // cleared it by setting the days apart has to answer it again rather than be signed up
 // to the fallback that resolves the days above.
-$primary_missing = $attendance_posted && $has_days && !$per_day && $solo_role === '';
+$primary_missing = $attendance_posted && $has_days && !$per_day && $solo_role === '' && !$withdraw_chosen;
 
 // The grid holds every day; the signup only holds the ones being attended.
 foreach($day_choices as $day_id => $choice)
@@ -250,6 +257,12 @@ elseif($solo_role !== '')
 }
 
 $roles = array_keys($role_days);
+
+// A member holding a signup who answers "Not attending" - or opens the grid and sits out
+// every day, which is the same answer given one day at a time - is withdrawing. On a first
+// signup that same empty answer is still an error, because there is nothing to withdraw.
+$withdrawing = $is_update && $attendance_posted && empty($role_days)
+    && ($withdraw_chosen || ($has_days && $per_day));
 
 $costumes_posted = isset($mybb->input['costumes']) || $submitted_step === 'costumes';
 $selected_costumes = array();
@@ -287,7 +300,9 @@ if(!$costume_choice && in_array('trooper', $roles, true))
 
 $errors = array();
 $render = 'attendance';
-$missing = events_check_prerequisites($event, null, $roles);
+// Withdrawing asks nothing of the member's profile: nobody should have to fill in an
+// emergency contact to say they are not coming.
+$missing = $withdrawing ? array() : events_check_prerequisites($event, null, $roles);
 $steps = events_signup_steps($roles, $missing, $costume_choice);
 
 if($mybb->request_method === 'post')
@@ -304,7 +319,11 @@ if($mybb->request_method === 'post')
 
     if($submitted === 'attendance')
     {
-        if($primary_missing)
+        if($withdrawing)
+        {
+            $render = 'confirm';
+        }
+        elseif($primary_missing)
         {
             $errors[] = 'Please choose how you will be attending.';
             $render = 'attendance';
@@ -375,9 +394,16 @@ if($mybb->request_method === 'post')
         // path is guaranteed to pass through. The checks run in wizard order, so a
         // skipped-ahead POST is sent back to the earliest step it failed rather than to
         // whichever one happened to be tested first.
-        $missing = events_check_prerequisites($event, null, $roles);
+        $missing = $withdrawing ? array() : events_check_prerequisites($event, null, $roles);
 
-        if($primary_missing)
+        if($withdrawing)
+        {
+            // An empty intent is every role dropped, so this deletes the signup's rows
+            // along with their days and costumes.
+            events_save_signup($event_id, $mybb->user['uid'], array(), array());
+            $render = 'success';
+        }
+        elseif($primary_missing)
         {
             $errors[] = 'Please choose how you will be attending.';
             $render = 'attendance';
@@ -410,6 +436,20 @@ if($mybb->request_method === 'post')
 // ---------------------------------------------------------------------------
 // Success
 // ---------------------------------------------------------------------------
+if($render === 'success' && $withdrawing)
+{
+    $signup_mode = 'withdraw';
+    $rsvp_success_title = 'Signup Withdrawn';
+    $rsvp_success_message = 'You are no longer signed up to attend <strong>' . $event_title . '</strong>.';
+    $rsvp_summary = '';
+
+    $events_print_header = events_print_header($rsvp_success_title, array($event['title']));
+
+    eval("\$page = \"" . $templates->get("events_rsvp_success") . "\";");
+    output_page($page);
+    exit;
+}
+
 if($render === 'success')
 {
     $rsvp_success_title = $is_update ? 'Signup Updated' : 'Signup Confirmed';
@@ -483,7 +523,7 @@ $attendance_state = $has_days
     ? '<input type="hidden" name="signup_role" value="' . htmlspecialchars_uni($signup_role) . '" />'
       . ($per_day ? '<input type="hidden" name="per_day" value="1" />' : '')
       . events_hidden_map('day_role', $day_choices)
-    : '<input type="hidden" name="signup_role" value="' . htmlspecialchars_uni($solo_role) . '" />';
+    : '<input type="hidden" name="signup_role" value="' . htmlspecialchars_uni($withdrawing ? 'none' : $solo_role) . '" />';
 
 if($rsvp_step === 'attendance')
 {
@@ -527,11 +567,20 @@ if($rsvp_step === 'attendance')
     // role="radiogroup" rather than a fieldset: a <legend> is lifted out of the fieldset's
     // box by the browser and themes restyle it freely, so the layout would be at the mercy
     // of whichever theme the board runs.
+    //
+    // Someone editing a signup can also answer that they are not coming after all. A first
+    // signup is not offered it: there is nothing yet to withdraw.
+    $primary_labels = array('trooper' => 'Trooping', 'wrangler' => 'Wrangling');
+    if($is_update)
+    {
+        $primary_labels['none'] = 'Not attending';
+    }
+
     $rsvp_body .= '<div class="signup_primary" role="radiogroup" aria-labelledby="signup_role_label">'
                 . '<span class="signup_primary_label" id="signup_role_label">How are you attending?</span>'
                 . events_signup_choices(
                     'signup_role',
-                    array('trooper' => 'Trooping', 'wrangler' => 'Wrangling'),
+                    $primary_labels,
                     $primary_choice,
                     'signup_role',
                     'signup_role_radio'
@@ -654,6 +703,16 @@ elseif($rsvp_step === 'costumes')
         }
         $rsvp_body .= '</div>';
     }
+}
+elseif($rsvp_step === 'confirm' && $withdrawing)
+{
+    $rsvp_page_title = 'Withdraw Your Signup';
+    $rsvp_carried_state .= $attendance_state;
+    $rsvp_submit_label = 'Withdraw Signup';
+
+    $rsvp_body = '<p><strong>Event:</strong> <span id="confirm_event">' . $event_title . '</span></p>'
+        . '<p id="confirm_withdraw">You will be taken off the attendance list for this event. '
+        . 'You can sign up again while signups are open.</p>';
 }
 elseif($rsvp_step === 'confirm')
 {

@@ -989,8 +989,9 @@ function events_signup_days_script()
 			if(selected(rowRadios(rows[i])) !== agreed) { agreed = ''; break; }
 		}
 
-		// 'none' agreed on every day is not an answer to the question above either - it is
-		// a signup to nothing, which the server turns away.
+		// 'none' agreed on every day lights "Not attending" on the edit form, where it is a
+		// withdrawal. A first signup has no such chip, so nothing lights: there it is a
+		// signup to nothing, which the server turns away.
 		selectPrimary(agreed);
 		if(selected(primary) !== '') { remembered = agreed; }
 	}

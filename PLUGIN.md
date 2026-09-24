@@ -347,8 +347,13 @@ Rewriting keeps the existing row for any role that is still held, so its origina
 date - which is what a coordinator sorts on - survives the edit. A role that is dropped
 entirely has its row, days and costumes deleted.
 
-There is no way to withdraw from an event through the form: at least one day must be
-attended, so a member who has to pull out asks the coordinator.
+A member who has to pull out does it from the same form. The edit form's "How are you
+attending?" question has a third answer, **Not attending**, and picking it (or marking every
+day as not attending in the per-day grid) goes straight to a confirm step. Confirming
+deletes the signup, including its days and costumes. The first signup form doesn't offer
+this, and still requires at least one day, since there is nothing to withdraw yet. Like any
+other change to a signup, withdrawing is only possible while signups are open. After the
+cutoff, a member who can't make it still has to ask the coordinator.
 
 ### Roles
 
@@ -577,6 +582,10 @@ All tables use the `mybb_event_plugin_` prefix:
 - `event_plugin_user_prefs` - Per-member preferences; currently which view the events
   index opens in. A member with no row gets the default, so it only holds people who have
   actually used the toggle
+
+Every table is `utf8mb4`, so a title or description can carry emoji. Boards installed
+before that shipped with three-byte `utf8` tables, which reject an emoji under strict mode;
+re-activating the plugin converts them in place, data included.
 
 ## Permissions
 

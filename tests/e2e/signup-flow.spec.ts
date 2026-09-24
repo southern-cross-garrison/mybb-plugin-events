@@ -417,6 +417,69 @@ test.describe('signup wizard', () => {
     expect(await countRsvps(eventId)).toBe(0);
   });
 
+  test('a first signup is not offered "Not attending"', async ({ page }) => {
+    const eventId = await createEvent({ title: 'No Withdraw Yet' });
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+
+    await expect(page.locator('#signup_role_trooper')).toBeVisible();
+    await expect(page.locator('#signup_role_none')).toHaveCount(0);
+  });
+
+  test('a member withdraws from the edit form, and every role they held goes', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Withdraw Troop' });
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+    await createRsvp(eventId, 'trooper1', { role: 'wrangler' });
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+
+    await page.locator('#signup_role_none').check();
+    await page.locator('#rsvp_submit').click();
+
+    // Straight to confirm: nobody is asked for costumes or profile details to say they
+    // are not coming.
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'confirm');
+    await expect(page.locator('#confirm_withdraw')).toBeVisible();
+    expect(await countRsvps(eventId)).toBe(2);
+
+    await page.locator('#rsvp_submit').click();
+
+    await expect(page.locator('#rsvp_success')).toHaveAttribute('data-signup-mode', 'withdraw');
+    await expect(page.locator('#rsvp_success_message')).toContainText('no longer signed up');
+    expect(await countRsvps(eventId)).toBe(0);
+    expect(await getRsvpCostumes(eventId, 'trooper1')).toEqual([]);
+  });
+
+  test('sitting out every day on the edit form is a withdrawal', async ({ page }) => {
+    const eventId = await createEvent({
+      title: 'Withdraw Weekend',
+      start: '2026-10-17 09:00:00',
+      end: '2026-10-18 17:00:00',
+      days: [{ date: '2026-10-17' }, { date: '2026-10-18' }],
+    });
+    const dayIds = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+    await createRsvp(eventId, 'trooper1', { costumes: [TK], dayIds });
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+
+    await page.locator('#signup_per_day').check();
+    for (const dayId of dayIds) {
+      await page.locator(`#day_${dayId}_none`).check();
+    }
+    // Every day agreeing on "not attending" is the answer above, stated one day at a time.
+    await expect(page.locator('#signup_role_none')).toBeChecked();
+
+    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'confirm');
+    await page.locator('#rsvp_submit').click();
+
+    await expect(page.locator('#rsvp_success')).toHaveAttribute('data-signup-mode', 'withdraw');
+    expect(await countRsvps(eventId)).toBe(0);
+  });
+
   test('asks a member with no costumes for them in the flow rather than sending them away', async ({ page }) => {
     const eventId = await createEvent({ title: 'Costumeless Troop' });
     await setUserField('trooper2', 'costume', '');

@@ -36,7 +36,7 @@ $is_gec = events_is_event_gec($event_id);
 $event_days = events_get_event_days($event_id);
 
 add_breadcrumb("Events", "events.php");
-add_breadcrumb($event['title'], "event.php?id=" . $event_id);
+add_breadcrumb(htmlspecialchars_uni($event['title']), "event.php?id=" . $event_id);
 
 $event_title = htmlspecialchars_uni($event['title']);
 // Read defensively: an event written before the column existed has no key at all until the

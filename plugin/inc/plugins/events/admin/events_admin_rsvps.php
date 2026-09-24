@@ -33,7 +33,7 @@ function events_admin_rsvps()
     $query = $db->simple_select("event_plugin_events", "id, title, start_date", $where, array("order_by" => "start_date", "order_dir" => "DESC"));
     while($event = $db->fetch_array($query))
     {
-        $events[$event['id']] = $event['title'] . " (" . events_format_date($event['start_date']) . ")";
+        $events[$event['id']] = htmlspecialchars_uni($event['title'] . " (" . events_format_date($event['start_date']) . ")");
     }
 
     $filter_costume = $mybb->get_input('filter_costume');

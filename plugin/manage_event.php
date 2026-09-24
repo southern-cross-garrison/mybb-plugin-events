@@ -103,7 +103,7 @@ $manage_cancel_url = $is_edit ? 'event.php?id=' . $event_id : 'events.php';
 add_breadcrumb("Events", "events.php");
 if($is_edit)
 {
-    add_breadcrumb($event['title'], "event.php?id=" . $event_id);
+    add_breadcrumb(htmlspecialchars_uni($event['title']), "event.php?id=" . $event_id);
     add_breadcrumb("Edit Event", "manage_event.php?id=" . $event_id);
 }
 else

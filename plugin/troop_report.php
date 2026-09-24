@@ -59,7 +59,7 @@ $troopers = events_get_attendees($event_id, array('role' => 'trooper'));
 $wranglers = events_get_attendees($event_id, array('role' => 'wrangler'));
 
 add_breadcrumb("Events", "events.php");
-add_breadcrumb($event['title'], "event.php?id=" . $event_id);
+add_breadcrumb(htmlspecialchars_uni($event['title']), "event.php?id=" . $event_id);
 add_breadcrumb("Troop Report", "troop_report.php?id=" . $event_id);
 
 // ---------------------------------------------------------------------------
