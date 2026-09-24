@@ -831,7 +831,15 @@ function events_validate_event_input(array $input, array $event = array())
         {
             $errors[] = $error;
         }
+        // Signups already close when the event ends, so a cutoff after that is a date that
+        // never applies - and read on the event page as signups still being open after it.
+        // A cutoff exactly at the end is allowed; it says the same thing as having none.
+        elseif(isset($stamps['end_date']) && events_strtotime($input['signup_cutoff']) > $stamps['end_date'])
+        {
+            $errors[] = "The signup cutoff cannot be later than the end of the event.";
+        }
     }
+
     $statuses = events_event_statuses();
     if(!isset($statuses[$input['status']]))
     {

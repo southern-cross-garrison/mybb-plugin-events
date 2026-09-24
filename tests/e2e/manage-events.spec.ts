@@ -717,6 +717,36 @@ test.describe('front-end event management', () => {
     expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Instant Troop'`)).toHaveLength(0);
   });
 
+  test('rejects a signup cutoff later than the end of the event', async ({ page }) => {
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+
+    // A cutoff past the end used to be saved as-is, and the event page then read it as
+    // signups still being open after the event was over.
+    await fillEventForm(page, {
+      title: 'Late Cutoff Troop',
+      status: 'live',
+      region: 'Hunter',
+      start: '2026-10-20 09:00:00',
+      end: '2026-10-20 17:00:00',
+      cutoff: '2026-10-20 17:01:00',
+    });
+    await submitEventForm(page);
+
+    await expect(page.locator('#manage_event_errors')).toContainText(
+      'The signup cutoff cannot be later than the end of the event.',
+    );
+    expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Late Cutoff Troop'`)).toHaveLength(0);
+
+    // Exactly at the end is fine: it closes signups when they would have closed anyway.
+    await fillEventForm(page, { cutoff: '2026-10-20 17:00:00' });
+    await submitEventForm(page);
+
+    await expect
+      .poll(async () => (await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Late Cutoff Troop'`)).length)
+      .toBe(1);
+  });
+
   test('the start and end dates need their times', async ({ page }) => {
     await loginAs(page, 'gec');
     await page.goto('/manage_event.php');
