@@ -5,6 +5,7 @@ import { withSettings } from "../helpers/settings";
 // The report box is MyBB's BBCode editor, which hides the textarea it binds to - so
 // typing into it goes through the same helper the event description uses.
 import { expectEditorAttached, fillDescription } from "../helpers/editor";
+import { submitFormAtOnce } from "../helpers/double-submit";
 import {
   createEvent,
   createRsvp,
@@ -309,6 +310,55 @@ test.describe("troop reports", () => {
     await expect(page.locator("body")).toContainText(
       "A troop report has already been posted",
     );
+  });
+
+  test("a double-clicked submit posts one report and points the second at it", async ({
+    page,
+  }) => {
+    // Both requests used to pass the "already posted" check before either had written
+    // anything, so each filed a thread of its own.
+    const eventId = await finishedEvent("Double Click Report Troop");
+    await createRsvp(eventId, "trooper1", { costumes: [TK] });
+
+    await loginAs(page, "trooper1");
+    await page.goto(`/troop_report.php?id=${eventId}`);
+    await expectEditorAttached(page, "troop_report_content");
+
+    const bodies = await submitFormAtOnce(page, "#troop_report_form", {
+      overrides: { report_content: "Posted once." },
+    });
+
+    const threads = await query(
+      `SELECT tid FROM ${T("threads")} WHERE subject = ?`,
+      ["Troop Report: Double Click Report Troop"],
+    );
+    expect(threads).toHaveLength(1);
+    const tid = Number(threads[0].tid);
+    expect(Number((await getTroopReport(eventId))!.thread_id)).toBe(tid);
+
+    const refused = bodies.filter((body) =>
+      body.includes("A troop report has already been posted"),
+    );
+    expect(refused).toHaveLength(1);
+    expect(refused[0]).toContain(`showthread.php?tid=${tid}`);
+    for (const body of bodies) {
+      expect(body).not.toMatch(/SQL Error|Fatal error/);
+    }
+  });
+
+  test("links to the posted report when it is opened again", async ({ page }) => {
+    const eventId = await finishedEvent("Linked Report Troop");
+    await createRsvp(eventId, "trooper1", { costumes: [TK] });
+
+    await loginAs(page, "trooper1");
+    await page.goto(`/troop_report.php?id=${eventId}`);
+    await fillDescription(page, "troop_report_content", "Already written.");
+    await page.locator("#troop_report_submit").click();
+    await expect(page.locator("body")).toContainText("Already written.");
+
+    await page.goto(`/troop_report.php?id=${eventId}`);
+    await page.locator("#troop_report_existing").click();
+    await expect(page.locator("body")).toContainText("Already written.");
   });
 
   test("say so when the board has no troop report forum configured", async ({ page }) => {

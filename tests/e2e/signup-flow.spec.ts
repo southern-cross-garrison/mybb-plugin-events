@@ -1,6 +1,8 @@
+import { Page } from '@playwright/test';
 import { test, expect } from '../helpers/fixtures';
 import { loginAs } from '../helpers/auth';
 import { signUpThroughWizard } from '../helpers/rsvp';
+import { submitFormAtOnce } from '../helpers/double-submit';
 import {
   createEvent,
   createRsvp,
@@ -683,6 +685,52 @@ test.describe('signup wizard', () => {
     await page.locator('#rsvp_submit').click();
 
     await expect(page.locator('#rsvp_success_message')).toContainText('has been updated');
+    expect(await countRsvps(eventId)).toBe(1);
+    expect((await getRsvpCostumes(eventId, 'trooper1')).sort()).toEqual([TK, TB].sort());
+  });
+});
+
+// A double-clicked Confirm is two requests racing through events_save_signup(). Both used
+// to read "no signup yet", so the second insert tripped the event_user_role key and came
+// back as an SQL error - or, editing a signup, both rewrote its costumes and left each
+// one twice. The second is now processed as an update to the first.
+test.describe('signup confirmed twice at once', () => {
+  async function toConfirmStep(page: Page, eventId: number) {
+    await page.goto(`/rsvp.php?id=${eventId}`);
+    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'costumes');
+    await page.locator(`input.costume_checkbox[value="${TK}"]`).check();
+    await page.locator(`input.costume_checkbox[value="${TB}"]`).check();
+    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'confirm');
+  }
+
+  function expectEverySignupSaved(bodies: string[]) {
+    for (const body of bodies) {
+      expect(body).not.toMatch(/SQL Error|Fatal error/);
+      expect(body).toContain('id="rsvp_success_message"');
+    }
+  }
+
+  test('a new signup is written once', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Double Click Troop' });
+
+    await loginAs(page, 'trooper1');
+    await toConfirmStep(page, eventId);
+    expectEverySignupSaved(await submitFormAtOnce(page, '#rsvp_form', { times: 3 }));
+
+    expect(await getSignupRoles(eventId, 'trooper1')).toEqual(['trooper']);
+    expect((await getRsvpCostumes(eventId, 'trooper1')).sort()).toEqual([TK, TB].sort());
+  });
+
+  test('an edited signup keeps each costume once', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Double Click Edit Troop' });
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+
+    await loginAs(page, 'trooper1');
+    await toConfirmStep(page, eventId);
+    expectEverySignupSaved(await submitFormAtOnce(page, '#rsvp_form', { times: 3 }));
+
     expect(await countRsvps(eventId)).toBe(1);
     expect((await getRsvpCostumes(eventId, 'trooper1')).sort()).toEqual([TK, TB].sort());
   });

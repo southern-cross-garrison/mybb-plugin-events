@@ -1119,6 +1119,56 @@ function events_get_user_signup($event_id, $user_id = null)
 }
 
 /**
+ * Take a named database lock, waiting up to $timeout seconds for whoever holds it.
+ *
+ * The plugin's tables are MyISAM, so there are no transactions to make a read-then-write
+ * atomic, and a double-clicked submit is two requests racing through the same check. A
+ * write that has to see the state the previous one left must hold one of these around
+ * the read *and* the write. Anything read before the lock was taken is stale.
+ *
+ * Named locks belong to the connection, so this goes over the write connection - where
+ * the writes it guards go - and one left behind by a request that died in error() or
+ * exit is released when that connection closes. Lock names are server-wide, so the
+ * database name and table prefix go into the hash to keep two boards on one server apart.
+ *
+ * @param string $name
+ * @param int $timeout
+ * @return bool false if the lock could not be had in time
+ */
+function events_acquire_lock($name, $timeout = 15)
+{
+    global $db;
+
+    $query = $db->write_query("SELECT GET_LOCK('" . events_lock_name($name) . "', " . (int)$timeout . ") AS acquired");
+
+    return (int)$db->fetch_field($query, 'acquired') === 1;
+}
+
+/**
+ * Release a lock taken with events_acquire_lock().
+ *
+ * @param string $name
+ * @return void
+ */
+function events_release_lock($name)
+{
+    global $db;
+
+    $db->write_query("SELECT RELEASE_LOCK('" . events_lock_name($name) . "')");
+}
+
+/**
+ * @param string $name
+ * @return string
+ */
+function events_lock_name($name)
+{
+    global $db;
+
+    return 'events_' . md5($db->database . '|' . TABLE_PREFIX . '|' . $name);
+}
+
+/**
  * Write a member's signup, replacing whatever they had before.
  *
  * $role_days is the whole intent: a role that is absent from it is a role the member is
@@ -1128,18 +1178,48 @@ function events_get_user_signup($event_id, $user_id = null)
  *
  * Costumes only ever attach to the trooper row; a wrangler is not in costume.
  *
+ * The whole write holds a lock on the member's signup for this event, and the signup it
+ * replaces is read inside that lock. A double-clicked Confirm is two of these at once,
+ * and without it both read "no signup yet": the second insert then trips the
+ * event_user_role key, or both rewrite the same row's costumes and leave each one twice.
+ * Held, the second request finds the row the first just wrote and updates it.
+ *
  * @param int $event_id
  * @param int $user_id
  * @param array $role_days role => array of event_day_id (empty array for an event with no days)
  * @param array $costumes
- * @return void
+ * @return bool false if the lock could not be had, in which case nothing was written
  */
 function events_save_signup($event_id, $user_id, array $role_days, array $costumes)
 {
-    global $db;
-
     $event_id = (int)$event_id;
     $user_id = (int)$user_id;
+    $lock = 'signup:' . $event_id . ':' . $user_id;
+
+    if(!events_acquire_lock($lock))
+    {
+        return false;
+    }
+
+    events_write_signup($event_id, $user_id, $role_days, $costumes);
+    events_release_lock($lock);
+
+    return true;
+}
+
+/**
+ * The body of events_save_signup(), which must only be called with its lock held.
+ *
+ * @param int $event_id
+ * @param int $user_id
+ * @param array $role_days
+ * @param array $costumes
+ * @return void
+ */
+function events_write_signup($event_id, $user_id, array $role_days, array $costumes)
+{
+    global $db;
+
     $existing = events_get_user_signup($event_id, $user_id);
 
     foreach(events_rsvp_roles() as $role)

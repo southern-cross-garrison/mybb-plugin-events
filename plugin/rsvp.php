@@ -400,7 +400,10 @@ if($mybb->request_method === 'post')
         {
             // An empty intent is every role dropped, so this deletes the signup's rows
             // along with their days and costumes.
-            events_save_signup($event_id, $mybb->user['uid'], array(), array());
+            if(!events_save_signup($event_id, $mybb->user['uid'], array(), array()))
+            {
+                error("Your signup is still being saved from another request. Please try again in a moment.");
+            }
             $render = 'success';
         }
         elseif($primary_missing)
@@ -425,7 +428,10 @@ if($mybb->request_method === 'post')
         }
         else
         {
-            events_save_signup($event_id, $mybb->user['uid'], $role_days, $selected_costumes);
+            if(!events_save_signup($event_id, $mybb->user['uid'], $role_days, $selected_costumes))
+            {
+                error("Your signup is still being saved from another request. Please try again in a moment.");
+            }
             $render = 'success';
         }
     }

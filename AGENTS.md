@@ -332,6 +332,16 @@ baseline picks the change up.
   because the pruning task runs from front-end page views), and the reminder still joins
   `users` so a stray row can never do it again. Any new multi-recipient PM must do the same.
 
+- The plugin's tables are MyISAM, like the rest of the board, so there are no transactions,
+  and a double-clicked submit is two requests racing through the same check-then-write.
+  Anything that reads state to decide what to write holds a named lock
+  (`events_acquire_lock()` / `events_release_lock()`, MariaDB `GET_LOCK`) around both, and
+  does the read *after* taking the lock. `events_save_signup()` locks per member per event,
+  so a second Confirm becomes an update to the first. `troop_report.php` and the reminder
+  task share a lock per event, so a second submit is told the report is posted and linked
+  to it. `tests/helpers/double-submit.ts` fires overlapping submits from the page. The
+  signup race only loses some of the time, so one passing run of a test like that proves
+  little.
 - A new front-end page needs three things beyond the file itself: a template file (synced
   on activate), its `THIS_SCRIPT` added to `EVENTS_STYLESHEET_ATTACHEDTO` in
   `events_stylesheets.php` - a page missing from that list renders completely unstyled -

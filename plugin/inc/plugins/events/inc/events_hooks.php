@@ -781,11 +781,16 @@ function events_send_reminders()
         $pmhandler->insert_pm();
         $reminded++;
 
-        if($event['report_id'])
+        // Re-read under troop_report.php's lock: a report posted since the query above
+        // has inserted the row this would otherwise insert again, into a unique key.
+        $locked = events_acquire_lock('troop_report:' . (int)$event['id']);
+        $report = events_get_troop_report($event['id']);
+
+        if($report)
         {
             $db->update_query("event_plugin_troop_reports",
                 array('last_reminder_sent' => $db->escape_string($now)),
-                "id = " . (int)$event['report_id']);
+                "id = " . (int)$report['id']);
         }
         else
         {
@@ -795,6 +800,11 @@ function events_send_reminders()
                 'created_at'         => $db->escape_string($now),
                 'last_reminder_sent' => $db->escape_string($now),
             ));
+        }
+
+        if($locked)
+        {
+            events_release_lock('troop_report:' . (int)$event['id']);
         }
     }
 

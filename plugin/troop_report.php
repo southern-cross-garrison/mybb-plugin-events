@@ -51,7 +51,7 @@ if(!events_has_rsvped($event_id, null, 'trooper'))
 $report = events_get_troop_report($event_id);
 if($report && !empty($report['posted_at']))
 {
-    error("A troop report has already been posted for this event.");
+    events_troop_report_posted_error($report);
 }
 
 $event_title = htmlspecialchars_uni($event['title']);
@@ -73,6 +73,22 @@ if($mybb->request_method === 'post' && $mybb->get_input('action') === 'post')
     if(!$forum_id)
     {
         error("No troop report forum has been configured. Ask an administrator to set one in Admin CP -> Event Management -> Settings.");
+    }
+
+    // A double-clicked submit is two of these at once, and both passed the posted_at
+    // check above before either had written anything - which filed two reports. The
+    // lock makes the second wait for the first, and the report is re-read once it is
+    // held, so the second finds the report the first posted and is pointed at it.
+    // Released when the request ends, error() included.
+    if(!events_acquire_lock('troop_report:' . $event_id))
+    {
+        error("This troop report is still being posted. Please try again in a moment.");
+    }
+
+    $report = events_get_troop_report($event_id);
+    if($report && !empty($report['posted_at']))
+    {
+        events_troop_report_posted_error($report);
     }
 
     require_once MYBB_ROOT . "inc/datahandlers/post.php";
@@ -144,7 +160,29 @@ if($mybb->request_method === 'post' && $mybb->get_input('action') === 'post')
     // Posting the report closes the event out.
     $db->update_query("event_plugin_events", array('status' => 'archived'), "id = " . $event_id);
 
+    events_release_lock('troop_report:' . $event_id);
+
     redirect("showthread.php?tid=" . $thread_id, "Troop report posted successfully.");
+}
+
+/**
+ * Stop: this event's report is already posted. Links to it where its thread still
+ * exists, since whoever lands here was about to write the same report.
+ *
+ * @param array $report
+ * @return void
+ */
+function events_troop_report_posted_error(array $report)
+{
+    $message = "A troop report has already been posted for this event.";
+
+    $thread = !empty($report['thread_id']) ? get_thread((int)$report['thread_id']) : null;
+    if($thread)
+    {
+        $message .= ' <a href="' . get_thread_link((int)$thread['tid']) . '" id="troop_report_existing">View the troop report</a>.';
+    }
+
+    error($message);
 }
 
 // ---------------------------------------------------------------------------
