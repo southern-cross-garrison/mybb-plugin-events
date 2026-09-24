@@ -9,6 +9,8 @@ import {
   findThreadBySubject,
   fixtures,
   uid,
+  query,
+  T,
 } from '../helpers/db';
 import { relativeToTestNow } from '../helpers/clock';
 import { fillDescription } from '../helpers/editor';
@@ -217,6 +219,12 @@ test.describe('event announcement threads', () => {
 
     expect(Number((await getEvent(eventId)).thread_id)).toBe(threadId);
     expect(Number((await getThread(threadId)).fid)).toBe(fixtures().forums.events_hunter);
+
+    // Moved outright, not redirected: a redirect stub left in the old forum carries the
+    // event's title and is not the event's thread, so nothing would hide it from members
+    // excluded from the event.
+    const stubs = await query(`SELECT tid FROM ${T('threads')} WHERE closed = ?`, [`moved|${threadId}`]);
+    expect(stubs).toHaveLength(0);
   });
 
   test('says so on the thread when an event is taken off the schedule', async ({ page }) => {

@@ -296,13 +296,16 @@ function events_sync_event_thread($event_id, &$error = null)
         // exists to avoid. But only while the thread is still in a forum the plugin
         // announces into: a moderator who filed it somewhere else meant it, and dragging
         // a discussion back out of the forum it has been living in is not a correction.
+        // "move" rather than MyBB's default "redirect": a redirect leaves a "Moved:" stub
+        // behind in the old forum, and nothing about that stub marks it as the event's
+        // thread, so the exclusion hooks would show its title to excluded members.
         $forum_id = events_event_forum_id($event['region']);
         if($forum_id && (int)$thread['fid'] !== $forum_id && in_array((int)$thread['fid'], events_announcement_forum_ids(), true))
         {
             require_once MYBB_ROOT . "inc/class_moderation.php";
 
             $moderation = new Moderation;
-            $moderation->move_thread((int)$thread['tid'], $forum_id);
+            $moderation->move_thread((int)$thread['tid'], $forum_id, "move");
         }
 
         $handler = new PostDataHandler("update");
