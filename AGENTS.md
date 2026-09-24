@@ -192,6 +192,16 @@ baseline picks the change up.
   anybody saves it, so it reads as "the event vanished" rather than as a settings bug.
   That is the whole reason deleting a region asks where its events go first.
 
+- The settings form writes every setting on it at once, so a save from a page opened
+  before someone else's change silently reverts it - and for a region added meanwhile,
+  that drops it from the list while its events stay filed under it. The form carries
+  `settings_version`, a fingerprint of every row in the `events` setting group
+  (`events_admin_settings_version()`), and a save whose token no longer matches is
+  refused whole and sent back to a fresh form. It fingerprints the rows rather than
+  keeping a counter so that region add/delete and MyBB's own settings screen are covered
+  without having to remember to bump anything. A form re-rendered after a validation
+  error keeps the token it was *submitted* with, not a fresh one.
+
 - Changing a setting from a test means changing it the way the Admin CP does. MyBB serves
   `$mybb->settings` from the generated `inc/settings.php`, not from the `settings` table,
   so a row written with SQL is invisible to every page until something calls

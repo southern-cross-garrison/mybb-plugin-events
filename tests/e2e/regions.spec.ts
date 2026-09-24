@@ -375,6 +375,95 @@ test.describe("configurable regions", () => {
     );
   });
 
+  test("refuses a save from a page opened before somebody else changed the regions", async ({
+    page,
+  }) => {
+    // The page that will save, opened first...
+    await gotoSettings(page);
+
+    // ...and a second tab, same admin, that adds a region while the first sits open.
+    const other = await page.context().newPage();
+    await gotoEventsAdmin(other, "&action=settings");
+    await addRegion(other, "Illawarra");
+    await expect(other.locator("#flash_message")).toContainText(
+      '"Illawarra" added',
+    );
+    await other.close();
+
+    // The stale page never saw Illawarra, so saving it used to write the list without
+    // it - leaving anything filed under Illawarra under a region the board did not have.
+    await renameRegion(page, "Canberra", "ACT");
+    await save(page);
+
+    await expect(page.locator("#flash_message")).toContainText(
+      "This data was altered by someone else between when you loaded it and when you saved.",
+    );
+    expect(await getSetting("events_regions")).toBe(
+      `${DEFAULT_REGIONS},Illawarra`,
+    );
+
+    // It comes back on a fresh form, so reapplying the rename is saved over the list as
+    // it now stands rather than over the one the refused save was based on.
+    await expect(page.locator('input[name="region_name[4]"]')).toHaveValue(
+      "Illawarra",
+    );
+    await renameRegion(page, "Canberra", "ACT");
+    await save(page);
+
+    await expect(page.locator("#flash_message")).toContainText(
+      "Settings updated successfully.",
+    );
+    expect(await getSetting("events_regions")).toBe(
+      "Sydney,Hunter,ACT,Other,Illawarra",
+    );
+  });
+
+  test("a form sent back with an error still refuses to overwrite a change made meanwhile", async ({
+    page,
+  }) => {
+    const f = fixtures();
+
+    await gotoSettings(page);
+    await renameRegion(page, "Canberra", "Bad=Name");
+    await save(page);
+    await expect(page.locator(".error")).toContainText(
+      "cannot contain a comma or an equals sign",
+    );
+
+    // The re-rendered form still shows the values the first page loaded, so it has to
+    // keep that page's token: a fresh one would let the corrected save undo this.
+    const other = await page.context().newPage();
+    await gotoEventsAdmin(other, "&action=settings");
+    await other
+      .locator('select[name="troop_report_forum"]')
+      .selectOption(String(f.forums.general));
+    await save(other);
+    await expect(other.locator("#flash_message")).toContainText(
+      "Settings updated successfully.",
+    );
+    await other.close();
+
+    await renameRegion(page, "Canberra", "ACT");
+    await save(page);
+
+    await expect(page.locator("#flash_message")).toContainText(
+      "altered by someone else",
+    );
+    expect(await getSetting("events_regions")).toBe(DEFAULT_REGIONS);
+    expect(await getSetting("events_troop_report_forum")).toBe(
+      String(f.forums.general),
+    );
+
+    // Put the troop report forum back; restoreRegions() only looks after the list.
+    await page
+      .locator('select[name="troop_report_forum"]')
+      .selectOption(String(f.forums.troop_reports));
+    await save(page);
+    expect(await getSetting("events_troop_report_forum")).toBe(
+      String(f.forums.troop_reports),
+    );
+  });
+
   test("stores an event under a region the board added itself", async ({
     page,
   }) => {

@@ -36,6 +36,42 @@ function events_admin_settings_value($input_name, $setting_name)
     return isset($mybb->settings[$setting_name]) ? $mybb->settings[$setting_name] : '';
 }
 
+/**
+ * A fingerprint of every stored plugin setting, which the settings form carries so a
+ * save can tell whether it is overwriting a state it was never shown.
+ *
+ * The form writes every setting on it at once, the region list included, so a save
+ * from a page opened before somebody else's change quietly undoes that change - and
+ * for a region added in the meantime that means dropping it from the list while its
+ * events stay filed under it. Adding and deleting a region, the other admin's own save,
+ * and MyBB's own settings screen all write these rows, so fingerprinting the rows
+ * rather than keeping a version number that each of them would have to remember to
+ * bump catches all of them.
+ *
+ * Read from the table rather than from $mybb->settings, which is the generated cache
+ * and could be behind the rows it was generated from.
+ *
+ * @return string
+ */
+function events_admin_settings_version()
+{
+    global $db;
+
+    $query = $db->write_query("SELECT s.name, s.value
+        FROM `" . TABLE_PREFIX . "settings` s
+        INNER JOIN `" . TABLE_PREFIX . "settinggroups` g ON g.gid = s.gid
+        WHERE g.name = 'events'
+        ORDER BY s.name");
+
+    $values = array();
+    while($row = $db->fetch_array($query))
+    {
+        $values[$row['name']] = $row['value'];
+    }
+
+    return sha1(json_encode($values));
+}
+
 function events_admin_settings()
 {
     global $mybb, $db, $page, $lang;
@@ -61,6 +97,17 @@ function events_admin_settings()
 
     if($mybb->request_method == "post")
     {
+        // Checked before anything else, and the whole save refused rather than merged:
+        // the form cannot say which of its values the admin changed and which it merely
+        // rendered, so there is nothing safe to keep. It goes back to a fresh form rather
+        // than re-rendering the submitted one, which would carry the stale values - and
+        // the stale token - straight into the next save.
+        if(!hash_equals(events_admin_settings_version(), (string)$mybb->get_input('settings_version')))
+        {
+            flash_message("This data was altered by someone else between when you loaded it and when you saved. Please reapply your changes so work is not lost.", "error");
+            admin_redirect("index.php?module=events&action=settings");
+        }
+
         // What the region rows mean is worked out before anything is written, because
         // the rest of this page hangs off them: the announcement forums are keyed by
         // region name, and an event carries its region as text. A save that wrote the
@@ -155,7 +202,14 @@ function events_admin_settings()
     }
     
     $form = new Form("index.php?module=events&action=settings", "post");
-    
+
+    // A form coming back with a validation error still shows what was submitted, so it
+    // keeps the token that was submitted with it: it is still based on that state, and a
+    // fresh token would let the next save overwrite whatever changed in between.
+    echo $form->generate_hidden_field("settings_version", $mybb->request_method == "post"
+        ? $mybb->get_input('settings_version')
+        : events_admin_settings_version());
+
     $form_container = new FormContainer("Event Management Settings");
 
     // Every date the plugin stores is a wall clock with no offset on it, so the board has
