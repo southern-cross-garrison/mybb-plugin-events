@@ -90,7 +90,7 @@ function events_admin_list_events()
             $popup->add_item("Make Live", "index.php?module=events&amp;action=status&amp;id=" . $event['id'] . "&amp;status=live&amp;my_post_key=" . $mybb->post_code);
         }
 
-        $popup->add_item("Delete", "index.php?module=events&amp;action=delete&amp;id=" . $event['id'] . "&amp;my_post_key=" . $mybb->post_code, "return confirm('Are you sure you want to delete this event?');");
+        $popup->add_item("Delete", "index.php?module=events&amp;action=delete&amp;id=" . $event['id'] . "&amp;my_post_key=" . $mybb->post_code, "return confirm('Are you sure you want to delete this event? Its announcement thread and every reply in it will be deleted too.');");
 
         $table->construct_cell($popup->fetch(), array("class" => "align_center"));
         $table->construct_row();
@@ -395,6 +395,24 @@ function events_admin_delete_event()
     {
         flash_message("You do not have permission to delete this event.", "error");
         admin_redirect("index.php?module=events");
+    }
+
+    // The announcement thread goes with the event. Left behind, it would outlive the
+    // exclusion rows that hide it - events_hidden_thread_ids() finds a thread through its
+    // event - so every member the event excluded could suddenly read it, and it would go
+    // on linking to an event that no longer exists. It goes wherever it has been filed:
+    // a thread a moderator moved is still this event's thread. The troop report's thread
+    // is not touched - it is the record of a troop that happened, and was never hidden.
+    if((int)$event['thread_id'] > 0)
+    {
+        $thread = $db->fetch_array($db->simple_select("threads", "tid", "tid = " . (int)$event['thread_id']));
+        if($thread)
+        {
+            require_once MYBB_ROOT . "inc/class_moderation.php";
+
+            $moderation = new Moderation;
+            $moderation->delete_thread((int)$thread['tid']);
+        }
     }
 
     // Remove the RSVP children before the RSVPs themselves.

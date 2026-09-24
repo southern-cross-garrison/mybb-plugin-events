@@ -5,7 +5,6 @@ import { withSettings } from '../helpers/settings';
 import {
   createEvent,
   execute,
-  findThreadBySubject,
   fixtures,
   getEvent,
   getThread,
@@ -143,19 +142,36 @@ test.describe('announcement threads when something goes wrong', () => {
     expect(message).not.toContain('taken off the schedule');
   });
 
-  test('deleting an event leaves its announcement standing', async ({ page }) => {
-    // Nothing deletes the thread, deliberately: it carries whatever discussion the board
-    // had on it, and that is not the plugin's to throw away. Pinned here so a change of
-    // mind about it is a decision rather than a surprise.
+  test('deleting an event deletes its announcement thread', async ({ page }) => {
+    // The thread is hidden from excluded members only through its event, so a thread
+    // that outlived the event would be readable by exactly the members it was hidden
+    // from, and would link them to an event that no longer exists.
     const title = announcementTitle('Deleted Troop');
     const eventId = await createEvent({ title, status: 'live', region: 'Sydney' });
     const { threadId } = await announce(eventId);
+    expect(threadId).toBeGreaterThan(0);
 
     await loginToAdminCp(page);
     await followAdminActionLink(page, `action=delete&id=${eventId}`);
 
     expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE id = ?`, [eventId])).toHaveLength(0);
-    expect(await findThreadBySubject(title)).toBeTruthy();
-    expect(Number((await getThread(threadId)).tid)).toBe(threadId);
+    expect(await query(`SELECT tid FROM ${T('threads')} WHERE tid = ?`, [threadId])).toHaveLength(0);
+    expect(await query(`SELECT pid FROM ${T('posts')} WHERE tid = ?`, [threadId])).toHaveLength(0);
+  });
+
+  test('deleting an event whose thread is already gone still deletes the event', async ({ page }) => {
+    const title = announcementTitle('Threadless Troop');
+    const eventId = await createEvent({ title, status: 'live', region: 'Sydney' });
+    const { threadId } = await announce(eventId);
+
+    await runPhp(`
+require_once MYBB_ROOT.'inc/class_moderation.php';
+(new Moderation)->delete_thread(${threadId});
+`);
+
+    await loginToAdminCp(page);
+    await followAdminActionLink(page, `action=delete&id=${eventId}`);
+
+    expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE id = ?`, [eventId])).toHaveLength(0);
   });
 });
