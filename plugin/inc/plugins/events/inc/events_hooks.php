@@ -664,6 +664,21 @@ function events_thread_link_to_start()
 }
 
 /**
+ * Drop a deleted member's signups, exclusions and preferences.
+ *
+ * Hook: datahandler_user_delete_end, by which point $handler->delete_uids is the
+ * comma-separated list of the members actually deleted.
+ *
+ * @param UserDataHandler $handler
+ */
+function events_user_deleted($handler)
+{
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
+
+    events_delete_member_data(explode(',', (string)$handler->delete_uids));
+}
+
+/**
  * PM every attendee of a finished event that still has no posted troop report.
  *
  * Reminders are re-sent at most once a week per event. All time comparisons are done
@@ -719,8 +734,19 @@ function events_send_reminders()
         // Troopers only: wranglers cannot author a troop report, so nagging them about a
         // missing one is noise. It also keeps somebody who both trooped and wrangled from
         // landing in $user_ids twice and being PMed twice.
-        $rsvp_query = $db->simple_select("event_plugin_rsvps", "user_id",
-            "event_id = " . (int)$event['id'] . " AND role = 'trooper' AND status = 'attending'");
+        //
+        // Joined to users because this is one PM to every recipient, and MyBB refuses the
+        // whole PM if any one of them does not exist. Deleting a member drops their
+        // signups (events_user_deleted()), but a single stray row would otherwise stop
+        // this event's reminder for everybody, silently and permanently.
+        $rsvp_query = $db->query("
+            SELECT r.user_id
+            FROM " . TABLE_PREFIX . "event_plugin_rsvps r
+            INNER JOIN " . TABLE_PREFIX . "users u ON u.uid = r.user_id
+            WHERE r.event_id = " . (int)$event['id'] . "
+              AND r.role = 'trooper'
+              AND r.status = 'attending'
+        ");
         while($rsvp = $db->fetch_array($rsvp_query))
         {
             if(in_array((int)$rsvp['user_id'], $excluded, true))

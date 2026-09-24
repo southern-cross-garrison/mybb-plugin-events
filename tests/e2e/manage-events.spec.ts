@@ -571,6 +571,27 @@ test.describe('front-end event management', () => {
     await expect(page.locator('#event_form_requires_wwcc')).toBeChecked();
   });
 
+  test('excluding a member who has signed up withdraws their signup', async ({ page }) => {
+    // Once excluded they cannot see the event to withdraw it, so a signup they kept would
+    // sit on the attendance sheet and in the counts with nobody able to take it off.
+    const eventId = await createEvent({ title: 'Signed Then Excluded Troop' });
+    await createRsvp(eventId, 'excluded', { role: 'trooper' });
+    await createRsvp(eventId, 'excluded', { role: 'wrangler' });
+    await createRsvp(eventId, 'trooper1');
+
+    await loginAs(page, 'gec');
+    await page.goto(`/manage_event.php?id=${eventId}`);
+    await fillEventForm(page, { exclusions: ['excluded'] });
+    await submitEventForm(page);
+    await expect(page.locator('#event_page')).toContainText('Signed Then Excluded Troop');
+
+    expect(await getSignupRoles(eventId, 'excluded')).toEqual([]);
+    expect(await getSignupRoles(eventId, 'trooper1')).toEqual(['trooper']);
+
+    // Withdrawing is not something they are told about: the event is hidden from them.
+    expect(await countPrivateMessages('excluded', '%Signed Then Excluded Troop%')).toBe(0);
+  });
+
   test('the excluded members field is a tag input that only takes real members', async ({ page }) => {
     await loginAs(page, 'gec');
     await page.goto('/manage_event.php');
@@ -776,6 +797,36 @@ test.describe('front-end event management', () => {
     await expect(errors).toContainText('A title is required.');
     await expect(errors).toContainText('A start date is required.');
     await expect(errors).toContainText('An end date is required.');
+  });
+
+  test('refuses a title too long to be a post or PM subject', async ({ page }) => {
+    // MyBB caps subjects at 85 characters, and "Troop Report Needed: " is the longest
+    // prefix the plugin puts on a title. A longer title saved fine and then broke the
+    // reminder PM, the troop report and the announcement, each somewhere nobody looked.
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+    await expect(page.locator('#event_form_title')).toHaveAttribute('maxlength', '64');
+
+    // maxlength is the browser's check; a forged post skips it, so lift it and post.
+    await page.locator('#event_form_title').evaluate((input: HTMLInputElement) => {
+      input.removeAttribute('maxlength');
+    });
+    await fillEventForm(page, {
+      title: 'T'.repeat(65),
+      description: 'A troop with a very long name.',
+      status: 'live',
+      region: 'Sydney',
+      start: relativeToTestNow({ days: 21 }),
+      end: relativeToTestNow({ days: 21, hours: 6 }),
+    });
+    await submitEventForm(page);
+    await expect(page.locator('#manage_event_errors')).toContainText(
+      'The title is too long (64 characters at most).',
+    );
+
+    await page.locator('#event_form_title').fill('T'.repeat(64));
+    await submitEventForm(page);
+    await expect(page.locator('#event_page')).toContainText('T'.repeat(64));
   });
 
   test('reports an unparseable day time as a form error rather than a SQL error', async ({ page }) => {

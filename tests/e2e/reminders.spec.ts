@@ -1,9 +1,11 @@
 import { test, expect } from '../helpers/fixtures';
 import { advanceClock, relativeToTestNow, setClock } from '../helpers/clock';
-import { runScheduledTask } from '../helpers/container';
+import { runPhp, runScheduledTask } from '../helpers/container';
 import {
   createEvent,
   createRsvp,
+  countRsvps,
+  query,
   createThread,
   countPrivateMessages,
   getTroopReport,
@@ -169,5 +171,120 @@ test.describe('troop report reminders', () => {
     await setClock(relativeToTestNow({ days: 2 }));
     await runScheduledTask('events_reminders');
     expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+  });
+
+  // The reminder is one PM to every attendee, and MyBB refuses the whole PM if any one
+  // recipient does not exist - so a single deleted member used to silence it for the
+  // rest of the event, every night, with nothing but a skipped event to show for it.
+  test.describe('deleted members', () => {
+    /** Register a member through MyBB's own datahandler; returns the uid. */
+    async function registerMember(username: string): Promise<number> {
+      const output = await runPhp(`
+require_once MYBB_ROOT.'inc/datahandlers/user.php';
+$handler = new UserDataHandler('insert');
+$handler->set_data(array(
+  'username' => '${username}',
+  'password' => 'Passw0rd!Passw0rd',
+  'password2' => 'Passw0rd!Passw0rd',
+  'email' => '${username}@example.invalid',
+  'email2' => '${username}@example.invalid',
+  'usergroup' => 2,
+  'regip' => '127.0.0.1',
+));
+if(!$handler->validate_user()) { echo 'INVALID:'.implode(',', array_keys($handler->get_errors())); exit; }
+$user = $handler->insert_user();
+echo 'UID:'.$user['uid'];
+`);
+      const match = output.match(/UID:(\d+)/);
+      expect(match, output).not.toBeNull();
+      return Number(match![1]);
+    }
+
+    /** A signup by uid: createRsvp() only knows the fixture members. */
+    async function insertSignup(eventId: number, userId: number, role: 'trooper' | 'wrangler' = 'trooper'): Promise<number> {
+      const result = await execute(
+        `INSERT INTO ${T('event_plugin_rsvps')} (event_id, user_id, role, rsvp_date, status) VALUES (?, ?, ?, ?, 'attending')`,
+        [eventId, userId, role, relativeToTestNow({ days: -4 })],
+      );
+      if (role === 'trooper') {
+        await execute(`INSERT INTO ${T('event_plugin_rsvp_costumes')} (rsvp_id, costume) VALUES (?, ?)`, [result.insertId, TK]);
+      }
+      return result.insertId;
+    }
+
+    /** Delete members the way the Admin CP and the pruning task do. */
+    async function deleteMembers(uids: number[]): Promise<void> {
+      await runPhp(`
+require_once MYBB_ROOT.'inc/datahandlers/user.php';
+$handler = new UserDataHandler('delete');
+$handler->delete_user(array(${uids.join(',')}));
+`);
+    }
+
+    test('a signup whose member no longer exists does not stop the reminder', async () => {
+      const eventId = await createEvent({
+        title: 'Orphaned Overdue Troop',
+        start: relativeToTestNow({ days: -3 }),
+        end: relativeToTestNow({ days: -2 }),
+      });
+      await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+
+      // Left behind by a deletion the plugin was not there to see - before this fix, or
+      // straight from the database.
+      const [{ uid: ghost }] = await query<any>(`SELECT MAX(uid) + 1000 AS uid FROM ${T('users')}`);
+      await insertSignup(eventId, ghost);
+
+      const output = await runScheduledTask('events_reminders');
+
+      expect(output).toContain('Event reminder PMs sent for 1 event(s)');
+      expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+      expect((await getTroopReport(eventId))?.last_reminder_sent).toBeTruthy();
+    });
+
+    test('deleting a member withdraws their signups, and the reminder still goes out', async () => {
+      const username = `e2e_deleted_${Date.now()}`;
+      const ghost = await registerMember(username);
+
+      const eventId = await createEvent({
+        title: 'Deleted Member Troop',
+        start: relativeToTestNow({ days: -3 }),
+        end: relativeToTestNow({ days: -2 }),
+      });
+      await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+      await insertSignup(eventId, ghost);
+      await insertSignup(eventId, ghost, 'wrangler');
+      expect(await countRsvps(eventId)).toBe(3);
+
+      await deleteMembers([ghost]);
+
+      // The counts now agree with the attendee list, which never showed them.
+      expect(await countRsvps(eventId)).toBe(1);
+      const leftovers = await query<any>(
+        `SELECT COUNT(*) AS n FROM ${T('event_plugin_rsvp_costumes')} c
+         LEFT JOIN ${T('event_plugin_rsvps')} r ON r.id = c.rsvp_id WHERE r.id IS NULL`,
+      );
+      expect(Number(leftovers[0].n)).toBe(0);
+
+      await runScheduledTask('events_reminders');
+      expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+    });
+
+    test('activation clears signups that earlier deletions left behind', async () => {
+      const eventId = await createEvent({ title: 'Upgrade Orphan Troop' });
+      await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+
+      const [{ uid: ghost }] = await query<any>(`SELECT MAX(uid) + 1000 AS uid FROM ${T('users')}`);
+      const rsvpId = await insertSignup(eventId, ghost);
+      expect(await countRsvps(eventId)).toBe(2);
+
+      await runPhp(`
+require_once MYBB_ROOT.'inc/plugins/events/inc/events_install.php';
+events_upgrade_database();
+`);
+
+      expect(await countRsvps(eventId)).toBe(1);
+      const costumes = await query<any>(`SELECT COUNT(*) AS n FROM ${T('event_plugin_rsvp_costumes')} WHERE rsvp_id = ?`, [rsvpId]);
+      expect(Number(costumes[0].n)).toBe(0);
+    });
   });
 });

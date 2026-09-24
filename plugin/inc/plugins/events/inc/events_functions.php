@@ -1197,6 +1197,52 @@ function events_save_signup($event_id, $user_id, array $role_days, array $costum
 }
 
 /**
+ * Remove everything the plugin holds against members who no longer exist.
+ *
+ * A signup left behind by a deleted member is on no attendance list - those join the
+ * users table - but it is still counted, so an event reads as having more attendees
+ * than it lists and a capped one fills up with nobody. Worse, it keeps them on the
+ * troop-report reminder, which is one PM to every attendee, and MyBB refuses the whole
+ * PM over a recipient who does not exist - so one deleted member silenced the reminder
+ * for everybody else on that event, every night, for good.
+ *
+ * Events and troop reports they created are kept: those belong to the garrison.
+ *
+ * @param int[] $user_ids
+ * @return void
+ */
+function events_delete_member_data(array $user_ids)
+{
+    global $db;
+
+    $user_ids = array_filter(array_map('intval', $user_ids));
+    if(empty($user_ids))
+    {
+        return;
+    }
+
+    $uids = implode(',', $user_ids);
+
+    $rsvp_ids = array();
+    $query = $db->simple_select("event_plugin_rsvps", "id", "user_id IN (" . $uids . ")");
+    while($row = $db->fetch_array($query))
+    {
+        $rsvp_ids[] = (int)$row['id'];
+    }
+
+    if(!empty($rsvp_ids))
+    {
+        $in = implode(',', $rsvp_ids);
+        $db->delete_query("event_plugin_rsvp_days", "rsvp_id IN (" . $in . ")");
+        $db->delete_query("event_plugin_rsvp_costumes", "rsvp_id IN (" . $in . ")");
+        $db->delete_query("event_plugin_rsvps", "id IN (" . $in . ")");
+    }
+
+    $db->delete_query("event_plugin_event_exclusions", "user_id IN (" . $uids . ")");
+    $db->delete_query("event_plugin_user_prefs", "user_id IN (" . $uids . ")");
+}
+
+/**
  * Read one of the mapped custom profile fields for a user.
  *
  * @param int $user_id

@@ -314,6 +314,14 @@ baseline picks the change up.
   form changed in between is warned about again. When an event goes back to one day, the
   day it still runs on doesn't count as removed, even though its row is deleted.
 
+- A PM to several recipients is all-or-nothing: `PMDataHandler` refuses the whole message
+  if any one `toid` is not a user, even with `admin_override`. The troop-report reminder is
+  one such PM, so a single signup held by a deleted member used to stop it for the whole
+  event, every night, with no error anywhere. Deleting a member now drops their rows
+  (`events_user_deleted()` on `datahandler_user_delete_end`, registered in both contexts
+  because the pruning task runs from front-end page views), and the reminder still joins
+  `users` so a stray row can never do it again. Any new multi-recipient PM must do the same.
+
 - A new front-end page needs three things beyond the file itself: a template file (synced
   on activate), its `THIS_SCRIPT` added to `EVENTS_STYLESHEET_ATTACHEDTO` in
   `events_stylesheets.php` - a page missing from that list renders completely unstyled -

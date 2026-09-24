@@ -148,7 +148,9 @@ render it.
 
 Either way the details are:
 
-- Title, description, region
+- Title, description, region. The title is 64 characters at most: it becomes the subject
+  of the announcement thread, the troop report and the reminder PMs, behind prefixes as
+  long as "Troop Report Needed: ", and MyBB refuses a subject over 85
 - The description is written in the board's own BBCode editor, on both forms, and rendered
   the way a post is - on the event page and in the announcement thread alike. **Preview**
   beside the save button shows what it will look like without saving anything. HTML is not
@@ -277,6 +279,13 @@ announcement thread cannot be opened, printed, replied to, searched for, found i
 forum it was posted into, or named as that forum's latest post on the board index. The
 alternative - the event in full view with "you have been excluded from signing up" beside
 the list of everybody who is going - is a worse way to be told than not being told.
+
+Excluding somebody who has already signed up withdraws their signup, exactly as if they
+had withdrawn it themselves first: they come off the attendance sheet and out of the
+counts, and they are not sent a PM about it. They could not withdraw it any other way,
+since the event is hidden from them. The save's confirmation message says how many
+signups went. Activating the plugin withdraws any such signup left over from before this
+was the case.
 
 Two things are deliberately still visible:
 

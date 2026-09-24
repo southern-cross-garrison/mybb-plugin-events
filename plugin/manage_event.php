@@ -85,7 +85,8 @@ if($mybb->request_method === 'post')
         {
             $thread_error = null;
             $cancelled = 0;
-            $saved_id = events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error, $cancelled);
+            $withdrawn = 0;
+            $saved_id = events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error, $cancelled, $withdrawn);
 
             // The event is saved either way; a thread that could not be written is
             // reported rather than swallowed, because nothing else on the page would
@@ -95,6 +96,11 @@ if($mybb->request_method === 'post')
             {
                 $message .= " " . $cancelled . ($cancelled === 1 ? " signup was" : " signups were")
                     . " cancelled and the members sent a PM.";
+            }
+            if($withdrawn > 0)
+            {
+                $message .= " " . $withdrawn . ($withdrawn === 1 ? " excluded member's signup was" : " excluded members' signups were")
+                    . " withdrawn.";
             }
             if($thread_error !== null)
             {
@@ -143,7 +149,7 @@ $coordinators = events_coordinator_choices(array(
 $manage_details = events_form_field(
     'event_form_title',
     'Title',
-    events_form_text('title', 'event_form_title', $values['title'], array('required' => 'required', 'maxlength' => 255)),
+    events_form_text('title', 'event_form_title', $values['title'], array('required' => 'required', 'maxlength' => EVENTS_TITLE_MAX_LENGTH)),
     '',
     true
 );
@@ -276,7 +282,7 @@ $manage_exclusions = events_form_field(
         'search_url' => 'xmlhttp.php?action=get_users&search_type=2',
         'described'  => true,
     )),
-    'Start typing a username and pick from the list. These members can see the event but cannot sign up.'
+    'Start typing a username and pick from the list. These members cannot see the event, and any signup they already have is withdrawn.'
 );
 
 // The calendar's stylesheet and library, and the tag field's and the preview's

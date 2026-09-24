@@ -10,6 +10,11 @@ if(!defined("IN_MYBB"))
 
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_hooks.php";
 
+// Registered in both contexts: members are deleted from the Admin CP, but also by the
+// user-pruning task, which runs from whatever front-end page view happens to trigger it.
+global $plugins;
+$plugins->add_hook("datahandler_user_delete_end", "events_user_deleted");
+
 if(defined('IN_ADMINCP'))
 {
     global $plugins;

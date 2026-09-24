@@ -771,6 +771,10 @@ function events_validate_event_input(array $input, array $event = array())
     {
         $errors[] = "A title is required.";
     }
+    elseif(my_strlen($input['title']) > EVENTS_TITLE_MAX_LENGTH)
+    {
+        $errors[] = "The title is too long (" . EVENTS_TITLE_MAX_LENGTH . " characters at most).";
+    }
 
     // Each date is checked on its own before the two are compared, so an event is never
     // told its end is before its start on the strength of a date that is not a date.
@@ -1079,6 +1083,10 @@ function events_day_change_to_confirm($event_id, array $input)
 
     $removed = events_removed_event_days($event_id, $input);
     $members = events_day_change_signups($event_id, $removed);
+
+    // A member being excluded in the same save is withdrawn by the exclusion, and is not
+    // sent the PM, so they are not somebody this save cancels on account of the days.
+    $members = array_diff_key($members, array_flip(events_parse_exclusions($input['exclusions'])));
     if(empty($members))
     {
         return null;
@@ -1251,10 +1259,16 @@ function events_send_day_change_pms($event_id, array $removed_days, array $membe
  * @param int $user_id Who is saving, recorded as created_by on a new event
  * @param string|null $thread_error Set to why the announcement thread could not be
  *                                  written, for a caller that can pass it on
+ * An excluded member cannot see the event, so cannot withdraw from it either: a signup
+ * they already held is withdrawn for them, exactly as if they had done it first. They are
+ * not PMed - the event is hidden from them, and a PM about it would say what the
+ * exclusion is there not to.
+ *
  * @param int $cancelled Set to how many members' signups a removed day cancelled
+ * @param int $withdrawn Set to how many excluded members' signups were withdrawn
  * @return int the event's id
  */
-function events_save_event($event_id, array $input, $user_id, &$thread_error = null, &$cancelled = 0)
+function events_save_event($event_id, array $input, $user_id, &$thread_error = null, &$cancelled = 0, &$withdrawn = 0)
 {
     global $db;
 
@@ -1307,6 +1321,20 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
             WHERE id = " . $event_id);
     }
 
+    $excluded = events_parse_exclusions($input['exclusions']);
+
+    // Withdrawn before the days are looked at, so a member being excluded is not also
+    // counted - and PMed - as a signup the removed days cancelled.
+    $withdrawn = 0;
+    foreach($excluded as $uid)
+    {
+        if(!empty(events_get_user_signup($event_id, $uid)))
+        {
+            events_save_signup($event_id, $uid, array(), array());
+            $withdrawn++;
+        }
+    }
+
     // Read before the days are reconciled, which deletes the rows this needs to name.
     $removed_days = $is_edit ? events_removed_event_days($event_id, $input) : array();
     $cancelled_members = events_day_change_signups($event_id, $removed_days);
@@ -1321,7 +1349,7 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
     events_save_event_days($event_id, $input['days']);
 
     $db->delete_query("event_plugin_event_exclusions", "event_id = " . $event_id);
-    foreach(events_parse_exclusions($input['exclusions']) as $uid)
+    foreach($excluded as $uid)
     {
         $db->insert_query("event_plugin_event_exclusions", array('event_id' => $event_id, 'user_id' => $uid));
     }
@@ -1338,6 +1366,17 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
 
     return $event_id;
 }
+
+/**
+ * The longest title an event can have.
+ *
+ * The title becomes the subject of posts and PMs the plugin writes, and MyBB refuses a
+ * subject over 85 characters - in a datahandler, long after the event was saved. The
+ * longest prefix is the reminder PM's "Troop Report Needed: ", which leaves 64. Past that
+ * the reminder fails every night without saying so, the troop report is refused after the
+ * member has written it, and the announcement thread is never posted.
+ */
+define('EVENTS_TITLE_MAX_LENGTH', 64);
 
 /**
  * How many day rows a form will ever draw.

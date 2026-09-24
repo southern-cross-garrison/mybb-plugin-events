@@ -271,4 +271,58 @@ function events_upgrade_database()
                 CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci");
         }
     }
+
+    // 1.7 - excluding a member now withdraws the signup they already held. Before, it
+    // stayed on the attendance sheet and in the counts, held by somebody who could no
+    // longer see the event to withdraw it. Those are withdrawn here the same way, and
+    // since nothing is left to match on a second run, this needs no guard.
+    if($db->table_exists('event_plugin_event_exclusions'))
+    {
+        $query = $db->write_query("
+            SELECT r.id
+            FROM " . TABLE_PREFIX . "event_plugin_rsvps r
+            INNER JOIN " . TABLE_PREFIX . "event_plugin_event_exclusions x
+                ON x.event_id = r.event_id AND x.user_id = r.user_id
+        ");
+        $rsvp_ids = array();
+        while($row = $db->fetch_array($query))
+        {
+            $rsvp_ids[] = (int)$row['id'];
+        }
+
+        if(!empty($rsvp_ids))
+        {
+            $in = implode(',', $rsvp_ids);
+            $db->delete_query("event_plugin_rsvp_days", "rsvp_id IN (" . $in . ")");
+            $db->delete_query("event_plugin_rsvp_costumes", "rsvp_id IN (" . $in . ")");
+            $db->delete_query("event_plugin_rsvps", "id IN (" . $in . ")");
+        }
+    }
+
+    // 1.8 - deleting a member now drops what the plugin held against them. Before, their
+    // signups stayed in the counts and blocked the troop-report reminder for everyone else
+    // on the event - see events_delete_member_data(). What earlier deletions left behind
+    // is cleared here; nothing matches on a second run.
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
+
+    $orphans = array();
+    foreach(array('event_plugin_rsvps', 'event_plugin_event_exclusions', 'event_plugin_user_prefs') as $table)
+    {
+        if(!$db->table_exists($table))
+        {
+            continue;
+        }
+
+        $query = $db->write_query("
+            SELECT DISTINCT t.user_id
+            FROM " . TABLE_PREFIX . $table . " t
+            LEFT JOIN " . TABLE_PREFIX . "users u ON u.uid = t.user_id
+            WHERE u.uid IS NULL
+        ");
+        while($row = $db->fetch_array($query))
+        {
+            $orphans[] = (int)$row['user_id'];
+        }
+    }
+    events_delete_member_data(array_unique($orphans));
 }

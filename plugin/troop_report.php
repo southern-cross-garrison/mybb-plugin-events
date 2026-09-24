@@ -29,9 +29,9 @@ if(!$event)
     error("Event not found.");
 }
 
-// A member excluded from an event cannot write its report, even if they hold a signup
-// made before they were excluded: this form is built from the event, and the event is
-// not one they can see. Reading the report once it is posted is another matter - it is
+// A member excluded from an event cannot write its report: this form is built from the
+// event, and the event is not one they can see. (Excluding a member also withdraws any
+// signup they held, so they are not on its attendance list either.) Reading the report once it is posted is another matter - it is
 // an ordinary thread in the troop report forum and is left alone.
 if(!events_can_view_event($event))
 {

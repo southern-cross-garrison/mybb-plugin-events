@@ -167,13 +167,19 @@ function events_admin_edit_event()
             {
                 $thread_error = null;
                 $cancelled = 0;
-                events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error, $cancelled);
+                $withdrawn = 0;
+                events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error, $cancelled, $withdrawn);
 
                 $message = $is_edit ? "Event updated successfully." : "Event created successfully.";
                 if($cancelled > 0)
                 {
                     $message .= " " . $cancelled . ($cancelled === 1 ? " signup was" : " signups were")
                         . " cancelled and the members sent a PM.";
+                }
+                if($withdrawn > 0)
+                {
+                    $message .= " " . $withdrawn . ($withdrawn === 1 ? " excluded member's signup was" : " excluded members' signups were")
+                        . " withdrawn.";
                 }
                 if($thread_error !== null)
                 {
@@ -213,7 +219,7 @@ function events_admin_edit_event()
     }
 
     $container = new FormContainer($is_edit ? "Edit Event" : "Add Event");
-    $container->output_row("Title", "The event's name", $form->generate_text_box("title", $values['title'], array("id" => "title")), "title");
+    $container->output_row("Title", "The event's name", $form->generate_text_box("title", $values['title'], array("id" => "title", "maxlength" => EVENTS_TITLE_MAX_LENGTH)), "title");
     // The description is BBCode, so it gets the board's own editor - see
     // events_description_editor(). The markup goes after the box it binds to, which is
     // where MyBB puts it in its own posting templates and in the Admin CP's signature box.
@@ -276,7 +282,7 @@ function events_admin_edit_event()
     $exclusions_container = new FormContainer("Excluded Members");
     $exclusions_container->output_row(
         "Excluded Members",
-        "Start typing a username and pick from the list. These members can see the event but cannot RSVP.",
+        "Start typing a username and pick from the list. These members cannot see the event, and any signup they already have is withdrawn.",
         events_exclusions_field($values['exclusions'], array(
             'id'          => 'exclusions',
             'input_class' => 'text_input',
