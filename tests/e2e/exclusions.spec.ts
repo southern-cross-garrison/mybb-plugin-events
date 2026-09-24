@@ -132,7 +132,8 @@ test.describe('per-event exclusions', () => {
     // A search is two requests: the POST files the hits in the search log and answers
     // with MyBB's own "redirecting" page, and the results are rendered from that log
     // afterwards. The filtering happens on the way into the log, so both halves are
-    // needed to see what it did.
+    // needed to see what it did. A search that finds nothing is answered by the POST
+    // itself, with no log entry to follow.
     const search = async (): Promise<string> => {
       await page.goto('/index.php');
       const postKey = await page.evaluate(() => (window as any).my_post_key);
@@ -146,16 +147,25 @@ test.describe('per-event exclusions', () => {
         },
       });
 
-      const sid = (await filed.text()).match(/sid=([a-f0-9]+)/)?.[1];
-      expect(sid, 'the search was not accepted').toBeTruthy();
+      const answer = await filed.text();
+      const sid = answer.match(/sid=([a-f0-9]+)/)?.[1];
+      if (!sid) {
+        return answer;
+      }
 
       const results = await page.request.get(`/search.php?action=results&sid=${sid}`);
 
       return results.text();
     };
 
+    // The announcement is the search's only hit, so once it is taken out the member must
+    // be told nothing matched - the answer they would get if it did not exist. Checking
+    // only that the title is absent passed against the SQL error the empty list used to
+    // cause, which does not name the thread either.
     await loginAs(page, 'excluded');
-    expect(await search()).not.toContain(title);
+    const hidden = await search();
+    expect(hidden).not.toContain(title);
+    expect(hidden).toContain('no results were returned');
 
     // The control: the same search does find it for everybody else, so the assertion
     // above is not passing because nothing was searched.

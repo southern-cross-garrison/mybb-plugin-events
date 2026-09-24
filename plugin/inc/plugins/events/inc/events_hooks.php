@@ -263,7 +263,7 @@ function events_hide_thread_in_forumbit($forum)
  */
 function events_hide_threads_in_search()
 {
-    global $db, $searcharray;
+    global $db, $lang, $searcharray;
 
     if(empty($searcharray))
     {
@@ -275,6 +275,11 @@ function events_hide_threads_in_search()
     {
         return;
     }
+
+    $before = array(
+        'threads' => (string)$searcharray['threads'],
+        'posts' => (string)$searcharray['posts'],
+    );
 
     if(!empty($searcharray['threads']))
     {
@@ -291,6 +296,17 @@ function events_hide_threads_in_search()
         }
 
         $searcharray['posts'] = implode(',', array_diff(events_id_list($searcharray['posts']), $hidden_posts));
+    }
+
+    // A search whose only hits were hidden has to be answered the way MyBB answers one that
+    // found nothing. Its search functions refuse to file an empty list, and the results page
+    // relies on that: it drops the thread list straight into "t.tid IN (...)", so an empty
+    // one is an SQL error. A search with a querycache is exempt - its results page re-runs
+    // the clause, never reads the list, and handles finding nothing itself.
+    $list = $searcharray['resulttype'] == 'posts' ? 'posts' : 'threads';
+    if(empty($searcharray['querycache']) && $searcharray[$list] === '' && $before[$list] !== '')
+    {
+        error($lang->error_nosearchresults);
     }
 }
 
