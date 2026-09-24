@@ -160,7 +160,9 @@ Either way the details are:
   search for it, opened in a new tab, and it is the `LOCATION` an attendee's downloaded
   calendar entry carries. An event with no address simply shows none, and its calendar
   entry falls back to naming the region
-- Start and end dates
+- Start and end dates. The end needs a time as well as a date, and has to be later than
+  the start - a blank end time would otherwise mean midnight at the *start* of the last
+  day. The start time may be left blank, which means midnight
 - Signup cutoff (optional - with none, signups stay open until the event ends)
 - WWCC requirement
 - GEC assignment - see below

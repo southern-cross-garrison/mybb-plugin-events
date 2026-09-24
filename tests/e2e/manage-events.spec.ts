@@ -557,7 +557,7 @@ test.describe('front-end event management', () => {
     });
     await submitEventForm(page);
 
-    await expect(page.locator('#manage_event_errors')).toContainText('The end date cannot be before the start date');
+    await expect(page.locator('#manage_event_errors')).toContainText('The end must be later than the start.');
 
     // A failed submit re-renders from what was posted, so nothing has to be retyped.
     await expect(page.locator('#event_form_title')).toHaveValue('Backwards Troop');
@@ -565,6 +565,59 @@ test.describe('front-end event management', () => {
     await expect(page.locator('#event_form_status')).toHaveValue('live');
 
     expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Backwards Troop'`)).toHaveLength(0);
+  });
+
+  test('rejects an end that is the same moment as the start', async ({ page }) => {
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+
+    await fillEventForm(page, {
+      title: 'Instant Troop',
+      status: 'live',
+      region: 'Hunter',
+      start: '2026-10-20 09:00:00',
+      end: '2026-10-20 09:00:00',
+    });
+    await submitEventForm(page);
+
+    await expect(page.locator('#manage_event_errors')).toContainText('The end must be later than the start.');
+    expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Instant Troop'`)).toHaveLength(0);
+  });
+
+  test('an end date needs its time', async ({ page }) => {
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+
+    // The browser asks for it first.
+    await expect(page.locator('#event_form_end_date_time')).toHaveAttribute('required', 'required');
+    await expect(page.locator('#event_form_start_date_time')).not.toHaveAttribute('required');
+
+    // And the server refuses it when the browser is bypassed. Left blank the time used to
+    // be read as midnight, which put the end of a one-day event at the very start of its
+    // day - locked for signups, "Needs Troop Report" and reminded before anybody arrived.
+    await page
+      .locator('#manage_event_form')
+      .evaluate((form: HTMLFormElement) => {
+        form.noValidate = true;
+      });
+    await fillEventForm(page, {
+      title: 'Timeless Troop',
+      status: 'live',
+      region: 'Hunter',
+      start: '2026-10-20',
+      end: '2026-10-20',
+    });
+    await submitEventForm(page);
+
+    await expect(page.locator('#manage_event_errors')).toContainText('An end date needs a time as well as a date.');
+
+    // The re-rendered form keeps the times blank rather than filling in a midnight nobody
+    // typed, which the next submit would otherwise carry straight past this check.
+    await expect(page.locator('#event_form_end_date')).toHaveValue('2026-10-20');
+    await expect(page.locator('#event_form_end_date_time')).toHaveValue('');
+    await expect(page.locator('#event_form_start_date_time')).toHaveValue('');
+
+    expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Timeless Troop'`)).toHaveLength(0);
   });
 
   test('the calendar stays shut when the browser reports an empty date', async ({ page }) => {

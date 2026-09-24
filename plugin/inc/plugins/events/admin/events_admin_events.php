@@ -221,7 +221,7 @@ function events_admin_edit_event()
     // class it is handed - MyBB's own .text_input here.
     $date_options = array("input_class" => "text_input");
     $container->output_row("Start Date", "When the event itself begins. Pick a date from the calendar, or type it as YYYY-MM-DD.", events_datetime_field("start_date", "start_date", $values['start_date'], $date_options + array("required" => true, "label" => "Start")), "start_date");
-    $container->output_row("End Date", "When it finishes. Signups close here when no cutoff is set below.", events_datetime_field("end_date", "end_date", $values['end_date'], $date_options + array("required" => true, "label" => "End")), "end_date");
+    $container->output_row("End Date", "When it finishes. Signups close here when no cutoff is set below.", events_datetime_field("end_date", "end_date", $values['end_date'], $date_options + array("required" => true, "time_required" => true, "label" => "End")), "end_date");
     $container->output_row("Signup Cutoff", "Optional. RSVPs close at this time; leave blank to keep them open until the event ends.", events_datetime_field("signup_cutoff", "signup_cutoff", $values['signup_cutoff'], $date_options + array("label" => "Signup cutoff")), "signup_cutoff");
     $container->output_row("Requires WWCC", "Attendees must have a WWCC number on file", $form->generate_check_box("requires_wwcc", 1, "This event requires a WWCC", array("id" => "requires_wwcc", "checked" => !empty($values['requires_wwcc']))), "requires_wwcc");
     $container->output_row("Coordinator", "The member who manages this event", $form->generate_select_box("gec_user_id", $coordinators, $values['gec_user_id'], array("id" => "gec_user_id")), "gec_user_id");

@@ -181,7 +181,7 @@ $manage_details .= events_form_field(
     'event_form_end_date',
     'End Date',
     events_datetime_field('end_date', 'event_form_end_date', $values['end_date'], array(
-        'required' => true, 'described' => true, 'label' => 'End',
+        'required' => true, 'time_required' => true, 'described' => true, 'label' => 'End',
     )),
     'When it finishes. Signups close here when no cutoff is set below.',
     true

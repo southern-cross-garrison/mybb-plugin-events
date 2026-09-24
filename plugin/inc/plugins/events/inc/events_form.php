@@ -244,7 +244,7 @@ function events_description_preview($description)
  * @param string $name
  * @param string $id
  * @param string $value 'Y-m-d H:i:s', or empty
- * @param array $options input_class, required, described, label
+ * @param array $options input_class, required, time_required, described, label
  * @return string
  */
 function events_datetime_field($name, $id, $value, array $options = array())
@@ -254,6 +254,7 @@ function events_datetime_field($name, $id, $value, array $options = array())
     $parts = events_datetime_parts($value);
 
     $required = !empty($options['required']) ? ' required="required"' : '';
+    $time_required = !empty($options['time_required']) ? ' required="required"' : '';
     $described = !empty($options['described']) ? ' aria-describedby="hint_' . $id . '"' : '';
 
     return '<span class="events_datetime">'
@@ -263,14 +264,18 @@ function events_datetime_field($name, $id, $value, array $options = array())
          . ' aria-label="' . htmlspecialchars_uni($label . ' date') . '"' . $required . $described . ' />'
          . '<input type="time" class="' . $input_class . ' events_time_input" name="' . $name . '_time"'
          . ' id="' . $id . '_time" value="' . htmlspecialchars_uni($parts['time']) . '"'
-         . ' aria-label="' . htmlspecialchars_uni($label . ' time') . '" />'
+         . ' aria-label="' . htmlspecialchars_uni($label . ' time') . '"' . $time_required . ' />'
          . '</span>';
 }
 
 /**
  * Split a stored date and time into the two boxes that render it.
  *
- * @param string $value 'Y-m-d H:i:s', or empty / the zero date for an unset one
+ * A bare 'Y-m-d' is a posted date whose time was left blank, and it comes back with the
+ * time box blank too - read as midnight, a form re-rendered after an error would fill in
+ * a time nobody typed, and the next submit would sail past the check that asked for one.
+ *
+ * @param string $value 'Y-m-d H:i:s', 'Y-m-d', or empty / the zero date for an unset one
  * @return array date ('Y-m-d') and time ('H:i'), both '' when unset
  */
 function events_datetime_parts($value)
@@ -281,6 +286,11 @@ function events_datetime_parts($value)
     if($stamp === false)
     {
         return array('date' => '', 'time' => '');
+    }
+
+    if(strlen($value) <= 10)
+    {
+        return array('date' => events_date('Y-m-d', $stamp), 'time' => '');
     }
 
     // H:i, not H:i:s: a time input with no step shows and posts whole minutes, and handing
@@ -297,8 +307,14 @@ function events_datetime_parts($value)
  * an optional date (the signup cutoff) says there is no cutoff. A time on its own is not a
  * date, so it goes with it.
  *
+ * A date with its time left blank comes back as the bare 'Y-m-d', not as midnight, so the
+ * validator can tell the two apart. Filled in as 00:00, an end date typed without a time
+ * put the end of a one-day event at the very start of its day: signups locked, the troop
+ * report opened and the reminders went out before anybody had arrived. Where a blank time
+ * is allowed, events_strtotime() still reads the bare date as midnight.
+ *
  * @param string $name
- * @return string '' when the field was left unset
+ * @return string '' when the field was left unset, 'Y-m-d' when only its time was
  */
 function events_posted_datetime($name)
 {
@@ -312,7 +328,7 @@ function events_posted_datetime($name)
         return '';
     }
 
-    return $date . ' ' . ($time === '' ? '00:00:00' : $time);
+    return $time === '' ? $date : $date . ' ' . $time;
 }
 
 /**
@@ -760,9 +776,13 @@ function events_validate_event_input(array $input, array $event = array())
     //
     // The article is spelled out beside each label rather than derived from it, which is
     // what produced "A end date is required."
+    //
+    // The end needs its time as well as its date. Left to default to midnight it is the
+    // start of the last day rather than the end of it, which is the one time an event
+    // certainly has not finished by.
     $date_fields = array(
-        'start_date' => array('label' => 'start date', 'article' => 'A'),
-        'end_date'   => array('label' => 'end date',   'article' => 'An'),
+        'start_date' => array('label' => 'start date', 'article' => 'A', 'time_required' => false),
+        'end_date'   => array('label' => 'end date',   'article' => 'An', 'time_required' => true),
     );
 
     $stamps = array();
@@ -783,12 +803,20 @@ function events_validate_event_input(array $input, array $event = array())
             continue;
         }
 
+        if($spec['time_required'] && strlen(trim($input[$field])) <= 10)
+        {
+            $errors[] = $spec['article'] . " " . $label . " needs a time as well as a date.";
+            continue;
+        }
+
         $stamps[$field] = events_strtotime($input[$field]);
     }
 
-    if(isset($stamps['start_date'], $stamps['end_date']) && $stamps['end_date'] < $stamps['start_date'])
+    // Strictly later: an event that ends the moment it starts has ended before anybody
+    // could sign up for it.
+    if(isset($stamps['start_date'], $stamps['end_date']) && $stamps['end_date'] <= $stamps['start_date'])
     {
-        $errors[] = "The end date cannot be before the start date.";
+        $errors[] = "The end must be later than the start.";
     }
 
     if($input['signup_cutoff'] !== '')
