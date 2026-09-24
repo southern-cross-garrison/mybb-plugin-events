@@ -84,6 +84,7 @@ const PLUGIN_TABLES = [
   'event_plugin_troop_reports',
   'event_plugin_events',
   'event_plugin_user_prefs',
+  'event_plugin_feed_tokens',
 ];
 
 const USERFIELDS_BACKUP = `${TABLE_PREFIX}userfields_e2e_backup`;

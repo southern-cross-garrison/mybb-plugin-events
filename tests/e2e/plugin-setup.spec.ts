@@ -10,6 +10,7 @@ test.describe('plugin installation', () => {
     expect(titles).toEqual([
       'events_attendance',
       'events_calendar',
+      'events_calendar_feed',
       'events_event',
       'events_event_card',
       'events_event_form',
@@ -29,7 +30,7 @@ test.describe('plugin installation', () => {
       `SELECT tid, attachedto FROM ${T('themestylesheets')} WHERE name = 'events.css'`,
     );
     expect(sheet?.tid).toBe(1);
-    expect(sheet?.attachedto).toBe('events.php|event.php|manage_event.php|rsvp.php|troop_report.php|showthread.php');
+    expect(sheet?.attachedto).toBe('events.php|event.php|manage_event.php|rsvp.php|troop_report.php|calendar_feed.php|showthread.php');
 
     // A stylesheet missing from a theme's display order is silently never output, so
     // assert on the rendered page rather than just the row.
@@ -65,7 +66,7 @@ test.describe('plugin installation', () => {
       `SELECT table_name AS name, table_collation AS collation FROM information_schema.tables
         WHERE table_schema = DATABASE() AND table_name LIKE '${T('event\\_plugin\\_%')}'`,
     );
-    expect(tables).toHaveLength(8);
+    expect(tables).toHaveLength(9);
     for (const table of tables as any[]) {
       expect(table.collation, table.name).toMatch(/^utf8mb4_/);
     }

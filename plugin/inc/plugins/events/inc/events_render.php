@@ -496,16 +496,26 @@ function events_parse_description($description)
  * For the iCal feed, whose DESCRIPTION is a text property that a calendar app shows
  * verbatim - so BBCode has to come out rather than be rendered. text_parse_message() is
  * MyBB's own plain-text pass, the one its feeds and its search index use, and strip_tags
- * catches the handful of places it still leaves a tag behind.
+ * catches the handful of places it still leaves a tag behind (lists come out as <ul>).
+ *
+ * The description itself is plain text as far as HTML goes, and strip_tags cannot tell a
+ * member's "<" from the start of a tag: "Kids <12 free" lost everything after "Kids". So
+ * every "<" the member wrote is parked on a private-use character for the duration and
+ * put back afterwards, leaving strip_tags only the tags the parser produced.
  *
  * @param string $description Raw, as stored
  * @return string
  */
 function events_description_text($description)
 {
-    return strip_tags(events_parser()->text_parse_message((string)$description, array(
+    $placeholder = "\u{E000}";
+    $description = str_replace(array($placeholder, '<'), array('', $placeholder), (string)$description);
+
+    $text = strip_tags(events_parser()->text_parse_message($description, array(
         'filter_badwords' => 1,
     )));
+
+    return str_replace($placeholder, '<', $text);
 }
 
 /**

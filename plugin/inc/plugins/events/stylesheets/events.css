@@ -1013,6 +1013,13 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
  * ------------------------------------------------------------------------ */
 .events_print_header { display: none; }
 
+/* Calendar subscription (calendar_feed.php). */
+.events_feed_link { margin: 12px 0; }
+.events_feed_link .events_notice { margin-bottom: 12px; }
+.events_feed_url { width: 100%; box-sizing: border-box; font-family: monospace; }
+.events_feed_actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.events_feed_form { display: inline; margin: 0; }
+
 @media print {
 	/* Hide everything that is neither the plugin's page nor an ancestor holding it in
 	 * the document. Naming a theme's own header, navigation and footer would not

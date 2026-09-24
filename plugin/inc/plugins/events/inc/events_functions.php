@@ -1320,6 +1320,13 @@ function events_delete_member_data(array $user_ids)
 
     $db->delete_query("event_plugin_event_exclusions", "user_id IN (" . $uids . ")");
     $db->delete_query("event_plugin_user_prefs", "user_id IN (" . $uids . ")");
+
+    // The feed already refuses a token whose member is gone; dropping it as well means a
+    // credential is never left in the table with nobody able to revoke it.
+    if($db->table_exists("event_plugin_feed_tokens"))
+    {
+        $db->delete_query("event_plugin_feed_tokens", "user_id IN (" . $uids . ")");
+    }
 }
 
 /**

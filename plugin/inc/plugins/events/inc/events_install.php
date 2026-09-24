@@ -24,7 +24,8 @@ function events_plugin_tables()
         'event_plugin_rsvp_days',
         'event_plugin_rsvp_costumes',
         'event_plugin_troop_reports',
-        'event_plugin_user_prefs'
+        'event_plugin_user_prefs',
+        'event_plugin_feed_tokens'
     );
 }
 
@@ -147,6 +148,7 @@ function events_install_database()
 
     // Per-member preferences table
     events_create_user_prefs_table();
+    events_create_feed_tokens_table();
 }
 
 /**
@@ -171,6 +173,33 @@ function events_create_user_prefs_table()
         `user_id` int(11) NOT NULL,
         `events_view` enum('list','calendar') NOT NULL DEFAULT 'list',
         PRIMARY KEY (`user_id`)
+    ) ENGINE=MyISAM {$charset};");
+}
+
+/**
+ * The calendar subscription tokens, one per member at most (see events_feed.php).
+ *
+ * Only a hash of each token is kept, never the token, so the table is of no use to
+ * anyone who reads it: a feed URL cannot be rebuilt from it. The hash is SHA-256 hex;
+ * utf8mb4 like every other column, which puts its unique key at 256 bytes, well inside
+ * MyISAM's limit. The collation is case-insensitive, which does not matter: the lookup
+ * is followed by an exact hash_equals() (events_feed_token_user()).
+ *
+ * Shared by install and upgrade, like events_create_user_prefs_table().
+ */
+function events_create_feed_tokens_table()
+{
+    global $db;
+
+    $charset = events_table_charset();
+
+    $db->write_query("CREATE TABLE IF NOT EXISTS `" . TABLE_PREFIX . "event_plugin_feed_tokens` (
+        `user_id` int(11) NOT NULL,
+        `token_hash` char(64) NOT NULL,
+        `created_at` int(10) unsigned NOT NULL DEFAULT 0,
+        `last_used_at` int(10) unsigned NOT NULL DEFAULT 0,
+        PRIMARY KEY (`user_id`),
+        UNIQUE KEY `token_hash` (`token_hash`)
     ) ENGINE=MyISAM {$charset};");
 }
 
@@ -221,6 +250,7 @@ function events_upgrade_database()
 
     // The events page opens in whichever view the member last used.
     events_create_user_prefs_table();
+    events_create_feed_tokens_table();
 
     // 1.4 - regions are the board's to configure, so the column can no longer be an
     // enum of the four the plugin shipped with: MySQL silently coerces a value outside
@@ -306,7 +336,7 @@ function events_upgrade_database()
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 
     $orphans = array();
-    foreach(array('event_plugin_rsvps', 'event_plugin_event_exclusions', 'event_plugin_user_prefs') as $table)
+    foreach(array('event_plugin_rsvps', 'event_plugin_event_exclusions', 'event_plugin_user_prefs', 'event_plugin_feed_tokens') as $table)
     {
         if(!$db->table_exists($table))
         {

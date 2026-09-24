@@ -1,6 +1,6 @@
 import { test, expect } from '../helpers/fixtures';
 import { loginAs, logout } from '../helpers/auth';
-import { createEvent, createRsvp, fixtures, getEventDays } from '../helpers/db';
+import { createEvent, createRsvp, execute, fixtures, getEventDays, T } from '../helpers/db';
 import type { Page } from '@playwright/test';
 
 const TK = fixtures().costumeOptions[0];
@@ -101,6 +101,68 @@ test.describe('iCal export', () => {
     expect(body).toContain('DTEND:20261018T160000Z');
   });
 
+  test('ends a day that runs to midnight or overnight on the following date', async ({ page }) => {
+    // A day stores only its times; an end at or before the start is the next morning.
+    const eventId = await createEvent({
+      title: 'Late Night Export Troop',
+      start: '2026-10-17 18:00:00',
+      end: '2026-10-19 02:00:00',
+      days: [
+        { date: '2026-10-17', start: '18:00:00', end: '00:00:00' },
+        { date: '2026-10-18', start: '20:00:00', end: '02:00:00' },
+      ],
+    });
+
+    await loginAs(page, 'trooper1');
+    const body = await fetchCalendar(page, eventId);
+
+    expect(body).toContain('DTSTART:20261017T180000Z');
+    expect(body).toContain('DTEND:20261018T000000Z');
+    expect(body).toContain('DTSTART:20261018T200000Z');
+    expect(body).toContain('DTEND:20261019T020000Z');
+  });
+
+  test('ends a single-day event that runs past midnight on the following date', async ({ page }) => {
+    const eventId = await createEvent({
+      title: 'Overnight Export Troop',
+      start: '2026-10-20 20:00:00',
+      end: '2026-10-21 01:00:00',
+    });
+
+    await loginAs(page, 'trooper1');
+    const body = await fetchCalendar(page, eventId);
+
+    expect(body).toContain('DTSTART:20261020T200000Z');
+    expect(body).toContain('DTEND:20261021T010000Z');
+  });
+
+  test('keeps each entry\'s UID when the event\'s days are recreated', async ({ page }) => {
+    // A calendar app matches a re-import by UID; one that changes leaves a duplicate.
+    const eventId = await createEvent({ title: 'Stable Weekend Troop', ...WEEKEND });
+
+    await loginAs(page, 'trooper1');
+    const uids = async () => (await fetchCalendar(page, eventId)).match(/^UID:.*$/gm);
+    const before = await uids();
+    expect(before).toEqual([
+      expect.stringMatching(new RegExp(`^UID:event-${eventId}@`)),
+      expect.stringMatching(new RegExp(`^UID:event-${eventId}-20261018@`)),
+    ]);
+
+    // New rows, new ids, same days.
+    await execute(`DELETE FROM ${T('event_plugin_event_days')} WHERE event_id = ?`, [eventId]);
+    for (const day of WEEKEND.days) {
+      await execute(
+        `INSERT INTO ${T('event_plugin_event_days')} (event_id, date, start_time, end_time) VALUES (?, ?, ?, ?)`,
+        [eventId, day.date, day.start, day.end],
+      );
+    }
+    expect(await uids()).toEqual(before);
+
+    // Back to a single day: no rows at all, and the entry that is left is still the first.
+    await execute(`DELETE FROM ${T('event_plugin_event_days')} WHERE event_id = ?`, [eventId]);
+    expect(await uids()).toEqual([before![0]]);
+  });
+
   test('escapes characters that would corrupt the feed', async ({ page }) => {
     const eventId = await createEvent({
       title: 'Troop; with, punctuation',
@@ -133,9 +195,23 @@ test.describe('iCal export', () => {
     expect(body).not.toContain('[b]');
   });
 
+  test('keeps a "<" in the description that is not a tag', async ({ page }) => {
+    const eventId = await createEvent({
+      title: 'Angle Bracket Export Troop',
+      description: 'Kids <12 free, adults > 12 pay.',
+      start: '2026-10-20 10:00:00',
+      end: '2026-10-20 16:00:00',
+    });
+
+    await loginAs(page, 'trooper1');
+    const body = await fetchCalendar(page, eventId);
+
+    expect(body).toContain(String.raw`\n\nKids <12 free\, adults > 12 pay.`);
+  });
+
   test('exports only the days the member signed up for, and says what they are doing', async ({ page }) => {
     const eventId = await createEvent({ title: 'Signed Up Weekend Troop', ...WEEKEND });
-    const [saturday, sunday] = (await getEventDays(eventId)).map((day) => Number(day.id));
+    const [, sunday] = (await getEventDays(eventId)).map((day) => Number(day.id));
     await createRsvp(eventId, 'trooper1', { costumes: [TK, SECOND_COSTUME], dayIds: [sunday] });
 
     await loginAs(page, 'trooper1');
@@ -143,8 +219,8 @@ test.describe('iCal export', () => {
 
     expect(body.match(/BEGIN:VEVENT/g)).toHaveLength(1);
     expect(body).not.toContain('DTSTART:20261017T090000Z');
-    expect(body).toContain(`UID:event-${eventId}-${sunday}@`);
-    expect(body).not.toContain(`UID:event-${eventId}-${saturday}@`);
+    expect(body).toContain(`UID:event-${eventId}-20261018@`);
+    expect(body).not.toContain(`UID:event-${eventId}@`);
     // The comma between costumes is escaped like any other in a text property.
     expect(signupLinesByStart(body)['20261018T100000Z']).toBe(
       `You're trooping (${TK}\\, ${SECOND_COSTUME}) this day.`,
