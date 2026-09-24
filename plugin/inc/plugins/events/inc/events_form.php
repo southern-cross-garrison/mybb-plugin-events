@@ -311,7 +311,8 @@ function events_datetime_parts($value)
  * validator can tell the two apart. Filled in as 00:00, an end date typed without a time
  * put the end of a one-day event at the very start of its day: signups locked, the troop
  * report opened and the reminders went out before anybody had arrived. Where a blank time
- * is allowed, events_strtotime() still reads the bare date as midnight.
+ * is allowed (only the signup cutoff), events_strtotime() still reads the bare date as
+ * midnight.
  *
  * @param string $name
  * @return string '' when the field was left unset, 'Y-m-d' when only its time was
@@ -777,12 +778,12 @@ function events_validate_event_input(array $input, array $event = array())
     // The article is spelled out beside each label rather than derived from it, which is
     // what produced "A end date is required."
     //
-    // The end needs its time as well as its date. Left to default to midnight it is the
-    // start of the last day rather than the end of it, which is the one time an event
-    // certainly has not finished by.
+    // Both need a time as well as a date. There is no sensible default: midnight puts an
+    // end at the start of the last day rather than the end of it, and a start at an hour
+    // no troop begins.
     $date_fields = array(
-        'start_date' => array('label' => 'start date', 'article' => 'A', 'time_required' => false),
-        'end_date'   => array('label' => 'end date',   'article' => 'An', 'time_required' => true),
+        'start_date' => array('label' => 'start date', 'article' => 'A'),
+        'end_date'   => array('label' => 'end date',   'article' => 'An'),
     );
 
     $stamps = array();
@@ -803,7 +804,7 @@ function events_validate_event_input(array $input, array $event = array())
             continue;
         }
 
-        if($spec['time_required'] && strlen(trim($input[$field])) <= 10)
+        if(strlen(trim($input[$field])) <= 10)
         {
             $errors[] = $spec['article'] . " " . $label . " needs a time as well as a date.";
             continue;

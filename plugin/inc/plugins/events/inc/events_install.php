@@ -10,9 +10,46 @@ if(!defined("IN_MYBB"))
     die("Direct initialization of this file is not allowed.");
 }
 
+/**
+ * Every table the plugin owns, unprefixed. Install, upgrade and uninstall all walk this
+ * list, so a table added here is created, converted and dropped with the rest.
+ */
+function events_plugin_tables()
+{
+    return array(
+        'event_plugin_events',
+        'event_plugin_event_days',
+        'event_plugin_event_exclusions',
+        'event_plugin_rsvps',
+        'event_plugin_rsvp_days',
+        'event_plugin_rsvp_costumes',
+        'event_plugin_troop_reports',
+        'event_plugin_user_prefs'
+    );
+}
+
+/**
+ * The character set every plugin table is created with.
+ *
+ * utf8mb4 regardless of the board's own connection encoding: MySQL's `utf8` is the
+ * three-byte subset that cannot hold an emoji, so "🎃 Halloween Troop" or a description
+ * pasted from Facebook fails to save under strict mode. utf8mb4 is a superset, so it is
+ * safe whatever the board connects as. The collation matches what MyBB itself creates
+ * its utf8mb4 tables with.
+ *
+ * Every key on these tables stays inside MyISAM's 1000-byte limit at four bytes a
+ * character - the widest is `region`, varchar(64). Indexing a varchar(255) would not.
+ */
+function events_table_charset()
+{
+    return "DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
+}
+
 function events_install_database()
 {
     global $db;
+
+    $charset = events_table_charset();
     
     // Events table
     $db->write_query("CREATE TABLE IF NOT EXISTS `" . TABLE_PREFIX . "event_plugin_events` (
@@ -38,7 +75,7 @@ function events_install_database()
         KEY `start_date` (`start_date`),
         KEY `gec_user_id` (`gec_user_id`),
         KEY `thread_id` (`thread_id`)
-    ) ENGINE=MyISAM DEFAULT CHARSET=utf8;");
+    ) ENGINE=MyISAM {$charset};");
     
     // Event days table (for multi-day events)
     $db->write_query("CREATE TABLE IF NOT EXISTS `" . TABLE_PREFIX . "event_plugin_event_days` (
@@ -50,7 +87,7 @@ function events_install_database()
         PRIMARY KEY (`id`),
         KEY `event_id` (`event_id`),
         KEY `date` (`date`)
-    ) ENGINE=MyISAM DEFAULT CHARSET=utf8;");
+    ) ENGINE=MyISAM {$charset};");
     
     // Event exclusions table
     $db->write_query("CREATE TABLE IF NOT EXISTS `" . TABLE_PREFIX . "event_plugin_event_exclusions` (
@@ -58,7 +95,7 @@ function events_install_database()
         `user_id` int(11) NOT NULL,
         PRIMARY KEY (`event_id`, `user_id`),
         KEY `user_id` (`user_id`)
-    ) ENGINE=MyISAM DEFAULT CHARSET=utf8;");
+    ) ENGINE=MyISAM {$charset};");
     
     // RSVPs table
     //
@@ -77,7 +114,7 @@ function events_install_database()
         UNIQUE KEY `event_user_role` (`event_id`, `user_id`, `role`),
         KEY `user_id` (`user_id`),
         KEY `status` (`status`)
-    ) ENGINE=MyISAM DEFAULT CHARSET=utf8;");
+    ) ENGINE=MyISAM {$charset};");
     
     // RSVP days table
     $db->write_query("CREATE TABLE IF NOT EXISTS `" . TABLE_PREFIX . "event_plugin_rsvp_days` (
@@ -85,14 +122,14 @@ function events_install_database()
         `event_day_id` int(11) NOT NULL,
         PRIMARY KEY (`rsvp_id`, `event_day_id`),
         KEY `event_day_id` (`event_day_id`)
-    ) ENGINE=MyISAM DEFAULT CHARSET=utf8;");
+    ) ENGINE=MyISAM {$charset};");
     
     // RSVP costumes table
     $db->write_query("CREATE TABLE IF NOT EXISTS `" . TABLE_PREFIX . "event_plugin_rsvp_costumes` (
         `rsvp_id` int(11) NOT NULL,
         `costume` varchar(255) NOT NULL,
         KEY `rsvp_id` (`rsvp_id`)
-    ) ENGINE=MyISAM DEFAULT CHARSET=utf8;");
+    ) ENGINE=MyISAM {$charset};");
     
     // Troop reports table
     $db->write_query("CREATE TABLE IF NOT EXISTS `" . TABLE_PREFIX . "event_plugin_troop_reports` (
@@ -106,7 +143,7 @@ function events_install_database()
         PRIMARY KEY (`id`),
         UNIQUE KEY `event_id` (`event_id`),
         KEY `thread_id` (`thread_id`)
-    ) ENGINE=MyISAM DEFAULT CHARSET=utf8;");
+    ) ENGINE=MyISAM {$charset};");
 
     // Per-member preferences table
     events_create_user_prefs_table();
@@ -128,11 +165,13 @@ function events_create_user_prefs_table()
 {
     global $db;
 
+    $charset = events_table_charset();
+
     $db->write_query("CREATE TABLE IF NOT EXISTS `" . TABLE_PREFIX . "event_plugin_user_prefs` (
         `user_id` int(11) NOT NULL,
         `events_view` enum('list','calendar') NOT NULL DEFAULT 'list',
         PRIMARY KEY (`user_id`)
-    ) ENGINE=MyISAM DEFAULT CHARSET=utf8;");
+    ) ENGINE=MyISAM {$charset};");
 }
 
 /**
@@ -214,5 +253,22 @@ function events_upgrade_database()
     {
         $db->write_query("ALTER TABLE `" . TABLE_PREFIX . "event_plugin_events`
             ADD `poc_user_id` int(11) NOT NULL DEFAULT 0 AFTER `gec_user_id`");
+    }
+
+    // 1.6 - the tables shipped as three-byte utf8, which cannot store an emoji. CONVERT TO
+    // rewrites every text column and the data in it; utf8 to utf8mb4 is lossless, since
+    // every three-byte sequence is already valid utf8mb4. It may widen a `text` column to
+    // `mediumtext` so it still holds as many characters, which is harmless. Guarded per
+    // table on its current collation, so an interrupted run picks up where it stopped.
+    foreach(events_plugin_tables() as $table)
+    {
+        $status = $db->fetch_array($db->write_query(
+            "SHOW TABLE STATUS LIKE '" . $db->escape_string(TABLE_PREFIX . $table) . "'"
+        ));
+        if($status && stripos((string)$status['Collation'], 'utf8mb4') !== 0)
+        {
+            $db->write_query("ALTER TABLE `" . TABLE_PREFIX . $table . "`
+                CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci");
+        }
     }
 }

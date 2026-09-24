@@ -58,6 +58,30 @@ test.describe('plugin installation', () => {
     expect(legacy).toHaveLength(0);
   });
 
+  test('stores every text column as utf8mb4, so emoji survive', async () => {
+    // Checked per column rather than per table: a table's default charset only governs
+    // columns added later, and CONVERT TO is what rewrites the ones already there.
+    const tables = await query(
+      `SELECT table_name AS name, table_collation AS collation FROM information_schema.tables
+        WHERE table_schema = DATABASE() AND table_name LIKE '${T('event\\_plugin\\_%')}'`,
+    );
+    expect(tables).toHaveLength(8);
+    for (const table of tables as any[]) {
+      expect(table.collation, table.name).toMatch(/^utf8mb4_/);
+    }
+
+    const columns = await query(
+      `SELECT table_name AS tbl, column_name AS col, character_set_name AS charset
+         FROM information_schema.columns
+        WHERE table_schema = DATABASE() AND table_name LIKE '${T('event\\_plugin\\_%')}'
+          AND character_set_name IS NOT NULL`,
+    );
+    expect(columns.length).toBeGreaterThan(0);
+    for (const column of columns as any[]) {
+      expect(column.charset, `${column.tbl}.${column.col}`).toBe('utf8mb4');
+    }
+  });
+
   test('registers the reminder task against a task file that actually exists', async () => {
     const rows = await query(`SELECT file, enabled FROM ${T('tasks')} WHERE file = 'events_reminders'`);
     expect(rows).toHaveLength(1);

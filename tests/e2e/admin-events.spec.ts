@@ -143,10 +143,11 @@ test.describe('admin event management', () => {
     expect(rows).toHaveLength(0);
   });
 
-  test('an end date needs its time', async ({ page }) => {
+  test('the start and end dates need their times', async ({ page }) => {
     await loginToAdminCp(page);
     await gotoEventsAdmin(page, '&action=add');
 
+    await expect(page.locator('input[name="start_date_time"]')).toHaveAttribute('required', 'required');
     await expect(page.locator('input[name="end_date_time"]')).toHaveAttribute('required', 'required');
 
     // Past the browser's check, the server's is the one that holds.
@@ -154,9 +155,10 @@ test.describe('admin event management', () => {
       input.form!.noValidate = true;
     });
     const day = relativeToTestNow({ days: 14 }).slice(0, 10);
-    await fillEventForm(page, { title: 'Timeless Event', start: `${day} 09:00:00`, end: day });
+    await fillEventForm(page, { title: 'Timeless Event', start: day, end: day });
 
     await page.locator('input[type="submit"][value="Create Event"]').click();
+    await expect(page.locator('#content')).toContainText('A start date needs a time as well as a date.');
     await expect(page.locator('#content')).toContainText('An end date needs a time as well as a date.');
 
     const rows = await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Timeless Event'`);

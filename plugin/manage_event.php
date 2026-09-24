@@ -171,7 +171,7 @@ $manage_details .= events_form_field(
     'event_form_start_date',
     'Start Date',
     events_datetime_field('start_date', 'event_form_start_date', $values['start_date'], array(
-        'required' => true, 'described' => true, 'label' => 'Start',
+        'required' => true, 'time_required' => true, 'described' => true, 'label' => 'Start',
     )),
     'When the event itself begins. Pick a date from the calendar, or type it as YYYY-MM-DD.',
     true

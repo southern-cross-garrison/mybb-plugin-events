@@ -111,6 +111,28 @@ test.describe('front-end event management', () => {
     expect(Number(created.gec_user_id)).toBe(uid('gec'));
   });
 
+  test('an event titled and described with emoji saves and reads back intact', async ({ page }) => {
+    // Three-byte utf8 tables reject a four-byte character outright under strict mode, so
+    // this was an SQL error page rather than a mangled title.
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+
+    await fillEventForm(page, {
+      title: '🎃 Halloween Troop',
+      description: 'Pasted from Facebook 👻🍬',
+      status: 'live',
+      start: relativeToTestNow({ days: 21 }),
+      end: relativeToTestNow({ days: 21, hours: 6 }),
+    });
+    await submitEventForm(page);
+
+    await expect(page.locator('#event_page')).toContainText('🎃 Halloween Troop');
+    const eventId = Number(await page.locator('#event_page').getAttribute('data-event-id'));
+    const saved = await getEvent(eventId);
+    expect(saved.title).toBe('🎃 Halloween Troop');
+    expect(saved.description).toBe('Pasted from Facebook 👻🍬');
+  });
+
   test('an address typed on the form becomes a map link on the event page', async ({ page }) => {
     await loginAs(page, 'gec');
     await page.goto('/manage_event.php');
@@ -584,15 +606,16 @@ test.describe('front-end event management', () => {
     expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Instant Troop'`)).toHaveLength(0);
   });
 
-  test('an end date needs its time', async ({ page }) => {
+  test('the start and end dates need their times', async ({ page }) => {
     await loginAs(page, 'gec');
     await page.goto('/manage_event.php');
 
     // The browser asks for it first.
+    await expect(page.locator('#event_form_start_date_time')).toHaveAttribute('required', 'required');
     await expect(page.locator('#event_form_end_date_time')).toHaveAttribute('required', 'required');
-    await expect(page.locator('#event_form_start_date_time')).not.toHaveAttribute('required');
+    await expect(page.locator('#event_form_signup_cutoff_time')).not.toHaveAttribute('required');
 
-    // And the server refuses it when the browser is bypassed. Left blank the time used to
+    // And the server refuses them when the browser is bypassed. Left blank a time used to
     // be read as midnight, which put the end of a one-day event at the very start of its
     // day - locked for signups, "Needs Troop Report" and reminded before anybody arrived.
     await page
@@ -609,6 +632,7 @@ test.describe('front-end event management', () => {
     });
     await submitEventForm(page);
 
+    await expect(page.locator('#manage_event_errors')).toContainText('A start date needs a time as well as a date.');
     await expect(page.locator('#manage_event_errors')).toContainText('An end date needs a time as well as a date.');
 
     // The re-rendered form keeps the times blank rather than filling in a midnight nobody

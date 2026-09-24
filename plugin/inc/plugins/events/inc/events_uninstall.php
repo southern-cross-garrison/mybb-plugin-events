@@ -14,19 +14,10 @@ function events_uninstall_database()
 {
     global $db;
     
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_install.php";
+
     // Drop all tables
-    $tables = array(
-        'event_plugin_events',
-        'event_plugin_event_days',
-        'event_plugin_event_exclusions',
-        'event_plugin_rsvps',
-        'event_plugin_rsvp_days',
-        'event_plugin_rsvp_costumes',
-        'event_plugin_troop_reports',
-        'event_plugin_user_prefs'
-    );
-    
-    foreach($tables as $table)
+    foreach(events_plugin_tables() as $table)
     {
         $db->write_query("DROP TABLE IF EXISTS `" . TABLE_PREFIX . $table . "`");
     }
