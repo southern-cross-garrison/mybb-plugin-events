@@ -10,6 +10,7 @@ import {
   createEvent,
   createRsvp,
   fixtures,
+  getRsvpDayIds,
   setAdditionalGroups,
 } from '../helpers/db';
 import { relativeToTestNow } from '../helpers/clock';
@@ -297,6 +298,55 @@ test.describe('front-end event management', () => {
 
     const grown = await getEventDays(eventId);
     expect(grown.map((day: any) => String(day.date))).toEqual(['2026-10-24', '2026-10-25', '2026-10-26']);
+  });
+
+  test('editing an event keeps its signups on the days they were for', async ({ page }) => {
+    // Signups point at day rows by id. Saving used to delete every day and insert it
+    // again, which gave each one a new id and left every signup pointing at nothing.
+    const eventId = await createEvent({
+      title: 'Edited Weekend Troop',
+      status: 'live',
+      coordinator: 'gec',
+      start: '2026-10-23 09:00:00',
+      end: '2026-10-25 17:00:00',
+      days: [
+        { date: '2026-10-23', start: '09:00:00', end: '17:00:00' },
+        { date: '2026-10-24', start: '09:00:00', end: '17:00:00' },
+        { date: '2026-10-25', start: '09:00:00', end: '17:00:00' },
+      ],
+    });
+    const [friday, saturday, sunday] = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+    await createRsvp(eventId, 'trooper1', { dayIds: [saturday] });
+    await createRsvp(eventId, 'trooper1', { role: 'wrangler', dayIds: [sunday] });
+    await createRsvp(eventId, 'trooper2', { dayIds: [friday, saturday] });
+
+    // Drop the Friday and move Saturday's hours.
+    await loginAs(page, 'gec');
+    await page.goto(`/manage_event.php?id=${eventId}`);
+    await fillEventForm(page, {
+      start: '2026-10-24 10:00:00',
+      days: [{ date: '2026-10-24', start: '10:00:00', end: '15:00:00' }],
+    });
+    await submitEventForm(page);
+    await expect(page.locator('#event_days li.event_day')).toHaveCount(2);
+
+    const days = await getEventDays(eventId);
+    expect(days.map((day: any) => Number(day.id))).toEqual([saturday, sunday]);
+    expect(String(days[0].start_time)).toBe('10:00:00');
+    expect(String(days[0].end_time)).toBe('15:00:00');
+
+    expect(await getRsvpDayIds(eventId, 'trooper1')).toEqual([saturday]);
+    expect(await getRsvpDayIds(eventId, 'trooper1', 'wrangler')).toEqual([sunday]);
+    // Nobody can be coming to a day the event no longer has, so Friday's claim goes with it.
+    expect(await getRsvpDayIds(eventId, 'trooper2')).toEqual([saturday]);
+
+    const orphans = await query(
+      `SELECT rd.event_day_id
+         FROM ${T('event_plugin_rsvp_days')} rd
+         LEFT JOIN ${T('event_plugin_event_days')} ed ON rd.event_day_id = ed.id
+        WHERE ed.id IS NULL`,
+    );
+    expect(orphans).toHaveLength(0);
   });
 
   test('the date boxes carry a calendar, and picking from it drives the day grid', async ({ page }) => {

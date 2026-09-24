@@ -875,10 +875,74 @@ function events_validate_event_input(array $input, array $event = array())
 }
 
 /**
+ * Bring an event's day rows into line with the posted days, keeping the rows that survive.
+ *
+ * A signup records its days as event_day ids, so replacing the rows wholesale - as this
+ * once did - gave every day a new id on every save and cut each signup off from the days
+ * it was for, without a word to anybody. Days are matched on their date instead, which is
+ * what the form draws a row for: a date still on the event keeps its row and has its times
+ * updated, a new date gets a new row, and a date that has gone is deleted along with the
+ * signups' claims on it, since nobody can be coming to a day the event no longer has.
+ *
+ * @param int $event_id
+ * @param array $days From events_event_form_input(), already validated
+ * @return void
+ */
+function events_save_event_days($event_id, array $days)
+{
+    global $db;
+
+    $event_id = (int)$event_id;
+
+    $existing = array();
+    foreach(events_get_event_days($event_id) as $day)
+    {
+        $existing[$day['date']] = (int)$day['id'];
+    }
+
+    $kept = array();
+    foreach($days as $day)
+    {
+        $date = events_date('Y-m-d', events_strtotime($day['date']));
+        $row = array(
+            'start_time' => $db->escape_string($day['start_time'] !== '' ? events_date('H:i:s', events_strtotime($day['start_time'])) : '00:00:00'),
+            'end_time'   => $db->escape_string($day['end_time'] !== '' ? events_date('H:i:s', events_strtotime($day['end_time'])) : '23:59:59'),
+        );
+
+        // The grid never posts a date twice, but a hand-built POST could; the first wins.
+        if(isset($kept[$date]))
+        {
+            continue;
+        }
+
+        if(isset($existing[$date]))
+        {
+            $db->update_query("event_plugin_event_days", $row, "id = " . $existing[$date]);
+            $kept[$date] = $existing[$date];
+        }
+        else
+        {
+            $row['event_id'] = $event_id;
+            $row['date'] = $db->escape_string($date);
+            $kept[$date] = (int)$db->insert_query("event_plugin_event_days", $row);
+        }
+    }
+
+    $removed = array_values(array_diff($existing, $kept));
+    if($removed)
+    {
+        $ids = implode(',', array_map('intval', $removed));
+        $db->delete_query("event_plugin_rsvp_days", "event_day_id IN (" . $ids . ")");
+        $db->delete_query("event_plugin_event_days", "id IN (" . $ids . ")");
+    }
+}
+
+/**
  * Write a validated event, its days and its exclusions.
  *
- * Days and exclusions are replaced wholesale rather than reconciled: they carry nothing
- * of their own worth keeping, and the form posts the complete set every time.
+ * Exclusions are replaced wholesale: they carry nothing of their own worth keeping, and
+ * the form posts the complete set every time. Days are reconciled instead, because
+ * signups point at them by id - see events_save_event_days().
  *
  * @param int $event_id 0 to create, otherwise the event to update
  * @param array $input From events_event_form_input(), already validated
@@ -940,16 +1004,7 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
             WHERE id = " . $event_id);
     }
 
-    $db->delete_query("event_plugin_event_days", "event_id = " . $event_id);
-    foreach($input['days'] as $day)
-    {
-        $db->insert_query("event_plugin_event_days", array(
-            'event_id'   => $event_id,
-            'date'       => $db->escape_string(events_date('Y-m-d', events_strtotime($day['date']))),
-            'start_time' => $db->escape_string($day['start_time'] !== '' ? events_date('H:i:s', events_strtotime($day['start_time'])) : '00:00:00'),
-            'end_time'   => $db->escape_string($day['end_time'] !== '' ? events_date('H:i:s', events_strtotime($day['end_time'])) : '23:59:59'),
-        ));
-    }
+    events_save_event_days($event_id, $input['days']);
 
     $db->delete_query("event_plugin_event_exclusions", "event_id = " . $event_id);
     foreach(events_parse_exclusions($input['exclusions']) as $uid)

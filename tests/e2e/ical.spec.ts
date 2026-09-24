@@ -1,8 +1,39 @@
 import { test, expect } from '../helpers/fixtures';
 import { loginAs, logout } from '../helpers/auth';
-import { createEvent, createRsvp, fixtures } from '../helpers/db';
+import { createEvent, createRsvp, fixtures, getEventDays } from '../helpers/db';
+import type { Page } from '@playwright/test';
 
 const TK = fixtures().costumeOptions[0];
+const SECOND_COSTUME = fixtures().costumeOptions[1];
+
+/**
+ * The feed with its long lines unfolded. RFC 5545 folds a line at 75 octets by breaking
+ * it and opening the continuation with a space, so a long DESCRIPTION arrives in pieces.
+ */
+async function fetchCalendar(page: Page, eventId: number): Promise<string> {
+  const body = await (await page.request.get(`/ical.php?id=${eventId}`)).text();
+  return body.replace(/\r\n[ \t]/g, '');
+}
+
+/** The first line of each VEVENT's DESCRIPTION - the one saying what the member is doing - keyed by DTSTART. */
+function signupLinesByStart(body: string): Record<string, string> {
+  const lines: Record<string, string> = {};
+  for (const block of body.split('BEGIN:VEVENT').slice(1)) {
+    const start = block.match(/^DTSTART:(.*)$/m)?.[1] ?? '';
+    const description = (block.match(/^DESCRIPTION:(.*)$/m)?.[1] ?? '').trim();
+    lines[start] = description.split(String.raw`\n`)[0];
+  }
+  return lines;
+}
+
+const WEEKEND = {
+  start: '2026-10-17 09:00:00',
+  end: '2026-10-18 17:00:00',
+  days: [
+    { date: '2026-10-17', start: '09:00:00', end: '17:00:00' },
+    { date: '2026-10-18', start: '10:00:00', end: '16:00:00' },
+  ],
+};
 
 test.describe('iCal export', () => {
   test('serves a downloadable calendar for a single-day event', async ({ page }) => {
@@ -82,7 +113,7 @@ test.describe('iCal export', () => {
     const body = await (await page.request.get(`/ical.php?id=${eventId}`)).text();
 
     expect(body).toContain(String.raw`SUMMARY:Troop\; with\, punctuation`);
-    expect(body).toContain(String.raw`DESCRIPTION:Line one\nLine two`);
+    expect(body).toContain(String.raw`\n\nLine one\nLine two`);
   });
 
   test('flattens the description\'s BBCode', async ({ page }) => {
@@ -96,10 +127,106 @@ test.describe('iCal export', () => {
     });
 
     await loginAs(page, 'trooper1');
-    const body = await (await page.request.get(`/ical.php?id=${eventId}`)).text();
+    const body = await fetchCalendar(page, eventId);
 
-    expect(body).toContain('DESCRIPTION:Full armour and a kit list (http://example.test/kit).');
+    expect(body).toContain(String.raw`\n\nFull armour and a kit list (http://example.test/kit).`);
     expect(body).not.toContain('[b]');
+  });
+
+  test('exports only the days the member signed up for, and says what they are doing', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Signed Up Weekend Troop', ...WEEKEND });
+    const [saturday, sunday] = (await getEventDays(eventId)).map((day) => Number(day.id));
+    await createRsvp(eventId, 'trooper1', { costumes: [TK, SECOND_COSTUME], dayIds: [sunday] });
+
+    await loginAs(page, 'trooper1');
+    const body = await fetchCalendar(page, eventId);
+
+    expect(body.match(/BEGIN:VEVENT/g)).toHaveLength(1);
+    expect(body).not.toContain('DTSTART:20261017T090000Z');
+    expect(body).toContain(`UID:event-${eventId}-${sunday}@`);
+    expect(body).not.toContain(`UID:event-${eventId}-${saturday}@`);
+    // The comma between costumes is escaped like any other in a text property.
+    expect(signupLinesByStart(body)['20261018T100000Z']).toBe(
+      `You're trooping (${TK}\\, ${SECOND_COSTUME}) this day.`,
+    );
+  });
+
+  test('gives a day held in both roles one entry that names both', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Two Role Weekend Troop', ...WEEKEND });
+    const [saturday, sunday] = (await getEventDays(eventId)).map((day) => Number(day.id));
+    await createRsvp(eventId, 'trooper1', { costumes: [TK], dayIds: [saturday, sunday] });
+    await createRsvp(eventId, 'trooper1', { role: 'wrangler', dayIds: [sunday] });
+
+    await loginAs(page, 'trooper1');
+    const body = await fetchCalendar(page, eventId);
+    const lines = signupLinesByStart(body);
+
+    expect(body.match(/BEGIN:VEVENT/g)).toHaveLength(2);
+    expect(lines['20261017T090000Z']).toBe(`You're trooping (${TK}) this day.`);
+    expect(lines['20261018T100000Z']).toBe(`You're trooping (${TK}) and wrangling this day.`);
+  });
+
+  test('describes a single-day signup as the whole event', async ({ page }) => {
+    // A single-day event has no day rows, so its signups point at none.
+    const eventId = await createEvent({
+      title: 'Single Day Wrangle',
+      start: '2026-10-20 10:00:00',
+      end: '2026-10-20 16:00:00',
+    });
+    await createRsvp(eventId, 'trooper1', { role: 'wrangler' });
+
+    await loginAs(page, 'trooper1');
+    const body = await fetchCalendar(page, eventId);
+
+    expect(body.match(/BEGIN:VEVENT/g)).toHaveLength(1);
+    expect(body).toContain("DESCRIPTION:You're wrangling at this event.");
+  });
+
+  test('exports every day to a member who has not signed up, and says so', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Undecided Weekend Troop', ...WEEKEND });
+
+    await loginAs(page, 'trooper1');
+    const body = await fetchCalendar(page, eventId);
+    expect(Object.values(signupLinesByStart(body))).toEqual([
+      "You haven't signed up for this event yet.",
+      "You haven't signed up for this event yet.",
+    ]);
+  });
+
+  test('carries the WWCC requirement, the address and the full description', async ({ page }) => {
+    const eventId = await createEvent({
+      title: 'Detailed Export Troop',
+      description: 'Meet at the loading dock. '.repeat(6).trim(),
+      address: '1 Showground Rd, Sydney Olympic Park NSW 2127',
+      requiresWwcc: true,
+      start: '2026-10-20 10:00:00',
+      end: '2026-10-20 16:00:00',
+    });
+
+    await loginAs(page, 'trooper1');
+    const raw = await (await page.request.get(`/ical.php?id=${eventId}`)).text();
+    const body = raw.replace(/\r\n[ \t]/g, '');
+
+    expect(body).toContain(
+      "DESCRIPTION:You haven't signed up for this event yet.\\n" +
+        'A Working With Children Check is required.\\n' +
+        'Address: 1 Showground Rd\\, Sydney Olympic Park NSW 2127\\n\\n' +
+        'Meet at the loading dock. '.repeat(6).trim(),
+    );
+
+    // That description is well past 75 octets, so it must have arrived folded.
+    for (const line of raw.split('\r\n')) {
+      expect(Buffer.byteLength(line)).toBeLessThanOrEqual(75);
+    }
+  });
+
+  test('leaves the WWCC line out when the event does not need one', async ({ page }) => {
+    const eventId = await createEvent({ title: 'No Check Export Troop' });
+
+    await loginAs(page, 'trooper1');
+    const body = await fetchCalendar(page, eventId);
+
+    expect(body).not.toContain('Working With Children');
   });
 
   test('is not available to guests', async ({ page }) => {
