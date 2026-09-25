@@ -141,6 +141,21 @@ function events_feed_token_user($token)
         return null;
     }
 
+    // Nor does it answer a member the board itself would turn away - one moved into a
+    // group that cannot view the board, "Inactive" and the like. Asked across every group
+    // they are in, merged the way MyBB merges them for a page view, so an additional
+    // group that grants it counts just as it does everywhere else.
+    $groups = $user['usergroup'];
+    if(!empty($user['additionalgroups']))
+    {
+        $groups .= ',' . $user['additionalgroups'];
+    }
+    $permissions = usergroup_permissions($groups);
+    if(empty($permissions['canview']))
+    {
+        return null;
+    }
+
     $db->update_query("event_plugin_feed_tokens", array('last_used_at' => TIME_NOW),
         "user_id = " . (int)$user['uid']);
 

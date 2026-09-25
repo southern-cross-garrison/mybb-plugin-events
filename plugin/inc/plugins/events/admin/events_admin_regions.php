@@ -36,6 +36,7 @@ if(!defined("IN_MYBB"))
 }
 
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
+require_once MYBB_ROOT . "inc/plugins/events/inc/events_thread.php";
 
 // The `region` column is varchar(64).
 define('EVENTS_REGION_MAX_LENGTH', 64);
@@ -154,6 +155,76 @@ function events_admin_apply_region_moves(array $moves)
 }
 
 /**
+ * The events a set of region moves will refile that have an announcement thread.
+ *
+ * Read before the moves are applied, since afterwards nothing says which events they
+ * touched.
+ *
+ * @param array $moves old region => new region
+ * @return array of int event id
+ */
+function events_admin_announced_event_ids(array $moves)
+{
+    global $db;
+
+    if(!$moves)
+    {
+        return array();
+    }
+
+    $from = array();
+    foreach(array_keys($moves) as $old)
+    {
+        $from[] = "'" . $db->escape_string($old) . "'";
+    }
+
+    $ids = array();
+    $query = $db->write_query("SELECT id FROM `" . TABLE_PREFIX . "event_plugin_events`
+        WHERE thread_id > 0 AND region IN (" . implode(',', $from) . ")");
+
+    while($row = $db->fetch_array($query))
+    {
+        $ids[] = (int)$row['id'];
+    }
+
+    return $ids;
+}
+
+/**
+ * Bring refiled events' announcement threads up to date with their new regions.
+ *
+ * The post names the region and links to its listing, and the thread belongs in the new
+ * region's forum - neither of which the UPDATE over the events table can see to. Run
+ * after the new region settings are written, since that is what the sync resolves the
+ * forum from.
+ *
+ * @param array $event_ids From events_admin_announced_event_ids()
+ * @param array $former_forum_ids events_announcement_forum_ids() as it was before the
+ *        change: a deleted region's forum is no longer on the map, and its threads have
+ *        to be allowed out of it
+ * @return array of string, one per thread that could not be updated
+ */
+function events_admin_sync_region_threads(array $event_ids, array $former_forum_ids)
+{
+    $errors = array();
+
+    foreach($event_ids as $event_id)
+    {
+        $error = null;
+        events_sync_event_thread($event_id, $error, $former_forum_ids);
+
+        if($error !== null)
+        {
+            $event = events_get_event($event_id);
+            $errors[] = "The announcement for \"" . htmlspecialchars_uni($event ? $event['title'] : '#' . $event_id)
+                . "\" could not be updated: " . $error;
+        }
+    }
+
+    return $errors;
+}
+
+/**
  * Write the region list and the per-region forum map, and refresh MyBB's settings cache.
  *
  * The two always move together: the forum map is keyed by region name, so a list written
@@ -211,10 +282,14 @@ function events_admin_add_region($name, array &$errors)
  * @param string $region
  * @param string $move_to Where its events go; ignored when it has none
  * @param array $errors Appended to
+ * @param array|null $thread_errors Set to the announcements that could not follow their
+ *        events, which does not stop the deletion
  * @return int|false events moved, or false when nothing was done
  */
-function events_admin_delete_region($region, $move_to, array &$errors)
+function events_admin_delete_region($region, $move_to, array &$errors, &$thread_errors = null)
 {
+    $thread_errors = array();
+
     $regions = events_regions();
 
     if(!in_array($region, $regions, true))
@@ -239,6 +314,9 @@ function events_admin_delete_region($region, $move_to, array &$errors)
         return false;
     }
 
+    $former_forum_ids = events_announcement_forum_ids();
+    $announced = $count > 0 ? events_admin_announced_event_ids(array($region => $move_to)) : array();
+
     // The events move first, so that an interruption between the two leaves them filed
     // under a region the board can still see rather than under one it cannot.
     $moved = $count > 0 ? events_admin_apply_region_moves(array($region => $move_to)) : 0;
@@ -258,6 +336,10 @@ function events_admin_delete_region($region, $move_to, array &$errors)
     }
 
     events_admin_save_region_settings($remaining, $forums);
+
+    // A thread failing to update does not undo the deletion: the events are already
+    // refiled, and the next save of each event retries its thread.
+    $thread_errors = events_admin_sync_region_threads($announced, $former_forum_ids);
 
     return $moved;
 }
@@ -464,7 +546,7 @@ function events_admin_region_action()
         else
         {
             $region = $mybb->get_input('region');
-            $moved = events_admin_delete_region($region, $mybb->get_input('region_move_to'), $errors);
+            $moved = events_admin_delete_region($region, $mybb->get_input('region_move_to'), $errors, $thread_errors);
 
             if($moved !== false)
             {
@@ -475,7 +557,14 @@ function events_admin_region_action()
                         . htmlspecialchars_uni($mybb->get_input('region_move_to')) . "\".";
                 }
 
-                flash_message($message, "success");
+                if($thread_errors)
+                {
+                    flash_message($message . " " . implode(" ", $thread_errors), "error");
+                }
+                else
+                {
+                    flash_message($message, "success");
+                }
                 admin_redirect("index.php?module=events&action=settings");
             }
         }

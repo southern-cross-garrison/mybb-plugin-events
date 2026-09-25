@@ -155,6 +155,8 @@ function events_admin_settings()
             // A rename takes the region's events with it, and they move before the list
             // is written so that an interruption between the two leaves them filed under
             // a region the board can still see rather than under one it cannot.
+            $former_forum_ids = events_announcement_forum_ids();
+            $announced = events_admin_announced_event_ids($region_plan['moves']);
             $moved = events_admin_apply_region_moves($region_plan['moves']);
 
             foreach($settings as $name => $value)
@@ -164,13 +166,25 @@ function events_admin_settings()
 
             rebuild_settings();
 
+            // The announcements name the region and link to its listing, and the same
+            // save may have pointed the region at another forum. Synced against the new
+            // settings, which is what rebuild_settings() just put in place.
+            $thread_errors = events_admin_sync_region_threads($announced, $former_forum_ids);
+
             $message = "Settings updated successfully.";
             if($moved > 0)
             {
                 $message .= " " . $moved . " " . ($moved === 1 ? "event was" : "events were") . " moved to a renamed region.";
             }
 
-            flash_message($message, "success");
+            if($thread_errors)
+            {
+                flash_message($message . " " . implode(" ", $thread_errors), "error");
+            }
+            else
+            {
+                flash_message($message, "success");
+            }
             admin_redirect("index.php?module=events&action=settings");
         }
 

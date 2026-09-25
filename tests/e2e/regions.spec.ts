@@ -1,9 +1,12 @@
 import { test, expect, Page } from "../helpers/fixtures";
 import { loginToAdminCp, gotoEventsAdmin, loginAs } from "../helpers/auth";
+import { runPhp } from "../helpers/container";
 import {
   createEvent,
   getEvent,
   getSetting,
+  getThread,
+  getThreadFirstPost,
   query,
   T,
   fixtures,
@@ -29,6 +32,20 @@ import {
  */
 
 const DEFAULT_REGIONS = "Sydney,Hunter,Canberra,Other";
+const DEFAULT_REGION_FORUMS = () => `Hunter=${fixtures().forums.events_hunter}`;
+
+/** Announce an event the way saving it live does, and return its thread id. */
+async function announce(eventId: number): Promise<number> {
+  const output = await runPhp(`
+require_once MYBB_ROOT.'inc/plugins/events/inc/events_thread.php';
+echo events_sync_event_thread(${eventId});
+`);
+
+  const threadId = Number(output.trim());
+  expect(threadId).toBeGreaterThan(0);
+
+  return threadId;
+}
 
 async function gotoSettings(page: Page): Promise<void> {
   await loginToAdminCp(page);
@@ -105,6 +122,25 @@ async function addRegion(page: Page, name: string): Promise<void> {
  * tests themselves are there to catch.
  */
 async function restoreRegions(page: Page): Promise<void> {
+  await restoreRegionList(page);
+
+  // Deleting a region takes its announcement forum with it, and nothing above puts that
+  // back: a region re-added under the same name starts with no forum.
+  if ((await getSetting("events_event_forums")) !== DEFAULT_REGION_FORUMS()) {
+    await gotoSettings(page);
+    for (const select of await page.locator('select[name^="event_forums["]').all()) {
+      await select.selectOption(
+        (await select.getAttribute("name")) === "event_forums[Hunter]"
+          ? String(fixtures().forums.events_hunter)
+          : "",
+      );
+    }
+    await save(page);
+    expect(await getSetting("events_event_forums")).toBe(DEFAULT_REGION_FORUMS());
+  }
+}
+
+async function restoreRegionList(page: Page): Promise<void> {
   const wanted = DEFAULT_REGIONS.split(",");
   let current = (await getSetting("events_regions")).split(",");
 
@@ -247,6 +283,64 @@ test.describe("configurable regions", () => {
     expect(await getSetting("events_event_forums")).toBe(
       `Newcastle=${f.forums.events_hunter}`,
     );
+  });
+
+  test("a rename rewrites the announcements of the events it moves", async ({
+    page,
+  }) => {
+    const eventId = await createEvent({
+      title: "Renamed Announcement Troop",
+      region: "Hunter",
+      status: "live",
+    });
+    const threadId = await announce(eventId);
+
+    await gotoSettings(page);
+    await renameRegion(page, "Hunter", "Newcastle");
+    await save(page);
+    await expect(page.locator("#flash_message")).toContainText(
+      "1 event was moved to a renamed region",
+    );
+
+    // The post names the region and links to its listing; left alone it sends readers
+    // to a filter for a region that no longer exists.
+    const post = await getThreadFirstPost(threadId);
+    expect(post.message).toContain("events.php?region=Newcastle]Newcastle[/url]");
+    expect(post.message).not.toContain("region=Hunter");
+
+    // The region kept its forum across the rename, so the thread stays put.
+    expect(Number((await getThread(threadId)).fid)).toBe(
+      fixtures().forums.events_hunter,
+    );
+  });
+
+  test("deleting a region takes its events' announcements to the region they moved to", async ({
+    page,
+  }) => {
+    const f = fixtures();
+    const eventId = await createEvent({
+      title: "Rehomed Announcement Troop",
+      region: "Hunter",
+      status: "live",
+    });
+    const threadId = await announce(eventId);
+    expect(Number((await getThread(threadId)).fid)).toBe(f.forums.events_hunter);
+
+    await gotoSettings(page);
+    await deleteRegion(page, "Hunter", "Sydney");
+    await expect(page.locator("#flash_message")).toContainText(
+      '1 event was moved to "Sydney"',
+    );
+
+    // Hunter's forum left the region map with it, so the thread is sitting in a forum the
+    // plugin no longer announces into - which is exactly what a thread a moderator filed
+    // by hand looks like. It has to be let out of there regardless, or no later save of
+    // the event could ever move it either.
+    expect(Number((await getThread(threadId)).fid)).toBe(f.forums.events);
+
+    const post = await getThreadFirstPost(threadId);
+    expect(post.message).toContain("events.php?region=Sydney]Sydney[/url]");
+    expect(post.message).not.toContain("region=Hunter");
   });
 
   test("deletes a region with no events straight from the are-you-sure step", async ({

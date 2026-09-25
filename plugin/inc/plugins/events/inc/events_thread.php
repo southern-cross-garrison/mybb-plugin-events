@@ -253,9 +253,13 @@ function events_event_post_content(array $event)
  *
  * @param int $event_id
  * @param string|null $error Set to why nothing was posted, for a caller that can say so
+ * @param array $former_forum_ids Forums the plugin announced into until the change that
+ *        prompted this sync. Deleting a region takes its forum out of the region map, so
+ *        a thread still sitting there would otherwise read as one a moderator filed by
+ *        hand and never follow its event to the region it was moved to.
  * @return int the thread id, or 0 when the event has no thread
  */
-function events_sync_event_thread($event_id, &$error = null)
+function events_sync_event_thread($event_id, &$error = null, array $former_forum_ids = array())
 {
     global $db, $mybb, $lang;
 
@@ -308,7 +312,8 @@ function events_sync_event_thread($event_id, &$error = null)
         // behind in the old forum, and nothing about that stub marks it as the event's
         // thread, so the exclusion hooks would show its title to excluded members.
         $forum_id = events_event_forum_id($event['region']);
-        if($forum_id && (int)$thread['fid'] !== $forum_id && in_array((int)$thread['fid'], events_announcement_forum_ids(), true))
+        $managed = array_merge(events_announcement_forum_ids(), array_map('intval', $former_forum_ids));
+        if($forum_id && (int)$thread['fid'] !== $forum_id && in_array((int)$thread['fid'], $managed, true))
         {
             require_once MYBB_ROOT . "inc/class_moderation.php";
 

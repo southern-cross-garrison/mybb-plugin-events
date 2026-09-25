@@ -3,6 +3,7 @@ import { loginAs } from '../helpers/auth';
 import { signUpThroughWizard } from '../helpers/rsvp';
 import { createEvent, createRsvp, execute, fixtures, getEventDays, query, queryOne, T, uid } from '../helpers/db';
 import type { APIRequestContext, Page } from '@playwright/test';
+import { runPhp } from '../helpers/container';
 
 /**
  * The calendar subscription: a member makes a private link on calendar_feed.php, and
@@ -315,6 +316,47 @@ test.describe('calendar subscription feed', () => {
       expect((await fetchFeed(request, url)).status).toBe(404);
     } finally {
       await execute(`UPDATE ${T('users')} SET usergroup = ? WHERE uid = ?`, [usergroup, uid('trooper1')]);
+    }
+
+    expect((await fetchFeed(request, url)).status).toBe(200);
+  });
+
+  test('answers nothing for a member whose groups cannot view the board', async ({ page, request }) => {
+    const eventId = await createEvent({ title: 'Feed Inactive Troop' });
+    await createRsvp(eventId, 'trooper1');
+
+    await loginAs(page, 'trooper1');
+    const url = await makeFeedLink(page);
+
+    const before = (await queryOne(`SELECT usergroup, additionalgroups FROM ${T('users')} WHERE uid = ?`, [
+      uid('trooper1'),
+    ]))!;
+    // An "Inactive"-style group: not banned, just not allowed to view the board. The
+    // usergroups cache is what permissions are read from, so it is rebuilt both ways.
+    const gid = Number(
+      await runPhp(`
+$db->insert_query('usergroups', array('title' => 'E2E Inactive', 'description' => '', 'namestyle' => '{username}', 'usertitle' => '', 'image' => '', 'disporder' => 0, 'canview' => 0));
+echo $db->insert_id();
+$cache->update_usergroups();
+`),
+    );
+    try {
+      await execute(`UPDATE ${T('users')} SET usergroup = ?, additionalgroups = '' WHERE uid = ?`, [gid, uid('trooper1')]);
+      expect((await fetchFeed(request, url)).status).toBe(404);
+
+      // Any one of their groups granting it is enough, as it is for a page view.
+      await execute(`UPDATE ${T('users')} SET additionalgroups = '2' WHERE uid = ?`, [uid('trooper1')]);
+      expect((await fetchFeed(request, url)).status).toBe(200);
+    } finally {
+      await execute(`UPDATE ${T('users')} SET usergroup = ?, additionalgroups = ? WHERE uid = ?`, [
+        before.usergroup,
+        before.additionalgroups,
+        uid('trooper1'),
+      ]);
+      await runPhp(`
+$db->delete_query('usergroups', 'gid = ${gid}');
+$cache->update_usergroups();
+`);
     }
 
     expect((await fetchFeed(request, url)).status).toBe(200);
