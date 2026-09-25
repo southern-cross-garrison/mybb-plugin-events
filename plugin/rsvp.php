@@ -71,6 +71,11 @@ foreach($event_days as $day)
 
 $existing_signup = events_get_user_signup($event_id);
 $is_update = !empty($existing_signup);
+
+// Every queue for the event's places, read once for the labels and the confirm step. It
+// only ever predicts: the save decides again under the event's lock, and the success page
+// reports what that decided.
+$queues = events_signup_queues($event_id);
 $signup_mode = $is_update ? 'update' : 'create';
 
 add_breadcrumb("Events", "events.php");
@@ -445,6 +450,7 @@ if($mybb->request_method === 'post')
 if($render === 'success' && $withdrawing)
 {
     $signup_mode = 'withdraw';
+    $rsvp_ical_link = '';
     $rsvp_success_title = 'Signup Withdrawn';
     $rsvp_success_message = 'You are no longer signed up to attend <strong>' . $event_title . '</strong>.';
     $rsvp_summary = '';
@@ -458,12 +464,32 @@ if($render === 'success' && $withdrawing)
 
 if($render === 'success')
 {
-    $rsvp_success_title = $is_update ? 'Signup Updated' : 'Signup Confirmed';
-    $rsvp_success_message = $is_update
-        ? 'Your signup for <strong>' . $event_title . '</strong> has been updated.'
-        : 'You are signed up to attend <strong>' . $event_title . '</strong>.';
+    // Read back rather than taken from the confirm step: somebody else can have taken the
+    // last place in between, and this page has to say what the member actually has.
+    $outcomes = events_signup_place_outcomes($event, $role_days, $mybb->user['uid']);
+    $waitlist_extent = events_signup_waitlist_extent($outcomes);
 
-    $rsvp_summary = events_signup_summary_html($event_days, $role_days, 'rsvp_summary');
+    if($waitlist_extent === 'all' && !$is_update)
+    {
+        $signup_mode = 'waitlist';
+        $rsvp_success_title = "You're on the Waitlist";
+        $rsvp_success_message = 'Every place you asked for at <strong>' . $event_title . '</strong> is taken, so you are on the waitlist.'
+            . ' You are not signed up to attend yet: if a place opens up it goes to the first person waiting, and you will be sent a PM.';
+    }
+    else
+    {
+        $rsvp_success_title = $is_update ? 'Signup Updated' : 'Signup Confirmed';
+        $rsvp_success_message = $is_update
+            ? 'Your signup for <strong>' . $event_title . '</strong> has been updated.'
+            : 'You are signed up to attend <strong>' . $event_title . '</strong>.';
+    }
+
+    $rsvp_summary = events_signup_summary_html($event_days, $role_days, 'rsvp_summary')
+        . events_signup_waitlist_html($event_days, $outcomes, 'rsvp_summary');
+
+    // A place in a queue is not on anybody's calendar yet.
+    $rsvp_ical_link = $waitlist_extent === 'all' ? ''
+        : '<a href="ical.php?id=' . $event_id . '" id="rsvp_ical">Add to Calendar</a> | ';
 
     if(!empty($selected_costumes))
     {
@@ -577,6 +603,33 @@ if($rsvp_step === 'attendance')
     // Someone editing a signup can also answer that they are not coming after all. A first
     // signup is not offered it: there is nothing yet to withdraw.
     $primary_labels = array('trooper' => 'Trooping', 'wrangler' => 'Wrangling');
+
+    // A role with no room says so on the choice itself, before anybody picks it, so
+    // nobody arrives at the confirm step to find they were only ever joining a queue.
+    $place_ids = $has_days ? $valid_day_ids : array(0);
+    $full_days = array();
+    foreach(events_rsvp_roles() as $role)
+    {
+        $full_days[$role] = array();
+        foreach($place_ids as $place_id)
+        {
+            $place = events_place_status($event, $role, $place_id, $mybb->user['uid'], $queues);
+            if($place['status'] === 'waitlisted')
+            {
+                $full_days[$role][] = $place_id;
+            }
+        }
+
+        if(count($full_days[$role]) === count($place_ids))
+        {
+            $primary_labels[$role] .= ' (full - join the waitlist)';
+        }
+        elseif(!empty($full_days[$role]))
+        {
+            $primary_labels[$role] .= ' (full on some days)';
+        }
+    }
+
     if($is_update)
     {
         $primary_labels['none'] = 'Not attending';
@@ -622,9 +675,18 @@ if($rsvp_step === 'attendance')
             $day_id = (int)$day['id'];
             $current = isset($day_choices[$day_id]) ? $day_choices[$day_id] : $signup_role;
 
+            $day_labels = $choices;
+            foreach(events_rsvp_roles() as $role)
+            {
+                if(in_array($day_id, $full_days[$role], true))
+                {
+                    $day_labels[$role] .= ' (full - waitlist)';
+                }
+            }
+
             $rsvp_body .= '<div class="signup_day" role="radiogroup" aria-labelledby="day_' . $day_id . '_label" data-day-id="' . $day_id . '">'
                         . '<span class="signup_day_label" id="day_' . $day_id . '_label">' . events_day_label($day) . '</span>'
-                        . events_signup_choices('day_role[' . $day_id . ']', $choices, $current, 'day_' . $day_id, 'day_role_radio')
+                        . events_signup_choices('day_role[' . $day_id . ']', $day_labels, $current, 'day_' . $day_id, 'day_role_radio')
                         . '</div>';
         }
 
@@ -722,12 +784,30 @@ elseif($rsvp_step === 'confirm' && $withdrawing)
 }
 elseif($rsvp_step === 'confirm')
 {
-    $rsvp_page_title = $is_update ? 'Confirm Your Changes' : 'Confirm Signup';
     $rsvp_carried_state .= $attendance_state . events_hidden_inputs('costumes', $selected_costumes);
-    $rsvp_submit_label = $is_update ? 'Save Changes' : 'Confirm Signup';
+
+    // The button says what pressing it does. Joining a waitlist is not signing up to
+    // troop, and a button reading "Confirm Signup" over a full event would say it was.
+    $outcomes = events_signup_place_outcomes($event, $role_days, $mybb->user['uid'], $queues);
+    if($is_update)
+    {
+        $rsvp_page_title = 'Confirm Your Changes';
+        $rsvp_submit_label = events_signup_waitlist_extent($outcomes, true) === 'none' ? 'Save Changes' : 'Save and Join the Waitlist';
+    }
+    else
+    {
+        $waitlist_extent = events_signup_waitlist_extent($outcomes);
+        $rsvp_page_title = $waitlist_extent === 'all' ? 'Join the Waitlist' : 'Confirm Signup';
+        $rsvp_submit_label = array(
+            'none' => 'Confirm Signup',
+            'some' => 'Confirm and Join the Waitlist',
+            'all'  => 'Join the Waitlist',
+        )[$waitlist_extent];
+    }
 
     $rsvp_body = '<p><strong>Event:</strong> <span id="confirm_event">' . $event_title . '</span></p>'
-        . events_signup_summary_html($event_days, $role_days, 'confirm');
+        . events_signup_summary_html($event_days, $role_days, 'confirm')
+        . events_signup_waitlist_html($event_days, $outcomes, 'confirm');
 
     if(!empty($selected_costumes))
     {

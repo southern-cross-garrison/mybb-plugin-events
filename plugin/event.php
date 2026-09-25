@@ -184,88 +184,185 @@ if($action === 'attendance')
     // Drives the column widths, which differ by one column between the two layouts.
     $attendance_table_class = !empty($event_days) ? 'has_days' : '';
 
-    $attendees_rows = '';
-    $position = 0;
-    foreach($attendees as $attendee)
+    // One renderer for both tables, so the waitlist cannot drift from the sheet it sits
+    // under: the same columns, the same contact details - those are what a point of
+    // contact needs to call somebody in off it - and the same tick box, since somebody
+    // pulled in off the waitlist on the day is ticked off like anybody else.
+    $render_attendee_rows = function(array $attendees, $waitlisted) use ($event, $event_days, $filter_day, $attendance_contact_columns)
     {
-        $position++;
-
-        // One <tbody> per attendee, so the pair of rows is a thing the stylesheet can
-        // band, rule off and keep on one page - none of which is sayable about two
-        // sibling <tr>s that only happen to be next to each other.
-        $attendees_rows .= '<tbody class="attendee_group" data-uid="' . $attendee['uid'] . '">';
-
-        $attendees_rows .= '<tr class="attendee_row" data-uid="' . $attendee['uid'] . '">';
-        // A real checkbox rather than a drawn box, so a coordinator can tick people off on
-        // screen and print the sheet with those ticks already on it - the print comes off
-        // the live page, so its state goes with it. It spans both rows for the same reason
-        // the number does: one person, one tick.
-        $attendees_rows .= '<td class="attendee_num" rowspan="2">' . $position . '</td>';
-        $attendees_rows .= '<td class="attendee_preferred_name">' . htmlspecialchars_uni($attendee['preferred_name']) . '</td>';
-        $attendees_rows .= '<td class="attendee_username">' . htmlspecialchars_uni($attendee['username']) . '</td>';
-        // The point of contact is the one person on the sheet somebody on the day will come
-        // looking for, so that is what their role says rather than which hat they signed up
-        // in. Only attendees are on the sheet at all, so a contact who has withdrawn simply
-        // is not here to be labelled.
-        $attendee_role = ((int)$attendee['uid'] === (int)$event['poc_user_id'])
-            ? 'Point of Contact'
-            : implode(' / ', array_map('events_role_label', array_unique($attendee['roles'])));
-        $attendees_rows .= '<td class="attendee_role">' . htmlspecialchars_uni($attendee_role) . '</td>';
-        $attendees_rows .= '<td class="attendee_tkid">' . htmlspecialchars_uni($attendee['tk_id']) . '</td>';
-
-        if(!empty($event_days))
+        $attendees_rows = '';
+        $position = 0;
+        foreach($attendees as $attendee)
         {
-            // Filtering to one day is a question about that day, so the answer names it
-            // rather than reciting the rest of the signup around it.
-            $role_days = $attendee['role_days'];
-            if($filter_day)
+            $position++;
+
+            // One <tbody> per attendee, so the pair of rows is a thing the stylesheet can
+            // band, rule off and keep on one page - none of which is sayable about two
+            // sibling <tr>s that only happen to be next to each other.
+            $attendees_rows .= '<tbody class="attendee_group' . ($waitlisted ? ' attendee_group_waitlisted' : '') . '" data-uid="' . $attendee['uid'] . '">';
+
+            $attendees_rows .= '<tr class="attendee_row" data-uid="' . $attendee['uid'] . '">';
+            // A real checkbox rather than a drawn box, so a coordinator can tick people off on
+            // screen and print the sheet with those ticks already on it - the print comes off
+            // the live page, so its state goes with it. It spans both rows for the same reason
+            // the number does: one person, one tick.
+            $attendees_rows .= '<td class="attendee_num" rowspan="2">' . ($waitlisted ? 'W' : '') . $position . '</td>';
+            $attendees_rows .= '<td class="attendee_preferred_name">' . htmlspecialchars_uni($attendee['preferred_name']) . '</td>';
+            $attendees_rows .= '<td class="attendee_username">' . htmlspecialchars_uni($attendee['username']) . '</td>';
+            // The point of contact is the one person on the sheet somebody on the day will come
+            // looking for, so that is what their role says rather than which hat they signed up
+            // in. Only attendees are on the sheet at all, so a contact who has withdrawn simply
+            // is not here to be labelled.
+            $attendee_role = ((int)$attendee['uid'] === (int)$event['poc_user_id'] && !$waitlisted)
+                ? 'Point of Contact'
+                : implode(' / ', array_map('events_role_label', array_unique($attendee['roles'])));
+            if($waitlisted)
             {
-                foreach($role_days as $role => $day_ids)
+                $attendee_role .= ' - waitlisted';
+            }
+            $attendees_rows .= '<td class="attendee_role">' . htmlspecialchars_uni($attendee_role) . '</td>';
+            $attendees_rows .= '<td class="attendee_tkid">' . htmlspecialchars_uni($attendee['tk_id']) . '</td>';
+
+            if(!empty($event_days))
+            {
+                // Filtering to one day is a question about that day, so the answer names it
+                // rather than reciting the rest of the signup around it.
+                $role_days = $attendee['role_days'];
+                if($filter_day)
                 {
-                    $role_days[$role] = array_values(array_intersect($day_ids, array($filter_day)));
-                    if(empty($role_days[$role]))
+                    foreach($role_days as $role => $day_ids)
                     {
-                        unset($role_days[$role]);
+                        $role_days[$role] = array_values(array_intersect($day_ids, array($filter_day)));
+                        if(empty($role_days[$role]))
+                        {
+                            unset($role_days[$role]);
+                        }
                     }
                 }
+
+                $day_items = events_attendance_day_items($event_days, $role_days);
+                $day_items = array_map('htmlspecialchars_uni', $day_items);
+
+                // A single answer is a sentence, not a list; more than one gets bullets.
+                $days_cell = (count($day_items) > 1)
+                    ? '<ul class="attendee_days_list"><li>' . implode('</li><li>', $day_items) . '</li></ul>'
+                    : implode('', $day_items);
+
+                $attendees_rows .= '<td class="attendee_days">' . $days_cell . '</td>';
             }
 
-            $day_items = events_attendance_day_items($event_days, $role_days);
-            $day_items = array_map('htmlspecialchars_uni', $day_items);
+            $attendees_rows .= '<td class="attendee_attended" rowspan="2">'
+                . '<input type="checkbox" class="attendee_tick" aria-label="Attended: '
+                . htmlspecialchars_uni($attendee['username']) . '" /></td>';
+            $attendees_rows .= '</tr>';
 
-            // A single answer is a sentence, not a list; more than one gets bullets.
-            $days_cell = (count($day_items) > 1)
-                ? '<ul class="attendee_days_list"><li>' . implode('</li><li>', $day_items) . '</li></ul>'
-                : implode('', $day_items);
+            // The contact half, laid over the identity row's columns - the spans are the ones
+            // the header row was built with, or the two halves would not line up.
+            $contact_cells = array(
+                'attendee_costumes'  => implode(', ', $attendee['costumes']),
+                'attendee_mobile'    => $attendee['mobile'],
+                'attendee_emergency' => $attendee['emergency_contact'],
+            );
 
-            $attendees_rows .= '<td class="attendee_days">' . $days_cell . '</td>';
+            $attendees_rows .= '<tr class="attendee_row_contact">';
+            foreach($contact_cells as $class => $value)
+            {
+                $attendees_rows .= '<td class="' . $class . '" colspan="' . $attendance_contact_columns[$class]['span'] . '">'
+                    . htmlspecialchars_uni($value) . '</td>';
+            }
+            $attendees_rows .= '</tr></tbody>';
         }
 
-        $attendees_rows .= '<td class="attendee_attended" rowspan="2">'
-            . '<input type="checkbox" class="attendee_tick" aria-label="Attended: '
-            . htmlspecialchars_uni($attendee['username']) . '" /></td>';
-        $attendees_rows .= '</tr>';
+        return $attendees_rows;
+    };
 
-        // The contact half, laid over the identity row's columns - the spans are the ones
-        // the header row was built with, or the two halves would not line up.
-        $contact_cells = array(
-            'attendee_costumes'  => implode(', ', $attendee['costumes']),
-            'attendee_mobile'    => $attendee['mobile'],
-            'attendee_emergency' => $attendee['emergency_contact'],
-        );
-
-        $attendees_rows .= '<tr class="attendee_row_contact">';
-        foreach($contact_cells as $class => $value)
-        {
-            $attendees_rows .= '<td class="' . $class . '" colspan="' . $attendance_contact_columns[$class]['span'] . '">'
-                . htmlspecialchars_uni($value) . '</td>';
-        }
-        $attendees_rows .= '</tr></tbody>';
-    }
+    $attendees_rows = $render_attendee_rows($attendees, false);
 
     if($attendees_rows === '')
     {
         $attendees_rows = '<tbody><tr id="attendance_empty"><td colspan="' . $attendance_colspan . '">No attendees yet.</td></tr></tbody>';
+    }
+
+    // -----------------------------------------------------------------------
+    // Waitlist
+    //
+    // Under the sheet rather than in it, and in the order people are waiting rather than
+    // by name: if somebody does not turn up, this is the list a point of contact works
+    // down, top first. A queue only means anything for one day, so an event of several
+    // days has one table per day - on "All days", one for each day somebody is waiting.
+    // -----------------------------------------------------------------------
+    $waitlist_places = array();
+    if($filter_day)
+    {
+        $waitlist_places[] = $filter_day;
+    }
+    elseif(!empty($event_days))
+    {
+        foreach($event_days as $day)
+        {
+            $waitlist_places[] = (int)$day['id'];
+        }
+    }
+    else
+    {
+        $waitlist_places[] = 0;
+    }
+
+    $day_rows = array();
+    foreach($event_days as $day)
+    {
+        $day_rows[(int)$day['id']] = $day;
+    }
+
+    $attendance_waitlist = '';
+    $waitlisted_uids = array();
+    foreach($waitlist_places as $place)
+    {
+        $waiting = array();
+        foreach(events_rsvp_roles() as $role)
+        {
+            foreach(events_get_attendees($event_id, array('day' => $place, 'role' => $role, 'status' => 'waitlisted')) as $row)
+            {
+                $day_ids = array();
+                foreach($row['days'] as $day)
+                {
+                    if(!$place || (int)$day['id'] === $place)
+                    {
+                        $day_ids[] = (int)$day['id'];
+                    }
+                }
+
+                $row['roles'] = array($role);
+                $row['role_days'] = array($role => $day_ids);
+                $row['costumes'] = $role === 'trooper' ? $row['costumes'] : array();
+                $waiting[] = $row;
+            }
+        }
+
+        if(empty($waiting))
+        {
+            continue;
+        }
+
+        usort($waiting, function($a, $b) {
+            $compared = strcmp($a['queued_at'], $b['queued_at']);
+            return $compared !== 0 ? $compared : $a['rsvp_id'] - $b['rsvp_id'];
+        });
+
+        foreach($waiting as $row)
+        {
+            $waitlisted_uids[$row['uid']] = true;
+        }
+
+        $heading = 'Waitlist' . ($place && isset($day_rows[$place]) ? ' - ' . events_day_label($day_rows[$place]) : '');
+
+        $attendance_waitlist .= '<div class="attendance_waitlist" data-day-id="' . (int)$place . '">'
+            . '<h4 class="attendance_waitlist_heading">' . htmlspecialchars_uni($heading) . '</h4>'
+            . '<p class="events_hint">Not attending. In signup order: if a place opens up, it goes to the first person waiting.</p>'
+            . '<table class="attendance_waitlist_table ' . $attendance_table_class . '">'
+            . '<thead>' . $attendance_headers . '</thead>'
+            . $render_attendee_rows($waiting, true)
+            . '</table></div>';
     }
 
     // The printed sheet leaves the board behind, so the facts a coordinator needs on the
@@ -279,7 +376,8 @@ if($action === 'attendance')
             $event['region'],
             $event_address,
             events_format_date($event['start_date']),
-            count($attendees) . ' ' . (count($attendees) === 1 ? 'attendee' : 'attendees'),
+            count($attendees) . ' ' . (count($attendees) === 1 ? 'attendee' : 'attendees')
+                . (empty($waitlisted_uids) ? '' : ' + ' . count($waitlisted_uids) . ' waitlisted'),
         ),
         'Attendance Sheet'
     );

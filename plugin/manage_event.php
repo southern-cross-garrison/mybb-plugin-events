@@ -86,7 +86,9 @@ if($mybb->request_method === 'post')
             $thread_error = null;
             $cancelled = 0;
             $withdrawn = 0;
-            $saved_id = events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error, $cancelled, $withdrawn);
+            $promoted = 0;
+            $demoted = 0;
+            $saved_id = events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error, $cancelled, $withdrawn, $promoted, $demoted);
 
             // The event is saved either way; a thread that could not be written is
             // reported rather than swallowed, because nothing else on the page would
@@ -102,6 +104,7 @@ if($mybb->request_method === 'post')
                 $message .= " " . $withdrawn . ($withdrawn === 1 ? " excluded member's signup was" : " excluded members' signups were")
                     . " withdrawn.";
             }
+            $message .= events_waitlist_save_message($promoted, $demoted);
             if($thread_error !== null)
             {
                 $message .= " " . $thread_error;
@@ -218,6 +221,19 @@ $manage_details .= events_form_field(
     )),
     'Optional. Signups close at this time; leave it blank to keep them open until the event ends.'
 );
+
+// Numeric keypad rather than type="number", which would let the browser refuse or quietly
+// reshape what was typed before the server could say what was wrong with it.
+foreach(array('max_troopers' => 'Maximum Troopers', 'max_wranglers' => 'Maximum Wranglers') as $field => $label)
+{
+    $manage_details .= events_form_field(
+        'event_form_' . $field,
+        $label,
+        events_form_text($field, 'event_form_' . $field, $values[$field], array('inputmode' => 'numeric', 'size' => 5), true),
+        'Optional. Leave empty for no limit. On an event of several days it applies to each day.'
+            . ' Once it is reached, new signups join a waitlist and are given places in signup order as they free up.'
+    );
+}
 
 $manage_details .= '<div class="events_field">'
     . '<span class="events_label">Requirements</span>'

@@ -58,13 +58,16 @@ function events_ical_summary(array $roles, $title, $day_id)
  * @param array $signup As returned by events_get_user_signup()
  * @param int $day_id
  * @param bool $multi_day
+ * @param bool $waitlisted Whether the member is waiting for a place rather than not signed up
  * @return string
  */
-function events_ical_signup_line(array $roles, array $signup, $day_id, $multi_day)
+function events_ical_signup_line(array $roles, array $signup, $day_id, $multi_day, $waitlisted = false)
 {
     if(!$roles)
     {
-        return "You haven't signed up for this event yet.";
+        return $waitlisted
+            ? "You're on the waitlist for this event, and don't have a place yet."
+            : "You haven't signed up for this event yet.";
     }
 
     $doing = array();
@@ -161,7 +164,32 @@ function events_ical_vevents(array $event, $user_id)
     // days (see the UID line below).
     $first_date = $days[0]['date'];
 
+    // Only confirmed places go on a calendar. A day the member is waiting for is not one
+    // they are going to yet, and an entry saying "Trooping" for it would be a promise; it
+    // arrives with the next sync once the place does. Somebody waiting for everything
+    // reads as not signed up, with a line saying why.
     $signup = events_get_user_signup($event_id, $user_id);
+    $waitlisted = !empty($signup);
+    foreach($signup as $role => $held)
+    {
+        if(empty($held['days']))
+        {
+            if($held['status'] === 'waitlisted')
+            {
+                unset($signup[$role]);
+            }
+            continue;
+        }
+
+        $signup[$role]['days'] = array_values(array_filter($held['days'], function($day_id) use ($held) {
+            return $held['day_status'][$day_id] === 'attending';
+        }));
+        if(empty($signup[$role]['days']))
+        {
+            unset($signup[$role]);
+        }
+    }
+    $waitlisted = $waitlisted && empty($signup);
     $multi_day = count($days) > 1;
     $day_ids = array_map(function($day) { return (int)$day['id']; }, $days);
 
@@ -239,7 +267,7 @@ function events_ical_vevents(array $event, $user_id)
         }
 
         $description = array_merge(
-            array(events_ical_signup_line($role_days, $signup, $day['id'], $multi_day)),
+            array(events_ical_signup_line($role_days, $signup, $day['id'], $multi_day, $waitlisted)),
             $details
         );
         $description = implode("\n", $description);

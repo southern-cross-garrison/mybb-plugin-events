@@ -107,5 +107,50 @@ function events_admin_rsvps()
 
     $table->output("RSVPs for: " . htmlspecialchars_uni($event['title']) . " (" . count($attendees) . ")");
 
+    // The waitlist, in the order its places will be given out rather than by name.
+    $waiting = array();
+    foreach(events_rsvp_roles() as $role)
+    {
+        $waiting = array_merge($waiting, events_get_attendees($event_id, array(
+            'costume' => $filter_costume, 'day' => $filter_day, 'role' => $role, 'status' => 'waitlisted',
+        )));
+    }
+    usort($waiting, function($a, $b) {
+        $compared = strcmp($a['queued_at'], $b['queued_at']);
+        return $compared !== 0 ? $compared : $a['rsvp_id'] - $b['rsvp_id'];
+    });
+
+    if(!empty($waiting))
+    {
+        $waitlist = new Table;
+        $waitlist->construct_header("User", array("width" => "16%"));
+        $waitlist->construct_header("Role", array("width" => "8%"));
+        $waitlist->construct_header("Legion ID", array("width" => "12%"));
+        $waitlist->construct_header("Costumes", array("width" => "26%"));
+        $waitlist->construct_header("Days Waiting For", array("width" => "18%"));
+        $waitlist->construct_header("Mobile", array("width" => "12%"));
+        $waitlist->construct_header("Joined Waitlist", array("width" => "12%"));
+
+        foreach($waiting as $member)
+        {
+            $waiting_day_ids = array();
+            foreach($member['days'] as $day)
+            {
+                $waiting_day_ids[] = (int)$day['id'];
+            }
+
+            $waitlist->construct_cell("<a href=\"index.php?module=user-users&amp;action=edit&amp;uid=" . $member['uid'] . "\">" . htmlspecialchars_uni($member['username']) . "</a>");
+            $waitlist->construct_cell(events_role_label($member['role']));
+            $waitlist->construct_cell(htmlspecialchars_uni($member['tk_id']));
+            $waitlist->construct_cell(htmlspecialchars_uni(implode(', ', $member['costumes'])));
+            $waitlist->construct_cell(htmlspecialchars_uni(implode(', ', events_day_labels($event_days, $waiting_day_ids, 'short'))));
+            $waitlist->construct_cell(htmlspecialchars_uni($member['mobile']));
+            $waitlist->construct_cell(events_format_date($member['queued_at']));
+            $waitlist->construct_row(array('class' => 'events_admin_waitlist_row'));
+        }
+
+        $waitlist->output("Waitlist (" . count($waiting) . ")");
+    }
+
     echo "<br /><a href=\"" . $mybb->settings['bburl'] . "/event.php?id=" . $event_id . "&amp;action=attendance\" class=\"button\" id=\"admin_attendance_link\">View Attendance Sheet</a>";
 }

@@ -335,12 +335,34 @@ baseline picks the change up.
   and a double-clicked submit is two requests racing through the same check-then-write.
   Anything that reads state to decide what to write holds a named lock
   (`events_acquire_lock()` / `events_release_lock()`, MariaDB `GET_LOCK`) around both, and
-  does the read *after* taking the lock. `events_save_signup()` locks per member per event,
-  so a second Confirm becomes an update to the first. `troop_report.php` and the reminder
+  does the read *after* taking the lock. `events_save_signup()` locks the whole event
+  (`events_signup_lock()`), not one member: whether a signup gets a place depends on
+  everybody else's, so two members confirming for the last place under per-member locks
+  both got it. A second Confirm still becomes an update to the first. `events_save_event()`
+  holds the same lock across its withdrawals, cancellations, day changes and rebalance, and
+  so calls `events_write_signup()` (the unlocked body) rather than `events_save_signup()`. `troop_report.php` and the reminder
   task share a lock per event, so a second submit is told the report is posted and linked
   to it. `tests/helpers/double-submit.ts` fires overlapping submits from the page. The
   signup race only loses some of the time, so one passing run of a test like that proves
   little.
+- Maximum troopers and wranglers work on one rule: a *place* is a role on one day (or on
+  the whole event, for an event with no days), its queue is every claim on it ordered by
+  `claimed_at`, and the first `max` of the queue are attending and the rest waitlisted.
+  `events_waitlist_moves()` is that rule and nothing else; `events_rebalance_waitlist()`
+  applies it and must run, under the event's signup lock, after anything that changes
+  signups, days or maximums. It holds only because a claim keeps its `claimed_at` for as
+  long as the member holds that day - which is why `events_write_signup()` diffs claims
+  rather than deleting and re-inserting them. Re-inserting on every save would send a member
+  to the back of the waitlist for changing their costume.
+
+- On an event with days, a signup's own `rsvps.status` is kept in step with its claims
+  (attending if any claim is), so every `status = 'attending'` read elsewhere means "going,
+  at least in part" and needed no change. Anything that lists *days*, though, has to look at
+  the claim's status: `events_get_attendees()` returns only the claims with the status it
+  was asked for (attending unless told otherwise), and `events_get_user_signup()` returns
+  waitlisted rows too, with `day_status`. A new place a signup is read from has to decide
+  which of the two it wants. The troop report, reminders and calendar want attending only.
+
 - A new front-end page needs three things beyond the file itself: a template file (synced
   on activate), its `THIS_SCRIPT` added to `EVENTS_STYLESHEET_ATTACHEDTO` in
   `events_stylesheets.php` - a page missing from that list renders completely unstyled -

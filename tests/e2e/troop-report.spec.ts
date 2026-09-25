@@ -124,6 +124,25 @@ test.describe("troop reports", () => {
     expect(draft.indexOf("newbie")).toBeGreaterThan(otherIndex);
   });
 
+  test("leaves out anybody who was only on the waitlist", async ({ page }) => {
+    const eventId = await finishedEvent("Waitlisted Troop");
+    await createRsvp(eventId, "trooper1", { costumes: [TK] });
+    await createRsvp(eventId, "trooper2", { costumes: [TD], status: "waitlisted" });
+
+    await loginAs(page, "trooper1");
+    await page.goto(`/troop_report.php?id=${eventId}`);
+
+    const draft = await page.locator("#troop_report_content").inputValue();
+    expect(draft).toContain("trooper1 (TK-20001)");
+    expect(draft).not.toContain("trooper2");
+    expect(draft).toContain("[b]Total attendees:[/b] 1");
+
+    // Waiting for a place is not having attended, so there is no report to write either.
+    await loginAs(page, "trooper2");
+    await page.goto(`/troop_report.php?id=${eventId}`);
+    await expect(page.locator("body")).toContainText("You must have attended this event");
+  });
+
   test("the report box is the board's BBCode editor", async ({ page }) => {
     const eventId = await finishedEvent("Edited Troop");
     await createRsvp(eventId, "trooper1", { costumes: [TK] });

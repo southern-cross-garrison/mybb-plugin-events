@@ -659,6 +659,8 @@ function events_event_form_values(array $event = array())
             'requires_wwcc' => 0,
             'gec_user_id'   => (int)$mybb->user['uid'],
             'poc_user_id'   => 0,
+            'max_troopers'  => '',
+            'max_wranglers' => '',
             'days'          => array(),
             'exclusions'    => '',
         );
@@ -699,6 +701,10 @@ function events_event_form_values(array $event = array())
         'gec_user_id'   => (int)$event['gec_user_id'],
         // Read defensively for the same reason as the address above.
         'poc_user_id'   => isset($event['poc_user_id']) ? (int)$event['poc_user_id'] : 0,
+        // No limit is stored as 0 and shown as an empty box, which is what the hint says
+        // to leave it as.
+        'max_troopers'  => events_event_cap($event, 'trooper') ? (string)events_event_cap($event, 'trooper') : '',
+        'max_wranglers' => events_event_cap($event, 'wrangler') ? (string)events_event_cap($event, 'wrangler') : '',
         'days'          => $days,
         'exclusions'    => implode(', ', events_get_event_exclusion_names($event_id)),
     );
@@ -749,6 +755,8 @@ function events_event_form_input()
         'requires_wwcc' => $mybb->get_input('requires_wwcc', MyBB::INPUT_INT) ? 1 : 0,
         'gec_user_id'   => $mybb->get_input('gec_user_id', MyBB::INPUT_INT),
         'poc_user_id'   => $mybb->get_input('poc_user_id', MyBB::INPUT_INT),
+        'max_troopers'  => trim($mybb->get_input('max_troopers')),
+        'max_wranglers' => trim($mybb->get_input('max_wranglers')),
         'days'          => $days,
         'exclusions'    => $mybb->get_input('exclusions'),
     );
@@ -877,6 +885,15 @@ function events_validate_event_input(array $input, array $event = array())
         && !array_key_exists((int)$input['poc_user_id'], events_poc_options($event)))
     {
         $errors[] = "Choose a point of contact from the list: somebody signed up to the event, or yourself.";
+    }
+
+    // A maximum is a count of people, so a whole number; empty is no limit, and so is 0.
+    foreach(array('max_troopers' => 'maximum number of troopers', 'max_wranglers' => 'maximum number of wranglers') as $field => $label)
+    {
+        if($input[$field] !== '' && (!ctype_digit($input[$field]) || (int)$input[$field] > EVENTS_MAX_PLACES))
+        {
+            $errors[] = "The " . $label . " must be a whole number from 0 to " . EVENTS_MAX_PLACES . ", or empty for no limit.";
+        }
     }
 
     // The exclusions field only lets a real member be picked, so a name that matches
@@ -1021,6 +1038,9 @@ function events_removed_event_days($event_id, array $input)
 /**
  * The members signed up for any of these days, and which of them each one holds.
  *
+ * Waitlisted claims count: a place in the queue for a day that is going is a signup the
+ * save cancels like any other, and its member is told the same way.
+ *
  * @param int $event_id
  * @param array $removed_days event_day rows, from events_removed_event_days()
  * @return array uid => array('uid', 'username', 'day_ids'), ordered by username
@@ -1043,7 +1063,6 @@ function events_day_change_signups($event_id, array $removed_days)
         INNER JOIN " . TABLE_PREFIX . "event_plugin_rsvp_days d ON d.rsvp_id = r.id
         LEFT JOIN " . TABLE_PREFIX . "users u ON u.uid = r.user_id
         WHERE r.event_id = " . (int)$event_id . "
-          AND r.status = 'attending'
           AND d.event_day_id IN (" . $ids . ")
         ORDER BY u.username ASC, d.event_day_id ASC
     ");
@@ -1076,9 +1095,13 @@ function events_day_change_signups($event_id, array $removed_days)
  * form edited again before confirming - or a signup that arrives in between - is warned
  * about afresh rather than carried through on the earlier answer.
  *
+ * Lowering a maximum is the same kind of change - it takes confirmed places away from
+ * people who hold them - so it is asked about in the same warning, under the same token.
+ * Raising one only ever gives places out, and needs no asking.
+ *
  * @param int $event_id 0 for a new event, which has nothing to cancel
  * @param array $input From events_event_form_input(), already validated
- * @return array|null array('removed', 'members', 'token'), or null when the save can go ahead
+ * @return array|null array('removed', 'members', 'demoted', 'token'), or null when the save can go ahead
  */
 function events_day_change_to_confirm($event_id, array $input)
 {
@@ -1094,21 +1117,103 @@ function events_day_change_to_confirm($event_id, array $input)
 
     // A member being excluded in the same save is withdrawn by the exclusion, and is not
     // sent the PM, so they are not somebody this save cancels on account of the days.
-    $members = array_diff_key($members, array_flip(events_parse_exclusions($input['exclusions'])));
-    if(empty($members))
+    $excluded = events_parse_exclusions($input['exclusions']);
+    $members = array_diff_key($members, array_flip($excluded));
+
+    $demoted = events_cap_change_demotions($event_id, $input, $removed, array_merge($excluded, array_keys($members)));
+
+    if(empty($members) && empty($demoted))
     {
         return null;
     }
 
     $day_ids = array_map(function($day) { return (int)$day['id']; }, $removed);
-    $token = md5(implode(',', $day_ids) . '|' . implode(',', array_keys($members)));
+    $demoted_key = array();
+    foreach($demoted as $uid => $member)
+    {
+        foreach($member['places'] as $role => $place_days)
+        {
+            $demoted_key[] = $uid . ':' . $role . ':' . implode('.', $place_days);
+        }
+    }
+    $token = md5(implode(',', $day_ids) . '|' . implode(',', array_keys($members)) . '|' . implode(',', $demoted_key));
 
     if($mybb->get_input('confirm_day_changes') === $token)
     {
         return null;
     }
 
-    return array('removed' => $removed, 'members' => $members, 'token' => $token);
+    return array('removed' => $removed, 'members' => $members, 'demoted' => $demoted, 'token' => $token);
+}
+
+/**
+ * The members a save's maximums would move from a place to the waitlist.
+ *
+ * Asked of the queues as the save will leave them: the members whose signups it cancels
+ * or withdraws, and the days it removes, are already out of the way, since the places
+ * they free are places nobody else has to give up.
+ *
+ * @param int $event_id
+ * @param array $input From events_event_form_input(), already validated
+ * @param array $removed_days From events_removed_event_days()
+ * @param int[] $dropped_uids Members whose signups the save removes
+ * @return array uid => array('uid', 'username', 'places' => role => day ids, 'labels'), ordered by username
+ */
+function events_cap_change_demotions($event_id, array $input, array $removed_days, array $dropped_uids)
+{
+    $event = events_get_event($event_id);
+
+    // A finished event is never rebalanced (events_rebalance_waitlist()), so nothing moves.
+    if(!$event || events_strtotime($input['end_date']) <= TIME_NOW)
+    {
+        return array();
+    }
+
+    $moves = events_waitlist_moves($event,
+        array('trooper' => (int)$input['max_troopers'], 'wrangler' => (int)$input['max_wranglers']),
+        array('uids' => $dropped_uids, 'days' => array_map(function($day) { return (int)$day['id']; }, $removed_days)));
+
+    $day_labels = array();
+    foreach(events_get_event_days($event_id) as $day)
+    {
+        $day_labels[(int)$day['id']] = events_day_label($day);
+    }
+
+    $demoted = array();
+    foreach(events_group_waitlist_moves($moves) as $uid => $member)
+    {
+        if(empty($member['demoted']))
+        {
+            continue;
+        }
+
+        $labels = array();
+        foreach($member['demoted'] as $role => $day_ids)
+        {
+            $days = array();
+            foreach($day_ids as $day_id)
+            {
+                if(isset($day_labels[$day_id]))
+                {
+                    $days[] = $day_labels[$day_id];
+                }
+            }
+
+            $labels[] = events_role_verb($role) . (empty($days) ? '' : ' - ' . implode(', ', $days));
+        }
+
+        $user = events_get_user($uid);
+        $demoted[$uid] = array(
+            'uid'      => $uid,
+            'username' => isset($user['username']) ? (string)$user['username'] : '',
+            'places'   => $member['demoted'],
+            'labels'   => $labels,
+        );
+    }
+
+    uasort($demoted, function($a, $b) { return strcasecmp($a['username'], $b['username']); });
+
+    return $demoted;
 }
 
 /**
@@ -1124,30 +1229,60 @@ function events_day_change_to_confirm($event_id, array $input)
  */
 function events_day_change_warning(array $change, $button_class)
 {
-    $dates = array();
-    foreach($change['removed'] as $day)
-    {
-        $dates[] = htmlspecialchars_uni(events_day_label($day));
-    }
-
-    $names = '';
-    foreach($change['members'] as $member)
-    {
-        $names .= '<li>' . htmlspecialchars_uni($member['username']) . '</li>';
-    }
+    $html = '';
+    $actions = array();
 
     $count = count($change['members']);
-    $noun = $count === 1 ? 'member is' : 'members are';
+    if($count)
+    {
+        $dates = array();
+        foreach($change['removed'] as $day)
+        {
+            $dates[] = htmlspecialchars_uni(events_day_label($day));
+        }
 
-    return '<p><strong>These changes remove ' . implode(', ', $dates) . ' from the event, and '
-        . $count . ' ' . $noun . ' signed up for ' . (count($dates) === 1 ? 'it' : 'them') . ':</strong></p>'
-        . '<ul id="event_day_change_members">' . $names . '</ul>'
-        . '<p>Saving will cancel ' . ($count === 1 ? 'that signup' : 'those signups')
-        . ' and send each of them a PM asking them to sign up again if the new times work for them.'
-        . ' To keep them, change the dates below and save again.</p>'
+        $names = '';
+        foreach($change['members'] as $member)
+        {
+            $names .= '<li>' . htmlspecialchars_uni($member['username']) . '</li>';
+        }
+
+        $noun = $count === 1 ? 'member is' : 'members are';
+
+        $html .= '<p><strong>These changes remove ' . implode(', ', $dates) . ' from the event, and '
+            . $count . ' ' . $noun . ' signed up for ' . (count($dates) === 1 ? 'it' : 'them') . ':</strong></p>'
+            . '<ul id="event_day_change_members">' . $names . '</ul>'
+            . '<p>Saving will cancel ' . ($count === 1 ? 'that signup' : 'those signups')
+            . ' and send each of them a PM asking them to sign up again if the new times work for them.'
+            . ' To keep them, change the dates below and save again.</p>';
+
+        $actions[] = 'cancel ' . $count . ' ' . ($count === 1 ? 'signup' : 'signups');
+    }
+
+    $demoted = isset($change['demoted']) ? $change['demoted'] : array();
+    if($demoted)
+    {
+        $names = '';
+        foreach($demoted as $member)
+        {
+            $names .= '<li>' . htmlspecialchars_uni($member['username'])
+                . ' (' . htmlspecialchars_uni(implode('; ', $member['labels'])) . ')</li>';
+        }
+
+        $demoted_count = count($demoted);
+        $html .= '<p><strong>Lowering the maximum moves ' . $demoted_count . ' '
+            . ($demoted_count === 1 ? 'member' : 'members') . ' from a place to the waitlist:</strong></p>'
+            . '<ul id="event_cap_change_members">' . $names . '</ul>'
+            . '<p>They are the most recent signups, and they keep their place at the front of the waitlist.'
+            . ' Each of them will be sent a PM. To keep them, raise the maximum below and save again.</p>';
+
+        $actions[] = 'move ' . $demoted_count . ' to the waitlist';
+    }
+
+    return $html
         . '<p><button type="submit" class="' . htmlspecialchars_uni($button_class) . '" name="confirm_day_changes"'
         . ' id="event_day_change_confirm" value="' . htmlspecialchars_uni($change['token']) . '">'
-        . 'Save and cancel ' . $count . ' ' . ($count === 1 ? 'signup' : 'signups') . '</button></p>';
+        . 'Save and ' . implode(' and ', $actions) . '</button></p>';
 }
 
 /**
@@ -1272,11 +1407,18 @@ function events_send_day_change_pms($event_id, array $removed_days, array $membe
  * not PMed - the event is hidden from them, and a PM about it would say what the
  * exclusion is there not to.
  *
+ * Everything that touches signups - the withdrawals, the cancellations, the days and the
+ * maximums - happens under the event's signup lock, and the queues are settled once at the
+ * end of it, so a place freed by a cancellation and a maximum lowered in the same save are
+ * one decision rather than a promotion and a demotion in turn.
+ *
  * @param int $cancelled Set to how many members' signups a removed day cancelled
  * @param int $withdrawn Set to how many excluded members' signups were withdrawn
+ * @param int $promoted Set to how many members were given a place off the waitlist
+ * @param int $demoted Set to how many members were moved to the waitlist
  * @return int the event's id
  */
-function events_save_event($event_id, array $input, $user_id, &$thread_error = null, &$cancelled = 0, &$withdrawn = 0)
+function events_save_event($event_id, array $input, $user_id, &$thread_error = null, &$cancelled = 0, &$withdrawn = 0, &$promoted = 0, &$demoted = 0)
 {
     global $db;
 
@@ -1294,6 +1436,8 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
         'requires_wwcc' => $input['requires_wwcc'] ? 1 : 0,
         'gec_user_id'   => (int)$input['gec_user_id'],
         'poc_user_id'   => (int)$input['poc_user_id'],
+        'max_troopers'  => (int)$input['max_troopers'],
+        'max_wranglers' => (int)$input['max_wranglers'],
         'updated_at'    => $db->escape_string(events_date('Y-m-d H:i:s')),
     );
 
@@ -1331,6 +1475,12 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
 
     $excluded = events_parse_exclusions($input['exclusions']);
 
+    // Taken whether or not it can be had: an administrator's save is not refused over a
+    // signup that is slow to finish, and every write below is one the lock would only
+    // have delayed.
+    $lock = events_signup_lock($event_id);
+    $locked = events_acquire_lock($lock);
+
     // Withdrawn before the days are looked at, so a member being excluded is not also
     // counted - and PMed - as a signup the removed days cancelled.
     $withdrawn = 0;
@@ -1338,7 +1488,7 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
     {
         if(!empty(events_get_user_signup($event_id, $uid)))
         {
-            events_save_signup($event_id, $uid, array(), array());
+            events_write_signup($event_id, $uid, array(), array());
             $withdrawn++;
         }
     }
@@ -1350,11 +1500,22 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
     {
         // An empty intent drops every role, with its days and costumes - the same write
         // as the member withdrawing themselves.
-        events_save_signup($event_id, $member['uid'], array(), array());
+        events_write_signup($event_id, $member['uid'], array(), array());
     }
     $cancelled = count($cancelled_members);
 
     events_save_event_days($event_id, $input['days']);
+    events_claim_every_day($event_id);
+
+    $moves = events_rebalance_waitlist($event_id);
+    if($locked)
+    {
+        events_release_lock($lock);
+    }
+
+    $moved = events_group_waitlist_moves($moves);
+    $promoted = count(array_filter($moved, function($member) { return !empty($member['promoted']); }));
+    $demoted = count(array_filter($moved, function($member) { return !empty($member['demoted']); }));
 
     $db->delete_query("event_plugin_event_exclusions", "event_id = " . $event_id);
     foreach($excluded as $uid)
@@ -1371,8 +1532,77 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
     events_sync_event_thread($event_id, $thread_error);
 
     events_send_day_change_pms($event_id, $removed_days, $cancelled_members, $user_id);
+    events_send_waitlist_pms($event_id, $moves, $user_id);
 
     return $event_id;
+}
+
+/**
+ * What a save did to the waitlist, for the message both forms show after it.
+ *
+ * @param int $promoted
+ * @param int $demoted
+ * @return string Empty when it did nothing, otherwise a sentence with a leading space
+ */
+function events_waitlist_save_message($promoted, $demoted)
+{
+    $message = '';
+    if($promoted > 0)
+    {
+        $message .= " " . $promoted . ($promoted === 1 ? " member was" : " members were")
+            . " given a place off the waitlist and sent a PM.";
+    }
+    if($demoted > 0)
+    {
+        $message .= " " . $demoted . ($demoted === 1 ? " member was" : " members were")
+            . " moved to the waitlist and sent a PM.";
+    }
+
+    return $message;
+}
+
+/**
+ * Give every signup without day claims a claim on each of the event's days.
+ *
+ * A signup made while an event had no days has no claims, and once the event gains some
+ * it reads as "every day" everywhere it is shown. Each day is its own queue, though, so
+ * a signup has to be in each one to be counted there. The claims take the signup's own
+ * status and its rsvp_date, which is where it would have been in each queue all along.
+ *
+ * Called with events_signup_lock() held.
+ *
+ * @param int $event_id
+ * @return void
+ */
+function events_claim_every_day($event_id)
+{
+    global $db;
+
+    $event_id = (int)$event_id;
+    $days = events_get_event_days($event_id);
+    if(empty($days))
+    {
+        return;
+    }
+
+    $query = $db->query("
+        SELECT r.id, r.status, r.rsvp_date
+        FROM " . TABLE_PREFIX . "event_plugin_rsvps r
+        WHERE r.event_id = " . $event_id . "
+          AND NOT EXISTS (SELECT 1 FROM " . TABLE_PREFIX . "event_plugin_rsvp_days d WHERE d.rsvp_id = r.id)
+    ");
+    while($row = $db->fetch_array($query))
+    {
+        foreach($days as $day)
+        {
+            $db->insert_query("event_plugin_rsvp_days", array(
+                'rsvp_id'      => (int)$row['id'],
+                'event_day_id' => (int)$day['id'],
+                'status'       => $row['status'] === 'waitlisted' ? 'waitlisted' : 'attending',
+                'claimed_at'   => $db->escape_string($row['rsvp_date']),
+            ));
+        }
+    }
 }
 
 /**
@@ -1394,6 +1624,12 @@ define('EVENTS_TITLE_MAX_LENGTH', 64);
  * is generous enough that no real event reaches it.
  */
 define('EVENTS_MAX_EVENT_DAYS', 31);
+
+/**
+ * The largest maximum troopers or wranglers an event can be given. Past this the number
+ * is a typo, not a limit, and would read on the event page as one.
+ */
+define('EVENTS_MAX_PLACES', 9999);
 
 /**
  * The calendar days an event covers, from its start date to its end date.

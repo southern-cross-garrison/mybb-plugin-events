@@ -1072,9 +1072,13 @@ function events_rsvp_count($event_id, $role = 'trooper')
  * troop some of an event's days and wrangle others. This returns them together so the
  * event page and the signup wizard can reason about the signup as one thing.
  *
+ * Waitlisted rows are included: a place in a queue is still the member's signup, and
+ * events_write_signup() reads this to find the row it is updating. A caller that only
+ * cares about confirmed places reads status and day_status.
+ *
  * @param int $event_id
  * @param int|null $user_id
- * @return array role => array(rsvp_id, rsvp_date, days (int[]), costumes (string[]))
+ * @return array role => array(rsvp_id, rsvp_date, status, days (int[]), day_status (day id => status), costumes (string[]))
  */
 function events_get_user_signup($event_id, $user_id = null)
 {
@@ -1087,17 +1091,19 @@ function events_get_user_signup($event_id, $user_id = null)
     }
 
     $signup = array();
-    $query = $db->simple_select("event_plugin_rsvps", "id, role, rsvp_date",
-        "event_id = " . (int)$event_id . " AND user_id = " . (int)$user['uid'] . " AND status = 'attending'");
+    $query = $db->simple_select("event_plugin_rsvps", "id, role, rsvp_date, status",
+        "event_id = " . (int)$event_id . " AND user_id = " . (int)$user['uid']);
     while($row = $db->fetch_array($query))
     {
         $rsvp_id = (int)$row['id'];
 
         $days = array();
-        $day_query = $db->simple_select("event_plugin_rsvp_days", "event_day_id", "rsvp_id = " . $rsvp_id);
+        $day_status = array();
+        $day_query = $db->simple_select("event_plugin_rsvp_days", "event_day_id, status", "rsvp_id = " . $rsvp_id);
         while($day = $db->fetch_array($day_query))
         {
             $days[] = (int)$day['event_day_id'];
+            $day_status[(int)$day['event_day_id']] = $day['status'];
         }
 
         $costumes = array();
@@ -1108,14 +1114,36 @@ function events_get_user_signup($event_id, $user_id = null)
         }
 
         $signup[events_rsvp_role($row['role'])] = array(
-            'rsvp_id'   => $rsvp_id,
-            'rsvp_date' => $row['rsvp_date'],
-            'days'      => $days,
-            'costumes'  => $costumes,
+            'rsvp_id'    => $rsvp_id,
+            'rsvp_date'  => $row['rsvp_date'],
+            'status'     => $row['status'] === 'waitlisted' ? 'waitlisted' : 'attending',
+            'days'       => $days,
+            'day_status' => $day_status,
+            'costumes'   => $costumes,
         );
     }
 
     return $signup;
+}
+
+/**
+ * Whether a signup holds a confirmed place anywhere - the ones that belong on the
+ * calendar, and the ones the troop report and reminders count.
+ *
+ * @param array $signup From events_get_user_signup()
+ * @return bool
+ */
+function events_signup_has_place(array $signup)
+{
+    foreach($signup as $held)
+    {
+        if($held['status'] === 'attending')
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 /**
@@ -1169,6 +1197,22 @@ function events_lock_name($name)
 }
 
 /**
+ * The name of the lock every write to an event's signups holds.
+ *
+ * One lock for the whole event rather than one per member, because a signup's place
+ * depends on everybody else's: two members confirming at once for the last place both
+ * read "one left" under per-member locks, and both get it. It still covers the
+ * double-clicked Confirm the per-member lock was for.
+ *
+ * @param int $event_id
+ * @return string
+ */
+function events_signup_lock($event_id)
+{
+    return 'signup:' . (int)$event_id;
+}
+
+/**
  * Write a member's signup, replacing whatever they had before.
  *
  * $role_days is the whole intent: a role that is absent from it is a role the member is
@@ -1178,11 +1222,15 @@ function events_lock_name($name)
  *
  * Costumes only ever attach to the trooper row; a wrangler is not in costume.
  *
- * The whole write holds a lock on the member's signup for this event, and the signup it
+ * The whole write holds the event's signup lock (events_signup_lock()), and the signup it
  * replaces is read inside that lock. A double-clicked Confirm is two of these at once,
  * and without it both read "no signup yet": the second insert then trips the
  * event_user_role key, or both rewrite the same row's costumes and leave each one twice.
- * Held, the second request finds the row the first just wrote and updates it.
+ * Held, the second request finds the row the first just wrote and updates it. The same
+ * lock is what makes a place taken by one member visible to the next.
+ *
+ * Anybody the write moves up off a waitlist - a member dropping a day frees a place - is
+ * PMed once the lock is released. The member saving is not: they know what they did.
  *
  * @param int $event_id
  * @param int $user_id
@@ -1194,7 +1242,7 @@ function events_save_signup($event_id, $user_id, array $role_days, array $costum
 {
     $event_id = (int)$event_id;
     $user_id = (int)$user_id;
-    $lock = 'signup:' . $event_id . ':' . $user_id;
+    $lock = events_signup_lock($event_id);
 
     if(!events_acquire_lock($lock))
     {
@@ -1202,13 +1250,24 @@ function events_save_signup($event_id, $user_id, array $role_days, array $costum
     }
 
     events_write_signup($event_id, $user_id, $role_days, $costumes);
+    $moves = events_rebalance_waitlist($event_id);
     events_release_lock($lock);
+
+    events_send_waitlist_pms($event_id, $moves, null, $user_id);
 
     return true;
 }
 
 /**
  * The body of events_save_signup(), which must only be called with its lock held.
+ *
+ * Day claims the member already holds are kept rather than rewritten, because a claim's
+ * claimed_at is its place in that day's queue: re-inserting it on every save would send
+ * a member to the back of the waitlist for changing their costume. A new claim joins the
+ * back of its queue, confirmed if there is room there and waitlisted if not.
+ *
+ * Leaves the rows' own status to events_rebalance_waitlist(), which every caller runs
+ * before releasing the lock.
  *
  * @param int $event_id
  * @param int $user_id
@@ -1220,7 +1279,12 @@ function events_write_signup($event_id, $user_id, array $role_days, array $costu
 {
     global $db;
 
+    $event_id = (int)$event_id;
+    $user_id = (int)$user_id;
+    $event = events_get_event($event_id);
     $existing = events_get_user_signup($event_id, $user_id);
+    $queues = events_signup_queues($event_id);
+    $now = $db->escape_string(events_date('Y-m-d H:i:s'));
 
     foreach(events_rsvp_roles() as $role)
     {
@@ -1238,28 +1302,47 @@ function events_write_signup($event_id, $user_id, array $role_days, array $costu
             continue;
         }
 
+        $day_ids = array_values(array_unique(array_map('intval', $role_days[$role])));
+
         if($held)
         {
             $rsvp_id = (int)$held['rsvp_id'];
-            $db->delete_query("event_plugin_rsvp_days", "rsvp_id = " . $rsvp_id);
+            $held_days = $held['days'];
+
+            $dropped = array_diff($held_days, $day_ids);
+            if($dropped)
+            {
+                $db->delete_query("event_plugin_rsvp_days", "rsvp_id = " . $rsvp_id
+                    . " AND event_day_id IN (" . implode(',', array_map('intval', $dropped)) . ")");
+            }
+
             $db->delete_query("event_plugin_rsvp_costumes", "rsvp_id = " . $rsvp_id);
         }
         else
         {
+            $held_days = array();
+
+            // An event with no days has no claims to carry the place, so the row does.
+            $place = events_place_status($event, $role, 0, $user_id, $queues);
+
             $rsvp_id = (int)$db->insert_query("event_plugin_rsvps", array(
                 'event_id'  => $event_id,
                 'user_id'   => $user_id,
                 'role'      => $db->escape_string($role),
-                'rsvp_date' => $db->escape_string(events_date('Y-m-d H:i:s')),
-                'status'    => 'attending',
+                'rsvp_date' => $now,
+                'status'    => $place['status'],
             ));
         }
 
-        foreach(array_unique($role_days[$role]) as $day_id)
+        foreach(array_diff($day_ids, $held_days) as $day_id)
         {
+            $place = events_place_status($event, $role, $day_id, $user_id, $queues);
+
             $db->insert_query("event_plugin_rsvp_days", array(
                 'rsvp_id'      => $rsvp_id,
                 'event_day_id' => (int)$day_id,
+                'status'       => $place['status'],
+                'claimed_at'   => $now,
             ));
         }
 
@@ -1277,6 +1360,437 @@ function events_write_signup($event_id, $user_id, array $role_days, array $costu
 }
 
 /**
+ * An event's maximum for a role. 0 is no limit.
+ *
+ * The same number applies to every day of the event: each day has a queue of its own
+ * for each role, and the maximum is how many of each queue get a place.
+ *
+ * @param array $event
+ * @param string $role
+ * @return int
+ */
+function events_event_cap(array $event, $role)
+{
+    $column = events_rsvp_role($role) === 'wrangler' ? 'max_wranglers' : 'max_troopers';
+
+    return isset($event[$column]) ? max(0, (int)$event[$column]) : 0;
+}
+
+/**
+ * Every queue for an event's places, in queue order.
+ *
+ * A place is a role on one day, keyed by the day's id, or by 0 for a signup with no day
+ * claims - which is every signup to an event with no days, where the row itself carries
+ * the place. A queue is ordered by when each claim was made, which is signup order: a
+ * claim is kept, with its claimed_at, for as long as the member holds that day.
+ *
+ * @param int $event_id
+ * @return array role => place => list of array(rsvp_id, uid, status, claimed_at)
+ */
+function events_signup_queues($event_id)
+{
+    global $db;
+
+    $event_id = (int)$event_id;
+    $queues = array_fill_keys(events_rsvp_roles(), array());
+
+    $query = $db->query("
+        SELECT r.id AS rsvp_id, r.user_id, r.role, d.event_day_id, d.status, d.claimed_at
+        FROM " . TABLE_PREFIX . "event_plugin_rsvps r
+        INNER JOIN " . TABLE_PREFIX . "event_plugin_rsvp_days d ON d.rsvp_id = r.id
+        WHERE r.event_id = " . $event_id . "
+        ORDER BY d.claimed_at ASC, r.id ASC
+    ");
+    while($row = $db->fetch_array($query))
+    {
+        $queues[events_rsvp_role($row['role'])][(int)$row['event_day_id']][] = array(
+            'rsvp_id'    => (int)$row['rsvp_id'],
+            'uid'        => (int)$row['user_id'],
+            'status'     => $row['status'],
+            'claimed_at' => $row['claimed_at'],
+        );
+    }
+
+    $query = $db->query("
+        SELECT r.id AS rsvp_id, r.user_id, r.role, r.status, r.rsvp_date
+        FROM " . TABLE_PREFIX . "event_plugin_rsvps r
+        WHERE r.event_id = " . $event_id . "
+          AND NOT EXISTS (SELECT 1 FROM " . TABLE_PREFIX . "event_plugin_rsvp_days d WHERE d.rsvp_id = r.id)
+        ORDER BY r.rsvp_date ASC, r.id ASC
+    ");
+    while($row = $db->fetch_array($query))
+    {
+        $queues[events_rsvp_role($row['role'])][0][] = array(
+            'rsvp_id'    => (int)$row['rsvp_id'],
+            'uid'        => (int)$row['user_id'],
+            'status'     => $row['status'],
+            'claimed_at' => $row['rsvp_date'],
+        );
+    }
+
+    return $queues;
+}
+
+/**
+ * Where a member stands, or would stand, in one place's queue.
+ *
+ * A member already in the queue is wherever they are. Anybody else is asked about as a
+ * newcomer, who joins the back: confirmed if the queue is shorter than the maximum,
+ * waitlisted behind everybody already waiting if not.
+ *
+ * @param array $event
+ * @param string $role
+ * @param int $day_id 0 for an event with no days
+ * @param int $user_id
+ * @param array|null $queues From events_signup_queues(), to save reading them per place
+ * @return array('status' => attending|waitlisted, 'position' => place on the waitlist, 0 when confirmed, 'held' => bool)
+ */
+function events_place_status(array $event, $role, $day_id, $user_id, $queues = null)
+{
+    if($queues === null)
+    {
+        $queues = events_signup_queues($event['id']);
+    }
+
+    $role = events_rsvp_role($role);
+    $queue = isset($queues[$role][(int)$day_id]) ? $queues[$role][(int)$day_id] : array();
+
+    $waiting = 0;
+    foreach($queue as $claim)
+    {
+        if($claim['status'] === 'waitlisted')
+        {
+            $waiting++;
+        }
+
+        if($claim['uid'] === (int)$user_id)
+        {
+            return $claim['status'] === 'waitlisted'
+                ? array('status' => 'waitlisted', 'position' => $waiting, 'held' => true)
+                : array('status' => 'attending', 'position' => 0, 'held' => true);
+        }
+    }
+
+    $cap = events_event_cap($event, $role);
+    if($cap === 0 || count($queue) < $cap)
+    {
+        return array('status' => 'attending', 'position' => 0, 'held' => false);
+    }
+
+    return array('status' => 'waitlisted', 'position' => $waiting + 1, 'held' => false);
+}
+
+/**
+ * The roles an event has no room left in for a newcomer, on any of its days.
+ *
+ * A role is full when every one of its places is: somebody signing up to it now can only
+ * join a waitlist, whichever days they pick. A role with room on some days is not, since
+ * the wizard is where somebody says which days they are coming.
+ *
+ * @param array $event
+ * @param array|null $queues From events_signup_queues()
+ * @return string[]
+ */
+function events_full_roles(array $event, $queues = null)
+{
+    if($queues === null)
+    {
+        $queues = events_signup_queues($event['id']);
+    }
+
+    $places = array();
+    foreach(events_get_event_days($event['id']) as $day)
+    {
+        $places[] = (int)$day['id'];
+    }
+    if(empty($places))
+    {
+        $places[] = 0;
+    }
+
+    $full = array();
+    foreach(events_rsvp_roles() as $role)
+    {
+        $cap = events_event_cap($event, $role);
+        if($cap === 0)
+        {
+            continue;
+        }
+
+        $has_room = false;
+        foreach($places as $place)
+        {
+            $queue = isset($queues[$role][$place]) ? $queues[$role][$place] : array();
+            if(count($queue) < $cap)
+            {
+                $has_room = true;
+                break;
+            }
+        }
+
+        if(!$has_room)
+        {
+            $full[] = $role;
+        }
+    }
+
+    return $full;
+}
+
+/**
+ * The places whose status would change if the event's queues were settled now.
+ *
+ * The whole rule: in each queue, the first max places are confirmed and the rest are
+ * waitlisted. A new claim only ever joins the back and a claim keeps its place for as
+ * long as it is held, so every confirmed claim is ahead of every waitlisted one and the
+ * rule only ever moves people at the boundary - a dropout moves the next person up, a
+ * higher maximum confirms that many more, and a lower one sends the most recent confirmed
+ * places back to the waitlist, where they are first in line because they were earlier.
+ *
+ * Writes nothing, so the event form can ask what a save would do before it is made.
+ *
+ * @param array $event
+ * @param array|null $caps role => maximum, to ask about maximums not yet saved
+ * @param array $ignore 'uids' and 'days' a pending save is about to remove
+ * @return array list of array(rsvp_id, uid, role, day_id, status) - status is the new one
+ */
+function events_waitlist_moves(array $event, $caps = null, array $ignore = array())
+{
+    $ignore_uids = isset($ignore['uids']) ? array_map('intval', $ignore['uids']) : array();
+    $ignore_days = isset($ignore['days']) ? array_map('intval', $ignore['days']) : array();
+
+    $moves = array();
+    foreach(events_signup_queues($event['id']) as $role => $places)
+    {
+        $cap = ($caps !== null && isset($caps[$role])) ? max(0, (int)$caps[$role]) : events_event_cap($event, $role);
+
+        foreach($places as $day_id => $queue)
+        {
+            if($day_id && in_array((int)$day_id, $ignore_days, true))
+            {
+                continue;
+            }
+
+            $position = 0;
+            foreach($queue as $claim)
+            {
+                if(in_array($claim['uid'], $ignore_uids, true))
+                {
+                    continue;
+                }
+
+                $position++;
+                $status = ($cap === 0 || $position <= $cap) ? 'attending' : 'waitlisted';
+
+                if($status !== $claim['status'])
+                {
+                    $moves[] = array(
+                        'rsvp_id' => $claim['rsvp_id'],
+                        'uid'     => $claim['uid'],
+                        'role'    => $role,
+                        'day_id'  => (int)$day_id,
+                        'status'  => $status,
+                    );
+                }
+            }
+        }
+    }
+
+    return $moves;
+}
+
+/**
+ * Settle an event's queues, and bring each signup's own status into step with its days.
+ *
+ * Must be called with events_signup_lock() held, by whatever changed the signups or the
+ * maximums. An event that has finished is left as it was: its lists are the record of
+ * who went, and a coordinator tidying the maximum afterwards should not reshuffle them or
+ * PM anybody about a place at something that is over.
+ *
+ * @param int $event_id
+ * @return array The moves made, from events_waitlist_moves(), for events_send_waitlist_pms()
+ */
+function events_rebalance_waitlist($event_id)
+{
+    global $db;
+
+    $event_id = (int)$event_id;
+    $event = events_get_event($event_id);
+    if(!$event)
+    {
+        return array();
+    }
+
+    $moves = array();
+    if(events_strtotime($event['end_date']) > TIME_NOW)
+    {
+        $moves = events_waitlist_moves($event);
+    }
+
+    foreach($moves as $move)
+    {
+        if($move['day_id'])
+        {
+            $db->update_query("event_plugin_rsvp_days", array('status' => $move['status']),
+                "rsvp_id = " . (int)$move['rsvp_id'] . " AND event_day_id = " . (int)$move['day_id']);
+        }
+        else
+        {
+            $db->update_query("event_plugin_rsvps", array('status' => $move['status']), "id = " . (int)$move['rsvp_id']);
+        }
+    }
+
+    // A signup with days is attending if any of them is: that is what every status =
+    // 'attending' read elsewhere - reminders, counts, the calendar feed - means by it.
+    $db->write_query("
+        UPDATE " . TABLE_PREFIX . "event_plugin_rsvps r
+        SET r.status = IF(EXISTS (SELECT 1 FROM " . TABLE_PREFIX . "event_plugin_rsvp_days d WHERE d.rsvp_id = r.id AND d.status = 'attending'), 'attending', 'waitlisted')
+        WHERE r.event_id = " . $event_id . "
+          AND EXISTS (SELECT 1 FROM " . TABLE_PREFIX . "event_plugin_rsvp_days d2 WHERE d2.rsvp_id = r.id)
+    ");
+
+    return $moves;
+}
+
+/**
+ * Moves from events_waitlist_moves(), gathered per member.
+ *
+ * @param array $moves
+ * @return array uid => array('promoted' => role => day ids, 'demoted' => role => day ids)
+ */
+function events_group_waitlist_moves(array $moves)
+{
+    $members = array();
+    foreach($moves as $move)
+    {
+        $uid = (int)$move['uid'];
+        if(!isset($members[$uid]))
+        {
+            $members[$uid] = array('promoted' => array(), 'demoted' => array());
+        }
+
+        $kind = $move['status'] === 'attending' ? 'promoted' : 'demoted';
+        $members[$uid][$kind][$move['role']][] = (int)$move['day_id'];
+    }
+
+    return $members;
+}
+
+/**
+ * PM each member the waitlist moved: given a place, or moved to the waitlist.
+ *
+ * Sent after the lock is released, like the day-change PMs, and one per member, because
+ * MyBB refuses a whole multi-recipient PM over a single recipient who cannot receive it.
+ * It comes from whoever made the change, so a reply reaches somebody who can answer it;
+ * when that was a member changing their own signup - a dropout freeing a place - it
+ * comes from the event's coordinator instead, since a PM from the member who pulled out
+ * would be a strange way to hear you have a place.
+ *
+ * @param int $event_id
+ * @param array $moves From events_rebalance_waitlist()
+ * @param int|null $from_uid null to send from the event's coordinator
+ * @param int $skip_uid A member not to PM - the one whose own save it was
+ * @return void
+ */
+function events_send_waitlist_pms($event_id, array $moves, $from_uid = null, $skip_uid = 0)
+{
+    global $mybb;
+
+    if(empty($moves))
+    {
+        return;
+    }
+
+    require_once MYBB_ROOT . "inc/datahandlers/pm.php";
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
+
+    $event = events_get_event($event_id);
+    if(!$event)
+    {
+        return;
+    }
+
+    if($from_uid === null)
+    {
+        $from_uid = (int)$event['gec_user_id'];
+    }
+
+    $day_labels = array();
+    foreach(events_get_event_days($event_id) as $day)
+    {
+        $day_labels[(int)$day['id']] = events_day_label($day);
+    }
+
+    $title = events_escape_bbcode($event['title']);
+    $url = $mybb->settings['bburl'] . '/' . events_event_url($event);
+
+    foreach(events_group_waitlist_moves($moves) as $uid => $member)
+    {
+        if($uid === (int)$skip_uid || $uid === (int)$from_uid)
+        {
+            continue;
+        }
+
+        foreach(array('promoted', 'demoted') as $kind)
+        {
+            if(empty($member[$kind]))
+            {
+                continue;
+            }
+
+            $places = '';
+            foreach($member[$kind] as $role => $day_ids)
+            {
+                $role_label = events_role_verb($role);
+                foreach($day_ids as $day_id)
+                {
+                    $places .= "[*]" . $role_label . (isset($day_labels[$day_id]) ? " - " . $day_labels[$day_id] : "") . "\n";
+                }
+            }
+
+            if($kind === 'promoted')
+            {
+                $subject = "You have a place: " . $event['title'];
+                $message = "A place has opened up at [b]" . $title . "[/b], and you have been moved off the waitlist. You are now confirmed for:\n"
+                    . "[list]\n" . $places . "[/list]\n"
+                    . "If you can no longer make it, please update your signup so the next person on the waitlist gets the place: "
+                    . "[url=" . $url . "]" . $title . "[/url]";
+            }
+            else
+            {
+                $subject = "Moved to the waitlist: " . $event['title'];
+                $message = "The number of places at [b]" . $title . "[/b] has been reduced, and you have been moved to the waitlist for:\n"
+                    . "[list]\n" . $places . "[/list]\n"
+                    . "You keep your place in the queue, ahead of anybody who signed up after you, and will be given a place back automatically as soon as one opens up. "
+                    . "[url=" . $url . "]" . $title . "[/url]";
+            }
+
+            if(my_strlen($subject) > 85)
+            {
+                $subject = my_substr($subject, 0, 82) . "...";
+            }
+
+            $pmhandler = new PMDataHandler();
+            $pmhandler->admin_override = true;
+            $pmhandler->set_data(array(
+                'subject'   => $subject,
+                'message'   => $message,
+                'fromid'    => (int)$from_uid,
+                'toid'      => array($uid),
+                'ipaddress' => my_inet_pton(get_ip()),
+                'options'   => array('savecopy' => 0),
+            ));
+
+            // An undeliverable PM does not undo the move: the place has already changed hands.
+            if($pmhandler->validate_pm())
+            {
+                $pmhandler->insert_pm();
+            }
+        }
+    }
+}
+
+/**
  * Remove everything the plugin holds against members who no longer exist.
  *
  * A signup left behind by a deleted member is on no attendance list - those join the
@@ -1287,6 +1801,9 @@ function events_write_signup($event_id, $user_id, array $role_days, array $costu
  * for everybody else on that event, every night, for good.
  *
  * Events and troop reports they created are kept: those belong to the garrison.
+ *
+ * A deleted member is a dropout like any other, so the places they held go to whoever
+ * is next on each waitlist, and those members are told.
  *
  * @param int[] $user_ids
  * @return void
@@ -1304,10 +1821,12 @@ function events_delete_member_data(array $user_ids)
     $uids = implode(',', $user_ids);
 
     $rsvp_ids = array();
-    $query = $db->simple_select("event_plugin_rsvps", "id", "user_id IN (" . $uids . ")");
+    $event_ids = array();
+    $query = $db->simple_select("event_plugin_rsvps", "id, event_id", "user_id IN (" . $uids . ")");
     while($row = $db->fetch_array($query))
     {
         $rsvp_ids[] = (int)$row['id'];
+        $event_ids[(int)$row['event_id']] = true;
     }
 
     if(!empty($rsvp_ids))
@@ -1316,6 +1835,19 @@ function events_delete_member_data(array $user_ids)
         $db->delete_query("event_plugin_rsvp_days", "rsvp_id IN (" . $in . ")");
         $db->delete_query("event_plugin_rsvp_costumes", "rsvp_id IN (" . $in . ")");
         $db->delete_query("event_plugin_rsvps", "id IN (" . $in . ")");
+    }
+
+    foreach(array_keys($event_ids) as $event_id)
+    {
+        $lock = events_signup_lock($event_id);
+        $locked = events_acquire_lock($lock);
+        $moves = events_rebalance_waitlist($event_id);
+        if($locked)
+        {
+            events_release_lock($lock);
+        }
+
+        events_send_waitlist_pms($event_id, $moves);
     }
 
     $db->delete_query("event_plugin_event_exclusions", "user_id IN (" . $uids . ")");
@@ -1534,8 +2066,17 @@ function events_prerequisite_labels()
  * Load the attendee list for an event, including the data the attendance sheet and
  * troop report need.
  *
+ * Confirmed places by default, which is what the troop report and the attendance list
+ * mean by "attendees". Asked for the waitlist, it returns the people waiting instead, in
+ * the order they are waiting - by their earliest waitlisted day, or by the one day asked
+ * about - since that is the order a point of contact calls them in on the day.
+ *
+ * Either way a signup's days are only the ones with that status: somebody confirmed for
+ * Saturday and waiting for Sunday is an attendee on Saturday and on the waitlist on
+ * Sunday, and nowhere else.
+ *
  * @param int $event_id
- * @param array $filters costume (string), day (int event_day_id), role (string)
+ * @param array $filters costume (string), day (int event_day_id), role (string), status (attending|waitlisted)
  * @return array
  */
 function events_get_attendees($event_id, array $filters = array())
@@ -1543,7 +2084,23 @@ function events_get_attendees($event_id, array $filters = array())
     global $db;
 
     $event_id = (int)$event_id;
-    $where = "r.event_id = " . $event_id . " AND r.status = 'attending'";
+    $status = (isset($filters['status']) && $filters['status'] === 'waitlisted') ? 'waitlisted' : 'attending';
+    $day_id = !empty($filters['day']) ? (int)$filters['day'] : 0;
+
+    $claims = "SELECT rsvp_id FROM " . TABLE_PREFIX . "event_plugin_rsvp_days WHERE status = '" . $status . "'"
+        . ($day_id ? " AND event_day_id = " . $day_id : "");
+
+    if($day_id)
+    {
+        $where = "r.event_id = " . $event_id . " AND r.id IN (" . $claims . ")";
+    }
+    else
+    {
+        // A signup with no day claims - every signup to an event with no days - carries
+        // its status on the row itself.
+        $where = "r.event_id = " . $event_id . " AND (r.id IN (" . $claims . ")"
+            . " OR (r.status = '" . $status . "' AND NOT EXISTS (SELECT 1 FROM " . TABLE_PREFIX . "event_plugin_rsvp_days nd WHERE nd.rsvp_id = r.id)))";
+    }
 
     if(!empty($filters['role']))
     {
@@ -1555,18 +2112,17 @@ function events_get_attendees($event_id, array $filters = array())
         $where .= " AND r.id IN (SELECT rsvp_id FROM " . TABLE_PREFIX . "event_plugin_rsvp_costumes WHERE costume LIKE '%" . $db->escape_string($filters['costume']) . "%')";
     }
 
-    if(!empty($filters['day']))
-    {
-        $where .= " AND r.id IN (SELECT rsvp_id FROM " . TABLE_PREFIX . "event_plugin_rsvp_days WHERE event_day_id = " . (int)$filters['day'] . ")";
-    }
+    $queued_at = "COALESCE((SELECT MIN(q.claimed_at) FROM " . TABLE_PREFIX . "event_plugin_rsvp_days q"
+        . " WHERE q.rsvp_id = r.id AND q.status = '" . $status . "'" . ($day_id ? " AND q.event_day_id = " . $day_id : "") . "), r.rsvp_date)";
+    $order = $status === 'waitlisted' ? "queued_at ASC, r.id ASC" : "u.username ASC";
 
     $query = $db->query("
-        SELECT r.id, r.user_id, r.role, r.rsvp_date, u.username, u.usergroup, u.additionalgroups, uf.*
+        SELECT r.id, r.user_id, r.role, r.rsvp_date, {$queued_at} AS queued_at, u.username, u.usergroup, u.additionalgroups, uf.*
         FROM " . TABLE_PREFIX . "event_plugin_rsvps r
         INNER JOIN " . TABLE_PREFIX . "users u ON r.user_id = u.uid
         LEFT JOIN " . TABLE_PREFIX . "userfields uf ON u.uid = uf.ufid
         WHERE {$where}
-        ORDER BY u.username ASC
+        ORDER BY {$order}
     ");
 
     $attendees = array();
@@ -1584,7 +2140,7 @@ function events_get_attendees($event_id, array $filters = array())
             SELECT ed.id, ed.date, ed.start_time, ed.end_time
             FROM " . TABLE_PREFIX . "event_plugin_rsvp_days rd
             INNER JOIN " . TABLE_PREFIX . "event_plugin_event_days ed ON rd.event_day_id = ed.id
-            WHERE rd.rsvp_id = " . (int)$row['id'] . "
+            WHERE rd.rsvp_id = " . (int)$row['id'] . " AND rd.status = '" . $status . "'
             ORDER BY ed.date ASC
         ");
         while($day = $db->fetch_array($day_query))
@@ -1600,6 +2156,8 @@ function events_get_attendees($event_id, array $filters = array())
             'usergroup'         => (int)$row['usergroup'],
             'additionalgroups'  => $row['additionalgroups'],
             'rsvp_date'         => $row['rsvp_date'],
+            'queued_at'         => $row['queued_at'],
+            'status'            => $status,
             'costumes'          => $costumes,
             'days'              => $days,
             'preferred_name'    => events_get_user_field($row['user_id'], 'preferred_name'),

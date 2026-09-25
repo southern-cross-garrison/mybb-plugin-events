@@ -553,6 +553,10 @@ a.event_action_secondary:hover, a.event_action_secondary:focus { color: #333; }
 .event_pill_trooper { background: #eaf2f8; border-color: #b8d4e8; color: #1f4e6e; }
 .event_pill_wrangler { background: #fdf3e3; border-color: #f0d5a8; color: #8a5300; }
 .event_pill_locked { background: #f2f2f2; border-color: #dedede; color: #767676; font-weight: normal; }
+/* Dashed, not just recoloured: a place in the queue must never pass for a place, and a
+   dashed outline still says so printed in black and white or to somebody who cannot tell
+   the colours apart. */
+.event_pill_waitlisted { background: #f6f2fa; border-color: #a58dbd; border-style: dashed; color: #5b3f78; }
 
 /* ---------------------------------------------------------------------------
  * Events list - cards on a phone and a tablet
@@ -749,6 +753,11 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 }
 .event_action_status_trooper { background: #eaf2f8; border-color: #b8d4e8; color: #1f4e6e; }
 .event_action_status_wrangler { background: #fdf3e3; border-color: #f0d5a8; color: #8a5300; }
+.event_action_status_waitlisted { background: #f6f2fa; border-color: #a58dbd; border-style: dashed; color: #5b3f78; }
+
+/* Why the button says "Join the Waitlist", or why one role will. A line of its own under
+   the bar's buttons rather than squeezed between them. */
+.event_signup_full_note { flex-basis: 100%; order: 1; font-size: 0.9em; opacity: 0.8; }
 
 /* The wizard's submit row: the button is the theme's, the link beside it needs the gap. */
 #rsvp_cancel, #troop_report_cancel { margin-left: 12px; }
@@ -824,6 +833,15 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
    first one left standing still starts the run without a leading dot. */
 .rsvp_detail + .rsvp_detail::before { content: "\00b7"; margin: 0 7px; opacity: 0.55; }
 .rsvp_date { opacity: 0.7; font-size: 0.9em; }
+
+/* The waitlist, under the attendance list: numbered, because its order is who is next. */
+#waitlist_list { margin-top: 18px; }
+#waitlist_count { font-weight: normal; opacity: 0.7; }
+#waitlist_hint { margin: 0 0 6px; }
+#waitlist_rows { margin: 8px 0 0; padding-left: 22px; }
+#waitlist_rows li { margin: 0 0 5px; line-height: 1.8; }
+.waitlist_row .event_pill { margin: 0 7px 0 0; }
+.waitlist_row .rsvp_username { margin-right: 7px; }
 
 /* ---------------------------------------------------------------------------
  * Signup wizard - the attendance step
@@ -937,12 +955,22 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 /* ---------------------------------------------------------------------------
  * Attendance sheet - built to be printed, so it keeps its own plain table rules
  * ------------------------------------------------------------------------ */
-#attendance_table { width: 100%; border-collapse: collapse; margin: 16px 0; }
-#attendance_table th, #attendance_table td { border: 1px solid #999; padding: 8px; text-align: left; vertical-align: top; }
-#attendance_table th { background: #f0f0f0; font-weight: bold; }
+/* The waitlist tables share every rule below with the sheet, through :is() - which takes
+   the id's weight, so a theme that has out-specified the sheet's rules has out-specified
+   these too. What sets them apart is here: a heading that says what they are, and a
+   dashed rule down the side so a page of them cannot be mistaken for more attendees,
+   on screen or on paper. */
+.attendance_waitlist { margin-top: 24px; border-left: 4px dashed #a58dbd; padding-left: 12px; }
+.attendance_waitlist_heading { margin: 0 0 4px; }
+.attendance_waitlist .events_hint { margin: 0 0 4px; }
+.attendance_waitlist_table .attendee_role { font-style: italic; }
+
+:is(#attendance_table, .attendance_waitlist_table) { width: 100%; border-collapse: collapse; margin: 16px 0; }
+:is(#attendance_table, .attendance_waitlist_table) th, :is(#attendance_table, .attendance_waitlist_table) td { border: 1px solid #999; padding: 8px; text-align: left; vertical-align: top; }
+:is(#attendance_table, .attendance_waitlist_table) th { background: #f0f0f0; font-weight: bold; }
 /* Banded by person, not by row: an attendee is a <tbody> holding the pair of rows, so the
    stripe covers both halves of one person rather than alternating within them. */
-#attendance_table tbody.attendee_group:nth-of-type(even) td { background: #f7f7f7; }
+:is(#attendance_table, .attendance_waitlist_table) tbody.attendee_group:nth-of-type(even) td { background: #f7f7f7; }
 
 /* Fixed proportions rather than letting the content size the columns, so the sheet keeps
    the same shape whoever is on it - and so the tick column stays wide enough to aim a pen
@@ -953,55 +981,55 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
    colspans cover. Keyed on the cells' classes rather than nth-child, because the Days
    column only exists for an event that has days and every position after it would
    otherwise shift. */
-#attendance_table { table-layout: fixed; }
-#attendance_table .attendance_identity_head .attendee_num { width: 5%; }
-#attendance_table .attendance_identity_head .attendee_preferred_name { width: 22%; }
-#attendance_table .attendance_identity_head .attendee_username { width: 21%; }
-#attendance_table .attendance_identity_head .attendee_role { width: 18%; }
-#attendance_table .attendance_identity_head .attendee_tkid { width: 24%; }
-#attendance_table .attendance_identity_head .attendee_attended { width: 10%; }
+:is(#attendance_table, .attendance_waitlist_table) { table-layout: fixed; }
+:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_num { width: 5%; }
+:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_preferred_name { width: 22%; }
+:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_username { width: 21%; }
+:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_role { width: 18%; }
+:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_tkid { width: 24%; }
+:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_attended { width: 10%; }
 
 /* Seven columns instead of six: everything gives a little back to make room for Days. */
-#attendance_table.has_days .attendance_identity_head .attendee_num { width: 4%; }
-#attendance_table.has_days .attendance_identity_head .attendee_preferred_name { width: 16%; }
-#attendance_table.has_days .attendance_identity_head .attendee_username { width: 16%; }
-#attendance_table.has_days .attendance_identity_head .attendee_role { width: 17%; }
-#attendance_table.has_days .attendance_identity_head .attendee_tkid { width: 15%; }
-#attendance_table.has_days .attendance_identity_head .attendee_days { width: 22%; }
-#attendance_table.has_days .attendance_identity_head .attendee_attended { width: 10%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_num { width: 4%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_preferred_name { width: 16%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_username { width: 16%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_role { width: 17%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_tkid { width: 15%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_days { width: 22%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_attended { width: 10%; }
 
 /* Where one person ends and the next begins. Without it the sheet reads as twice as many
    people, half of them nameless. The rule goes along the bottom of the pair, which means
    the contact row's cells *and* the two that span both rows - they end at the same line. */
-#attendance_table tbody.attendee_group > .attendee_row > td[rowspan],
-#attendance_table tbody.attendee_group > .attendee_row_contact > td { border-bottom-width: 3px; }
+:is(#attendance_table, .attendance_waitlist_table) tbody.attendee_group > .attendee_row > td[rowspan],
+:is(#attendance_table, .attendance_waitlist_table) tbody.attendee_group > .attendee_row_contact > td { border-bottom-width: 3px; }
 
 /* The number and the tick sit against two rows of content, so they are centred in it
    rather than pinned to the top of the first row. */
-#attendance_table .attendee_num { text-align: center; vertical-align: middle; }
+:is(#attendance_table, .attendance_waitlist_table) .attendee_num { text-align: center; vertical-align: middle; }
 
 /* The contact row is supporting detail under the name, so it is labelled quietly rather
    than repeating the header's weight down the sheet. */
-#attendance_table .attendance_contact_head th { font-weight: normal; font-style: italic; }
+:is(#attendance_table, .attendance_waitlist_table) .attendance_contact_head th { font-weight: normal; font-style: italic; }
 
 /* Bullets pulled back inside the cell - a default <ul> indents its markers into the
    neighbouring column's border. */
-#attendance_table .attendee_days_list { margin: 0; padding-left: 1.1em; }
-#attendance_table .attendee_days_list li { margin: 0; }
+:is(#attendance_table, .attendance_waitlist_table) .attendee_days_list { margin: 0; padding-left: 1.1em; }
+:is(#attendance_table, .attendance_waitlist_table) .attendee_days_list li { margin: 0; }
 
 /* The tick box is the point of the last column, so centre it and give it something to
    aim at with a pen as well as with a mouse. */
-#attendance_table td.attendee_attended { text-align: center; vertical-align: middle; }
-#attendance_table .attendee_tick { width: 17px; height: 17px; margin: 0; cursor: pointer; }
+:is(#attendance_table, .attendance_waitlist_table) td.attendee_attended { text-align: center; vertical-align: middle; }
+:is(#attendance_table, .attendance_waitlist_table) .attendee_tick { width: 17px; height: 17px; margin: 0; cursor: pointer; }
 /* Nothing is held on one line by force: table-layout: fixed does not widen a column to
    fit, so a value told not to wrap - "Trooper / Wrangler" on a mixed signup, say - runs
    out over the cell beside it instead. Wrapping is the lesser of the two. */
-#attendance_table th, #attendance_table td { overflow-wrap: break-word; }
+:is(#attendance_table, .attendance_waitlist_table) th, :is(#attendance_table, .attendance_waitlist_table) td { overflow-wrap: break-word; }
 /* The Legion ID is the one exception: a short value in a known format, whose column is
    sized to hold it, and which reads badly broken over two lines. The value only - the
    heading has to be free to wrap, or at a narrow width "Legion ID" runs out over the
    column beside it, which is the very thing the rule above is avoiding. */
-#attendance_table td.attendee_tkid { white-space: nowrap; }
+:is(#attendance_table, .attendance_waitlist_table) td.attendee_tkid { white-space: nowrap; }
 
 /* ---------------------------------------------------------------------------
  * Print
@@ -1121,35 +1149,40 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 	/* The event name is in the masthead; the on-screen heading under it would repeat it. */
 	#attendance_event_title { display: none; }
 	#attendance_day { font-size: 11pt; margin: 0 0 8pt; }
+	/* Its own heading and a rule down the side, in ink: the dashed purple of the screen
+	   is a background colour's worth of distinction, and printers drop those. */
+	.attendance_waitlist { margin-top: 14pt; border-left: 3pt dashed #000; padding-left: 6pt; }
+	.attendance_waitlist_heading { font-size: 11pt; margin: 0 0 2pt; }
+	.attendance_waitlist .events_hint { font-size: 8.5pt; margin: 0 0 4pt; }
 
-	#attendance_table { margin: 0; font-size: 9pt; }
+	:is(#attendance_table, .attendance_waitlist_table) { margin: 0; font-size: 9pt; }
 	/* 0.75pt is one device pixel at 96dpi. Below that the grid is sub-pixel, and the
 	   rasteriser drops whichever lines round to nothing - which showed up as the table's
 	   top edge going missing in the print preview while the rest of the grid survived. */
-	#attendance_table th, #attendance_table td { border: 1.5pt solid #000; padding: 4pt; }
+	:is(#attendance_table, .attendance_waitlist_table) th, :is(#attendance_table, .attendance_waitlist_table) td { border: 1.5pt solid #000; padding: 4pt; }
 	/* Browsers print no backgrounds unless the reader opts into background graphics, so
 	   the header row and the banding are weighted with rules instead of fills. */
-	#attendance_table th { background: none; border-bottom-width: 2.25pt; }
-	#attendance_table .attendance_identity_head th { border-top-width: 2.25pt; }
-	#attendance_table tbody.attendee_group:nth-of-type(even) td { background: none; }
+	:is(#attendance_table, .attendance_waitlist_table) th { background: none; border-bottom-width: 2.25pt; }
+	:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head th { border-top-width: 2.25pt; }
+	:is(#attendance_table, .attendance_waitlist_table) tbody.attendee_group:nth-of-type(even) td { background: none; }
 	/* Repeat the header on every sheet, and never split a person across two of them - a
 	   <tbody> is the pair of rows, so avoiding a break inside it is what keeps somebody's
 	   phone number on the same page as their name. */
-	#attendance_table thead { display: table-header-group; }
-	#attendance_table tbody, #attendance_table tr { break-inside: avoid; page-break-inside: avoid; }
+	:is(#attendance_table, .attendance_waitlist_table) thead { display: table-header-group; }
+	:is(#attendance_table, .attendance_waitlist_table) tbody, :is(#attendance_table, .attendance_waitlist_table) tr { break-inside: avoid; page-break-inside: avoid; }
 	/* Room to run a pen down the column without the rows crowding each other. Two rows a
 	   person now, so each is shorter than the single row was and the pair a little taller. */
-	#attendance_table tbody td { height: 15pt; }
+	:is(#attendance_table, .attendance_waitlist_table) tbody td { height: 15pt; }
 	/* Heavy enough to read as a divider at 9pt without looking like a second grid. */
-	#attendance_table tbody.attendee_group > .attendee_row > td[rowspan],
-	#attendance_table tbody.attendee_group > .attendee_row_contact > td { border-bottom-width: 2.25pt; }
+	:is(#attendance_table, .attendance_waitlist_table) tbody.attendee_group > .attendee_row > td[rowspan],
+	:is(#attendance_table, .attendance_waitlist_table) tbody.attendee_group > .attendee_row_contact > td { border-bottom-width: 2.25pt; }
 
 	/* Whatever was ticked on screen is ticked on paper - the print is taken from the live
 	   page, so the box only has to survive being printed. A browser draws the control but
 	   drops its fill along with every other background unless told otherwise, which would
 	   turn a ticked box back into an empty one; accent-color puts the tick in ink rather
 	   than in the browser's blue. */
-	#attendance_table .attendee_tick {
+	:is(#attendance_table, .attendance_waitlist_table) .attendee_tick {
 		width: 11pt; height: 11pt;
 		accent-color: #000;
 		-webkit-print-color-adjust: exact;

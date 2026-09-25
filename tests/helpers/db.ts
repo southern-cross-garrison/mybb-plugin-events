@@ -223,6 +223,9 @@ export interface EventInput {
   /** Dates (YYYY-MM-DD) for a multi-day event. */
   days?: Array<{ date: string; start?: string; end?: string }>;
   excluded?: string[];
+  /** Places per role (per day, on a multi-day event); 0 or omitted is no limit. */
+  maxTroopers?: number;
+  maxWranglers?: number;
 }
 
 const toDateTime = (
@@ -246,8 +249,8 @@ export async function createEvent(input: EventInput): Promise<number> {
   const result = await execute(
     `INSERT INTO ${T('event_plugin_events')}
        (title, description, status, region, address, start_date, end_date, signup_cutoff,
-        requires_wwcc, gec_user_id, poc_user_id, created_by, thread_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        requires_wwcc, gec_user_id, poc_user_id, max_troopers, max_wranglers, created_by, thread_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.title,
       input.description ?? `${input.title} description`,
@@ -260,6 +263,8 @@ export async function createEvent(input: EventInput): Promise<number> {
       input.requiresWwcc ? 1 : 0,
       uid(input.coordinator ?? 'gec'),
       input.pointOfContact ? uid(input.pointOfContact) : 0,
+      input.maxTroopers ?? 0,
+      input.maxWranglers ?? 0,
       uid('gec'),
       input.threadId ?? null,
       now,
@@ -300,17 +305,26 @@ export async function getEventDays(eventId: number): Promise<RowDataPacket[]> {
 
 /** Record an RSVP without walking the wizard, for tests that only need the end state. */
 export type SignupRole = 'trooper' | 'wrangler';
+export type SignupStatus = 'attending' | 'waitlisted';
 
+/**
+ * `at` is when the signup was made, and so where it sits in each queue: tests that build
+ * a waitlist by hand should give each signup a distinct one, or the order falls to insert
+ * order. `status` is written as given, not worked out - a hand-built signup is whatever
+ * the test says it is, until something the plugin does settles the queues.
+ */
 export async function createRsvp(
   eventId: number,
   username: string,
-  options: { costumes?: string[]; dayIds?: number[]; at?: string; role?: SignupRole } = {},
+  options: { costumes?: string[]; dayIds?: number[]; at?: string; role?: SignupRole; status?: SignupStatus } = {},
 ): Promise<number> {
   const role: SignupRole = options.role ?? 'trooper';
+  const at = options.at ?? relativeToTestNow({});
+  const status: SignupStatus = options.status ?? 'attending';
 
   const result = await execute(
-    `INSERT INTO ${T('event_plugin_rsvps')} (event_id, user_id, role, rsvp_date, status) VALUES (?, ?, ?, ?, 'attending')`,
-    [eventId, uid(username), role, options.at ?? relativeToTestNow({})],
+    `INSERT INTO ${T('event_plugin_rsvps')} (event_id, user_id, role, rsvp_date, status) VALUES (?, ?, ?, ?, ?)`,
+    [eventId, uid(username), role, at, status],
   );
 
   const rsvpId = result.insertId;
@@ -322,7 +336,10 @@ export async function createRsvp(
   }
 
   for (const dayId of options.dayIds ?? []) {
-    await execute(`INSERT INTO ${T('event_plugin_rsvp_days')} (rsvp_id, event_day_id) VALUES (?, ?)`, [rsvpId, dayId]);
+    await execute(
+      `INSERT INTO ${T('event_plugin_rsvp_days')} (rsvp_id, event_day_id, status, claimed_at) VALUES (?, ?, ?, ?)`,
+      [rsvpId, dayId, status, at],
+    );
   }
 
   return rsvpId;
@@ -336,6 +353,34 @@ export async function countRsvps(eventId: number, role?: SignupRole): Promise<nu
     role ? [eventId, role] : [eventId],
   );
   return Number(row?.total ?? 0);
+}
+
+/**
+ * A member's signup status for one role: the row's own, which on a multi-day event is
+ * attending if any day is. null when they hold no signup in that role.
+ */
+export async function getRsvpStatus(eventId: number, username: string, role: SignupRole = 'trooper'): Promise<string | null> {
+  const row = await queryOne<RowDataPacket>(
+    `SELECT status FROM ${T('event_plugin_rsvps')} WHERE event_id = ? AND user_id = ? AND role = ?`,
+    [eventId, uid(username), role],
+  );
+  return row ? String(row.status) : null;
+}
+
+/** A member's day claims for one role, as day id => status. */
+export async function getClaimStatuses(
+  eventId: number,
+  username: string,
+  role: SignupRole = 'trooper',
+): Promise<Record<number, string>> {
+  const rows = await query<RowDataPacket>(
+    `SELECT d.event_day_id, d.status
+       FROM ${T('event_plugin_rsvp_days')} d
+       INNER JOIN ${T('event_plugin_rsvps')} r ON d.rsvp_id = r.id
+      WHERE r.event_id = ? AND r.user_id = ? AND r.role = ?`,
+    [eventId, uid(username), role],
+  );
+  return Object.fromEntries(rows.map((row) => [Number(row.event_day_id), String(row.status)]));
 }
 
 /** The roles a member holds for an event, in insertion order. */

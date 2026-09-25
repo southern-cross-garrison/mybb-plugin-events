@@ -10,6 +10,8 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 - **Signup System**: One "Sign Up to Attend" flow with prerequisite validation
 - **Per-day Roles**: Troop some days and wrangle others in a single signup
 - **Wrangler Signups**: Non-costumed helpers can sign up without being full members
+- **Maximums and a Waitlist**: Cap how many troopers and wranglers an event takes; once
+  it is full, signups join a waitlist that hands places out in signup order as they free up
 - **Prerequisites**: TK ID, WWCC, preferred name, mobile number, and emergency contact validation
 - **Costume Selection**: Select from user's profile costumes during signup
 - **Region Filtering**: Filter events by region. The region list is the board's own -
@@ -169,6 +171,8 @@ Either way the details are:
   midnight would put the end at the *start* of the last day - and the end has to be later
   than the start
 - Signup cutoff (optional - with none, signups stay open until the event ends)
+- Maximum troopers and maximum wranglers (optional - empty is no limit). On an event of
+  several days each is a limit per day. See [Maximums and the Waitlist](#maximums-and-the-waitlist)
 - WWCC requirement
 - GEC assignment - see below
 - Event days - the hours the event runs on each of its days. The rows follow the start
@@ -393,6 +397,43 @@ troopers and wranglers, so an event with helpers but no costumed attendance read
 "0 troopers, 1 wrangler" rather than an unexplained zero. They
 are not sent troop report reminders, and cannot author a troop report - that is troopers
 only, since the report records costumed attendance.
+
+### Maximums and the Waitlist
+
+An event can be given a maximum number of troopers and of wranglers. Once one is reached,
+the event is still open to sign up to, but anybody who signs up for that role joins a
+waitlist instead of getting a place. Every step says so: the event page's button reads
+**Join the Waitlist** when both roles are full (and notes which one is when only one is),
+the wizard labels a full role "full - join the waitlist", and the confirm button reads
+**Join the Waitlist** rather than Confirm Signup. Joining the waitlist asks for exactly the
+same prerequisites as signing up does, so a member who gets a place is already able to take it.
+
+On an event of several days, each day has its own places and its own waitlist, so a member
+can have a place on the Sunday and be waiting for the Saturday. The maximum is the same
+number for every day.
+
+The rule behind every change is one sentence: in each role's queue for each day, ordered by
+when each person signed up for it, the first *maximum* people have a place and the rest are
+waiting. So:
+
+- **Somebody drops out** - withdraws, drops a day, is excluded or is deleted - and the first
+  person waiting for that role on that day gets the place.
+- **The maximum is raised**, and that many more people get places, in signup order.
+- **The maximum is lowered**, and the most recent signups go back onto the waitlist. They
+  signed up before anybody already waiting, so they wait at the front of it. Both event
+  forms stop and list who would move before saving, the same way removing a day does.
+
+Everybody the waitlist moves is sent a PM, whichever way they moved. The PM comes from whoever
+edited the event, or from the event's coordinator when a member's own dropout freed the place.
+An event that has finished is never reshuffled, so tidying its maximum afterwards changes
+nobody's record and PMs nobody.
+
+The waitlist is shown under "Who is Attending" on the event, in signup order rather than by
+name. On the attendance sheet it gets a table of its own under the attendees, one per day on an
+event of several days, marked **Waitlist** and numbered W1, W2 and so on. It carries the same
+contact details, so a point of contact whose trooper doesn't show can ring down it in order.
+Waitlisted members are never on the troop report, can't write one, aren't sent its reminders,
+and don't get calendar entries for the days they are waiting for.
 
 ### Printing
 
@@ -630,7 +671,10 @@ All tables use the `mybb_event_plugin_` prefix:
 - `event_plugin_rsvps` - Signup records; `role` is `trooper` or `wrangler`, unique per
   `(event_id, user_id, role)` so a member can hold both - one signup covering a mix of
   trooping and wrangling days is two rows
-- `event_plugin_rsvp_days` - Which days user is attending
+- `event_plugin_rsvp_days` - Which days user is attending, one claim per day. Each claim
+  carries its own `status` (`attending` or `waitlisted`) and `claimed_at`, the order of that
+  day's waitlist. A signup's own `status` is attending if any of its days is; on an event
+  with no days, it has no claims and the row's status is the whole answer
 - `event_plugin_rsvp_costumes` - Costumes per RSVP
 - `event_plugin_troop_reports` - Troop report tracking
 - `event_plugin_user_prefs` - Per-member preferences; currently which view the events

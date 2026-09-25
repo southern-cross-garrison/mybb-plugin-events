@@ -66,6 +66,8 @@ function events_install_database()
         `requires_wwcc` tinyint(1) NOT NULL DEFAULT 0,
         `gec_user_id` int(11) NOT NULL,
         `poc_user_id` int(11) NOT NULL DEFAULT 0,
+        `max_troopers` int(10) unsigned NOT NULL DEFAULT 0,
+        `max_wranglers` int(10) unsigned NOT NULL DEFAULT 0,
         `created_by` int(11) NOT NULL,
         `thread_id` int(11) DEFAULT NULL,
         `created_at` datetime NOT NULL,
@@ -101,16 +103,21 @@ function events_install_database()
     // RSVPs table
     //
     // One row per member per role, so somebody can troop an event and also wrangle it.
-    // The unique key deliberately excludes status: if cancelling is ever implemented as
-    // a status flip, a cancelled row would keep occupying the slot and the member could
-    // never sign up again. Delete the row instead, or widen the key.
+    // A waitlisted row is still that member's one row for the role, which is why the
+    // unique key excludes status. Withdrawing deletes the row; there is no cancelled state
+    // to flip to, because a row left behind would keep occupying the slot.
+    //
+    // For an event with no days the signup has no day claims, and status is the signup's
+    // own. Otherwise it is kept in step with the claims below - attending if any claim is
+    // (events_rebalance_waitlist()) - so a status = 'attending' read means "going, at
+    // least in part" either way.
     $db->write_query("CREATE TABLE IF NOT EXISTS `" . TABLE_PREFIX . "event_plugin_rsvps` (
         `id` int(11) NOT NULL AUTO_INCREMENT,
         `event_id` int(11) NOT NULL,
         `user_id` int(11) NOT NULL,
         `role` enum('trooper','wrangler') NOT NULL DEFAULT 'trooper',
         `rsvp_date` datetime NOT NULL,
-        `status` enum('attending','cancelled') NOT NULL DEFAULT 'attending',
+        `status` enum('attending','waitlisted') NOT NULL DEFAULT 'attending',
         PRIMARY KEY (`id`),
         UNIQUE KEY `event_user_role` (`event_id`, `user_id`, `role`),
         KEY `user_id` (`user_id`),
@@ -118,9 +125,16 @@ function events_install_database()
     ) ENGINE=MyISAM {$charset};");
     
     // RSVP days table
+    //
+    // One claim per signup per day. Each claim is its own place in that day's queue for
+    // the role: claimed_at is the order the queue is in, and a day added to a signup later
+    // joins the back of it. The first max_troopers / max_wranglers of a queue are
+    // attending and the rest waitlisted - see events_waitlist_moves().
     $db->write_query("CREATE TABLE IF NOT EXISTS `" . TABLE_PREFIX . "event_plugin_rsvp_days` (
         `rsvp_id` int(11) NOT NULL,
         `event_day_id` int(11) NOT NULL,
+        `status` enum('attending','waitlisted') NOT NULL DEFAULT 'attending',
+        `claimed_at` datetime NOT NULL,
         PRIMARY KEY (`rsvp_id`, `event_day_id`),
         KEY `event_day_id` (`event_day_id`)
     ) ENGINE=MyISAM {$charset};");

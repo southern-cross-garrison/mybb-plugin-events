@@ -799,6 +799,36 @@ function events_signup_next_step($step, array $roles, array $missing, $costume_c
 }
 
 /**
+ * An event's maximums as one line, e.g. "10 troopers, 2 wranglers each day".
+ *
+ * Only the roles that have one: a role with no limit is the normal case and needs no
+ * saying. "Each day" goes on for an event of several days, where the maximum is a day's.
+ *
+ * @param array $event
+ * @param bool $has_days
+ * @return string Plain text, empty when neither role is limited
+ */
+function events_capacity_text(array $event, $has_days)
+{
+    $parts = array();
+    foreach(events_rsvp_roles() as $role)
+    {
+        $cap = events_event_cap($event, $role);
+        if($cap > 0)
+        {
+            $parts[] = $cap . ' ' . strtolower(events_role_label($role)) . ($cap === 1 ? '' : 's');
+        }
+    }
+
+    if(empty($parts))
+    {
+        return '';
+    }
+
+    return implode(', ', $parts) . ($has_days ? ' each day' : '');
+}
+
+/**
  * How a role reads as an activity rather than as a job title.
  *
  * @param string $role
@@ -1107,6 +1137,113 @@ function events_signup_summary_html(array $event_days, array $role_days, $id_pre
     }
 
     return $html;
+}
+
+/**
+ * Where each place a signup asks for stands: confirmed, or waitlisted and how far back.
+ *
+ * Asked of the queues as they are, so a place the member already holds is wherever it is
+ * and a new one is where a newcomer would land. Read again after saving, when every place
+ * is held, it is what the save actually did.
+ *
+ * @param array $event
+ * @param array $role_days role => day ids (an empty list for an event with no days)
+ * @param int $user_id
+ * @param array|null $queues From events_signup_queues()
+ * @return array role => day id (0 for an event with no days) => events_place_status()
+ */
+function events_signup_place_outcomes(array $event, array $role_days, $user_id, $queues = null)
+{
+    if($queues === null)
+    {
+        $queues = events_signup_queues($event['id']);
+    }
+
+    $outcomes = array();
+    foreach($role_days as $role => $day_ids)
+    {
+        $places = empty($day_ids) ? array(0) : array_map('intval', $day_ids);
+        foreach($places as $day_id)
+        {
+            $outcomes[$role][$day_id] = events_place_status($event, $role, $day_id, $user_id, $queues);
+        }
+    }
+
+    return $outcomes;
+}
+
+/**
+ * How much of a signup is on the waitlist: 'none', 'some' or 'all'.
+ *
+ * @param array $outcomes From events_signup_place_outcomes()
+ * @param bool $new_only Count only places the member does not hold yet
+ * @return string
+ */
+function events_signup_waitlist_extent(array $outcomes, $new_only = false)
+{
+    $total = 0;
+    $waiting = 0;
+    foreach($outcomes as $places)
+    {
+        foreach($places as $place)
+        {
+            if($new_only && $place['held'])
+            {
+                continue;
+            }
+
+            $total++;
+            if($place['status'] === 'waitlisted')
+            {
+                $waiting++;
+            }
+        }
+    }
+
+    if($waiting === 0)
+    {
+        return 'none';
+    }
+
+    return $waiting === $total ? 'all' : 'some';
+}
+
+/**
+ * The places of a signup that are on the waitlist, as a line to put under its summary.
+ *
+ * @param array $event_days
+ * @param array $outcomes From events_signup_place_outcomes()
+ * @param string $id_prefix
+ * @return string HTML, empty when nothing is waitlisted
+ */
+function events_signup_waitlist_html(array $event_days, array $outcomes, $id_prefix)
+{
+    $items = '';
+    foreach($outcomes as $role => $places)
+    {
+        foreach($places as $day_id => $place)
+        {
+            if($place['status'] !== 'waitlisted')
+            {
+                continue;
+            }
+
+            $labels = $day_id ? events_day_labels($event_days, array($day_id)) : array();
+            $items .= '<li data-role="' . $role . '" data-day-id="' . (int)$day_id . '" data-position="' . (int)$place['position'] . '">'
+                . htmlspecialchars_uni(events_role_verb($role) . (empty($labels) ? '' : ' - ' . $labels[0]))
+                . ': <strong>number ' . (int)$place['position'] . ' on the waitlist</strong></li>';
+        }
+    }
+
+    if($items === '')
+    {
+        return '';
+    }
+
+    return '<div class="signup_waitlist_note" id="' . $id_prefix . '_waitlist">'
+        . '<p><strong>Waitlist:</strong> these places are full, so you are joining the waitlist rather than signing up to attend.'
+        . ' If a place opens up it goes to the first person waiting, and you will be sent a PM.</p>'
+        . '<ul>' . $items . '</ul></div>';
 }
 
 /**

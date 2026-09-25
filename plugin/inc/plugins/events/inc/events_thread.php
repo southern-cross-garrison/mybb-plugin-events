@@ -198,6 +198,14 @@ function events_event_post_content(array $event)
         $content .= "[b]Signups close:[/b] " . $cutoff . "\n";
     }
 
+    // The maximums are part of what the event is: a reader deciding whether to bother
+    // signing up wants to know there are only ten places.
+    $capacity = events_capacity_text($event, !empty(events_get_event_days($event_id)));
+    if($capacity !== '')
+    {
+        $content .= "[b]Places:[/b] " . $capacity . "\n";
+    }
+
     if(!empty($event['requires_wwcc']))
     {
         $content .= "[b]Requirement:[/b] attendees must have a current WWCC number on file.\n";

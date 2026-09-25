@@ -82,10 +82,19 @@ if(!empty($hidden_event_ids))
 // Tracked per role, because the listing shows which way round the viewer is signed up -
 // a mixed signup holds both, and reads as "Trooping" and "Wrangling" side by side.
 $user_roles = array();
-$rsvp_query = $db->simple_select("event_plugin_rsvps", "event_id, role",
-    "user_id = " . (int)$mybb->user['uid'] . " AND status = 'attending'");
+// A member waiting for a place has not got one, so they are told they are waiting rather
+// than offered a Sign Up button for a signup they already hold.
+$user_waitlisted = array();
+$rsvp_query = $db->simple_select("event_plugin_rsvps", "event_id, role, status",
+    "user_id = " . (int)$mybb->user['uid']);
 while($row = $db->fetch_array($rsvp_query))
 {
+    if($row['status'] === 'waitlisted')
+    {
+        $user_waitlisted[(int)$row['event_id']] = true;
+        continue;
+    }
+
     $user_roles[(int)$row['event_id']][] = events_rsvp_role($row['role']);
 }
 
@@ -195,6 +204,10 @@ foreach($events as $event)
                       . events_role_verb($role, $ended) . '</span> ';
             }
         }
+    }
+    elseif(isset($user_waitlisted[(int)$event['id']]))
+    {
+        $you = '<span class="event_pill event_pill_waitlisted event_waitlisted">Waitlisted</span>';
     }
     elseif($lock_reason === null)
     {

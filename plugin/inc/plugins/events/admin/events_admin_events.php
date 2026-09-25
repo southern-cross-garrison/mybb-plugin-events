@@ -168,7 +168,9 @@ function events_admin_edit_event()
                 $thread_error = null;
                 $cancelled = 0;
                 $withdrawn = 0;
-                events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error, $cancelled, $withdrawn);
+                $promoted = 0;
+                $demoted = 0;
+                events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error, $cancelled, $withdrawn, $promoted, $demoted);
 
                 $message = $is_edit ? "Event updated successfully." : "Event created successfully.";
                 if($cancelled > 0)
@@ -181,6 +183,7 @@ function events_admin_edit_event()
                     $message .= " " . $withdrawn . ($withdrawn === 1 ? " excluded member's signup was" : " excluded members' signups were")
                         . " withdrawn.";
                 }
+                $message .= events_waitlist_save_message($promoted, $demoted);
                 if($thread_error !== null)
                 {
                     // The event saved; only its announcement did not.
@@ -247,6 +250,9 @@ function events_admin_edit_event()
     $container->output_row("Start Date", "When the event itself begins. Pick a date from the calendar, or type it as YYYY-MM-DD.", events_datetime_field("start_date", "start_date", $values['start_date'], $date_options + array("required" => true, "time_required" => true, "label" => "Start")), "start_date");
     $container->output_row("End Date", "When it finishes. Signups close here when no cutoff is set below.", events_datetime_field("end_date", "end_date", $values['end_date'], $date_options + array("required" => true, "time_required" => true, "label" => "End")), "end_date");
     $container->output_row("Signup Cutoff", "Optional. RSVPs close at this time; leave blank to keep them open until the event ends.", events_datetime_field("signup_cutoff", "signup_cutoff", $values['signup_cutoff'], $date_options + array("label" => "Signup cutoff")), "signup_cutoff");
+    $max_hint = "Optional. Leave empty for no limit. On an event of several days it applies to each day. Once it is reached, new signups join a waitlist and are given places in signup order as they free up.";
+    $container->output_row("Maximum Troopers", $max_hint, $form->generate_text_box("max_troopers", $values['max_troopers'], array("id" => "max_troopers")), "max_troopers");
+    $container->output_row("Maximum Wranglers", $max_hint, $form->generate_text_box("max_wranglers", $values['max_wranglers'], array("id" => "max_wranglers")), "max_wranglers");
     $container->output_row("Requires WWCC", "Attendees must have a WWCC number on file", $form->generate_check_box("requires_wwcc", 1, "This event requires a WWCC", array("id" => "requires_wwcc", "checked" => !empty($values['requires_wwcc']))), "requires_wwcc");
     $container->output_row("Coordinator", "The member who manages this event", $form->generate_select_box("gec_user_id", $coordinators, $values['gec_user_id'], array("id" => "gec_user_id")), "gec_user_id");
     $container->output_row("Point of Contact", "Optional. Who attendees should contact about the event - yourself, or anybody signed up to it. Shown on the event page.", $form->generate_select_box("poc_user_id", events_poc_options($event), $values['poc_user_id'], array("id" => "poc_user_id")), "poc_user_id");
