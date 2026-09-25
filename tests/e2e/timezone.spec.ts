@@ -2,7 +2,7 @@ import { test, expect, Page } from '../helpers/fixtures';
 import { loginAs, loginToAdminCp, gotoEventsAdmin } from '../helpers/auth';
 import { setClock } from '../helpers/clock';
 import { lockReasonOnEventPage } from '../helpers/rsvp';
-import { createEvent, createRsvp, getSetting, fixtures } from '../helpers/db';
+import { createEvent, createRsvp, getEventDays, getSetting, fixtures, query, T } from '../helpers/db';
 import { setSettings } from '../helpers/settings';
 
 const TK = fixtures().costumeOptions[0];
@@ -144,6 +144,50 @@ test.describe(`events in ${ZONE}`, () => {
 
     expect(body).toContain('DTSTART:20261005T080000Z');
     expect(body).toContain('DTEND:20261005T113000Z');
+  });
+});
+
+/**
+ * A day's hours are a clock time on that day, not an instant. They used to be read with
+ * strtotime(), which put them on *today's* date in the event zone - so an event saved on
+ * the morning Sydney springs forward had its 02:30 start silently moved to 03:30, since
+ * 02:30 does not exist that day. The event itself is weeks later, when it does.
+ */
+test.describe('day hours saved on a daylight-saving change', () => {
+  test.afterEach(async () => {
+    await setSettings({ events_timezone: 'UTC' });
+  });
+
+  test('keeps the time that was typed', async ({ page }) => {
+    await setSettings({ events_timezone: 'Australia/Sydney' });
+    // 09:00 on 4 October in Sydney, the day its clocks went from 02:00 to 03:00.
+    await setClock('2026-10-03 22:00:00');
+
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+    await page.locator('#event_form_title').fill('Early Start Troop');
+    await page.locator('#event_form_status').selectOption('live');
+    await page.locator('#event_form_start_date').fill('2026-10-24');
+    await page.locator('#event_form_start_date_time').fill('02:30');
+    await page.locator('#event_form_end_date').fill('2026-10-25');
+    await page.locator('#event_form_end_date_time').fill('17:00');
+
+    const row = page.locator('[data-events-day-date="2026-10-24"] input[type="time"]');
+    await row.nth(0).fill('02:30');
+    await row.nth(1).fill('06:00');
+    await page.locator('#manage_event_submit').click();
+    await expect(page.locator('#event_page')).toContainText('Early Start Troop');
+
+    const [event] = (await query(
+      `SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Early Start Troop'`,
+    )) as any[];
+    const days = await getEventDays(event.id);
+    expect(days[0].start_time).toBe('02:30:00');
+    expect(days[0].end_time).toBe('06:00:00');
+
+    // And shown back as stored, which went through the same conversion.
+    await page.goto(`/manage_event.php?id=${event.id}`);
+    await expect(row.nth(0)).toHaveValue('02:30');
   });
 });
 

@@ -202,7 +202,9 @@ function events_admin_edit_event()
 
     if(!empty($errors))
     {
-        $page->output_inline_error($errors);
+        // The validator's messages are plain text and quote what was posted;
+        // output_inline_error() prints them as they are.
+        $page->output_inline_error(array_map('htmlspecialchars_uni', $errors));
     }
 
     // The event's stored coordinator rather than the posted one: a forged uid that failed

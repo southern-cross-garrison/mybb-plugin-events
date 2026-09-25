@@ -359,7 +359,7 @@ function events_datetime_error($value, $label)
 
     if($time !== '' && events_strtotime($date . ' ' . $time) === false)
     {
-        return "The " . $label . " time '" . htmlspecialchars_uni($time)
+        return "The " . $label . " time '" . $time
             . "' is not a valid time (HH:MM).";
     }
 
@@ -763,7 +763,9 @@ function events_event_form_input()
  *
  * @param array $input From events_event_form_input()
  * @param array $event The event being edited, or empty when creating
- * @return array of error strings, empty when the event can be saved
+ * @return array of plain-text error strings, empty when the event can be saved. They
+ *         quote what was posted, so each renderer escapes them: events_form_errors() on
+ *         the front end, and the Admin CP before output_inline_error(), which echoes raw.
  */
 function events_validate_event_input(array $input, array $event = array())
 {
@@ -900,7 +902,7 @@ function events_validate_event_input(array $input, array $event = array())
     events_parse_exclusions($input['exclusions'], $unknown);
     foreach($unknown as $token)
     {
-        $errors[] = "There is no member named '" . htmlspecialchars_uni($token) . "'.";
+        $errors[] = "There is no member named '" . $token . "'.";
     }
 
     foreach($input['days'] as $day)
@@ -908,24 +910,79 @@ function events_validate_event_input(array $input, array $event = array())
         if(!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $day['date'], $ymd)
             || !checkdate((int)$ymd[2], (int)$ymd[3], (int)$ymd[1]))
         {
-            $errors[] = "Event day '" . htmlspecialchars_uni($day['date']) . "' is not a valid date.";
+            $errors[] = "Event day '" . $day['date'] . "' is not a valid date.";
             continue;
         }
 
         // Times are validated as well as dates because this form is no longer admins only.
         // An unparseable time would otherwise reach a TIME column and fail as a SQL error
         // rather than as something the form could explain.
+        $valid = true;
         foreach(array('start_time' => 'start time', 'end_time' => 'end time') as $field => $label)
         {
-            if($day[$field] !== '' && events_strtotime($day[$field]) === false)
+            if($day[$field] !== '' && events_parse_day_time($day[$field]) === false)
             {
-                $errors[] = "The " . $label . " '" . htmlspecialchars_uni($day[$field])
-                    . "' for " . htmlspecialchars_uni($day['date']) . " is not a valid time (HH:MM:SS).";
+                $errors[] = "The " . $label . " '" . $day[$field]
+                    . "' for " . $day['date'] . " is not a valid time (HH:MM:SS).";
+                $valid = false;
             }
+        }
+
+        // Compared as the strings they are stored as, with the same defaults a blank box
+        // saves as. A day ending before it starts would otherwise be saved as written, and
+        // the calendar feed would hand out an event with a negative length.
+        if($valid && events_day_time($day, 'end_time') <= events_day_time($day, 'start_time'))
+        {
+            $errors[] = "The end time for " . htmlspecialchars_uni($day['date']) . " must be after its start time.";
         }
     }
 
     return $errors;
+}
+
+/**
+ * Read a time of day as H:i:s, or false if it is not one.
+ *
+ * Only a clock time is accepted - H:MM or H:MM:SS, 24-hour - and it is read as digits
+ * rather than through strtotime(), which would build it on today's date in the event
+ * zone. That moved 02:30 to 03:30 on a spring-forward day, and it took "now" or
+ * "+3 hours" as a time. A day's times belong to that day's date, not to today's.
+ *
+ * @param string $value
+ * @return string|false
+ */
+function events_parse_day_time($value)
+{
+    if(!preg_match('/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/', trim((string)$value), $m))
+    {
+        return false;
+    }
+
+    $seconds = isset($m[3]) ? (int)$m[3] : 0;
+    if((int)$m[1] > 23 || (int)$m[2] > 59 || $seconds > 59)
+    {
+        return false;
+    }
+
+    return sprintf('%02d:%02d:%02d', (int)$m[1], (int)$m[2], $seconds);
+}
+
+/**
+ * A posted day's start or end time as it is stored: a blank box is the whole day's edge.
+ *
+ * @param array $day From events_event_form_input(), already validated
+ * @param string $field start_time or end_time
+ * @return string H:i:s
+ */
+function events_day_time(array $day, $field)
+{
+    $time = $day[$field] !== '' ? events_parse_day_time($day[$field]) : false;
+    if($time === false)
+    {
+        return $field === 'start_time' ? '00:00:00' : '23:59:59';
+    }
+
+    return $time;
 }
 
 /**
@@ -960,8 +1017,8 @@ function events_save_event_days($event_id, array $days)
     {
         $date = events_date('Y-m-d', events_strtotime($day['date']));
         $row = array(
-            'start_time' => $db->escape_string($day['start_time'] !== '' ? events_date('H:i:s', events_strtotime($day['start_time'])) : '00:00:00'),
-            'end_time'   => $db->escape_string($day['end_time'] !== '' ? events_date('H:i:s', events_strtotime($day['end_time'])) : '23:59:59'),
+            'start_time' => $db->escape_string(events_day_time($day, 'start_time')),
+            'end_time'   => $db->escape_string(events_day_time($day, 'end_time')),
         );
 
         // The grid never posts a date twice, but a hand-built POST could; the first wins.
@@ -1775,7 +1832,9 @@ function events_event_day_row($index, $date, $label, $start_time, $end_time, $id
     // H:i:s, and handing the box seconds it will drop makes it disagree with what was saved.
     $time_value = function($value)
     {
-        return events_date('H:i', events_strtotime($value));
+        $time = events_parse_day_time($value);
+
+        return $time === false ? '' : substr($time, 0, 5);
     };
 
     $cell = function($name, $id, $value, $label) use ($input_class, $time_value)

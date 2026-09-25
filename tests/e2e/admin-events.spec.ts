@@ -173,6 +173,30 @@ test.describe('admin event management', () => {
     expect(rows).toHaveLength(0);
   });
 
+  test('an error quoting what was posted is escaped once, not twice', async ({ page }) => {
+    await loginToAdminCp(page);
+    await gotoEventsAdmin(page, '&action=add');
+
+    await fillEventForm(page, {
+      title: 'Escaped Error Event',
+      start: relativeToTestNow({ days: 14 }),
+      end: relativeToTestNow({ days: 14, hours: 4 }),
+    });
+    // What the tag field posts with its script off: it cannot offer a member who is nobody.
+    await page.locator('input[name="exclusions"]').evaluate((input: HTMLInputElement) => {
+      input.value = 'Tom & <b>Jerry</b>';
+    });
+
+    await page.locator('input[type="submit"][value="Create Event"]').click();
+
+    // MyBB's output_inline_error() prints its messages raw, so the escaping is done
+    // before they reach it - once.
+    const errors = page.locator('#content .error');
+    await expect(errors).toContainText("There is no member named 'Tom & <b>Jerry</b>'.");
+    await expect(errors.locator('b')).toHaveCount(0);
+    expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Escaped Error Event'`)).toHaveLength(0);
+  });
+
   test('the start and end dates need their times', async ({ page }) => {
     await loginToAdminCp(page);
     await gotoEventsAdmin(page, '&action=add');

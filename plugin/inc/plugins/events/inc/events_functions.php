@@ -570,12 +570,26 @@ function events_is_excluded($event_id, $user_id = null)
         return false;
     }
 
-    // Exclusions have no role column: being excluded from an event excludes you from
-    // every way of signing up to it.
-    $query = $db->simple_select("event_plugin_event_exclusions", "user_id",
-        "event_id = " . (int)$event_id . " AND user_id = " . (int)$user['uid']);
+    // Every exclusion the member has, read once for the request: the listing asks this of
+    // every row it draws. Cached on the same terms as events_hidden_event_ids() - nothing
+    // that changes an exclusion goes on to render anything that reads this.
+    static $cache = array();
 
-    return $db->num_rows($query) > 0;
+    $uid = (int)$user['uid'];
+    if(!isset($cache[$uid]))
+    {
+        $cache[$uid] = array();
+
+        // Exclusions have no role column: being excluded from an event excludes you from
+        // every way of signing up to it.
+        $query = $db->simple_select("event_plugin_event_exclusions", "event_id", "user_id = " . $uid);
+        while($row = $db->fetch_array($query))
+        {
+            $cache[$uid][(int)$row['event_id']] = true;
+        }
+    }
+
+    return isset($cache[$uid][(int)$event_id]);
 }
 
 /**
@@ -2174,31 +2188,57 @@ function events_get_attendees($event_id, array $filters = array())
         ORDER BY {$order}
     ");
 
-    $attendees = array();
+    $rows = array();
     while($row = $db->fetch_array($query))
     {
-        $costumes = array();
-        $costume_query = $db->simple_select("event_plugin_rsvp_costumes", "costume", "rsvp_id = " . (int)$row['id']);
-        while($costume = $db->fetch_array($costume_query))
-        {
-            $costumes[] = $costume['costume'];
-        }
+        $rows[(int)$row['id']] = $row;
+    }
 
-        $days = array();
-        $day_query = $db->query("
-            SELECT ed.id, ed.date, ed.start_time, ed.end_time
-            FROM " . TABLE_PREFIX . "event_plugin_rsvp_days rd
-            INNER JOIN " . TABLE_PREFIX . "event_plugin_event_days ed ON rd.event_day_id = ed.id
-            WHERE rd.rsvp_id = " . (int)$row['id'] . " AND rd.status = '" . $status . "'
-            ORDER BY ed.date ASC
-        ");
-        while($day = $db->fetch_array($day_query))
-        {
-            $days[] = $day;
-        }
+    if(empty($rows))
+    {
+        return array();
+    }
 
-        $attendees[] = array(
-            'rsvp_id'           => (int)$row['id'],
+    // Costumes and days for the whole list in one query each, rather than two per
+    // attendee: the event card asks for four lists on every view.
+    $rsvp_ids = implode(',', array_keys($rows));
+
+    $costumes = array();
+    $costume_query = $db->simple_select("event_plugin_rsvp_costumes", "rsvp_id, costume", "rsvp_id IN (" . $rsvp_ids . ")");
+    while($costume = $db->fetch_array($costume_query))
+    {
+        $costumes[(int)$costume['rsvp_id']][] = $costume['costume'];
+    }
+
+    $days = array();
+    $day_query = $db->query("
+        SELECT rd.rsvp_id, ed.id, ed.date, ed.start_time, ed.end_time
+        FROM " . TABLE_PREFIX . "event_plugin_rsvp_days rd
+        INNER JOIN " . TABLE_PREFIX . "event_plugin_event_days ed ON rd.event_day_id = ed.id
+        WHERE rd.rsvp_id IN (" . $rsvp_ids . ") AND rd.status = '" . $status . "'
+        ORDER BY ed.date ASC
+    ");
+    while($day = $db->fetch_array($day_query))
+    {
+        $rsvp_id = (int)$day['rsvp_id'];
+        unset($day['rsvp_id']);
+        $days[$rsvp_id][] = $day;
+    }
+
+    // The profile fields come off the userfields row already joined above; which column
+    // holds each is a setting, and a field left unmapped reads as blank.
+    $field_columns = array();
+    foreach(array('preferred_name', 'tk_id', 'mobile', 'emergency_contact', 'wwcc') as $field)
+    {
+        $field_id = (int)events_get_setting($field . '_field');
+        $field_columns[$field] = $field_id ? 'fid' . $field_id : null;
+    }
+
+    $attendees = array();
+    foreach($rows as $rsvp_id => $row)
+    {
+        $attendee = array(
+            'rsvp_id'           => $rsvp_id,
             'uid'               => (int)$row['user_id'],
             'role'              => $row['role'],
             'username'          => $row['username'],
@@ -2207,14 +2247,16 @@ function events_get_attendees($event_id, array $filters = array())
             'rsvp_date'         => $row['rsvp_date'],
             'queued_at'         => $row['queued_at'],
             'status'            => $status,
-            'costumes'          => $costumes,
-            'days'              => $days,
-            'preferred_name'    => events_get_user_field($row['user_id'], 'preferred_name'),
-            'tk_id'             => events_get_user_field($row['user_id'], 'tk_id'),
-            'mobile'            => events_get_user_field($row['user_id'], 'mobile'),
-            'emergency_contact' => events_get_user_field($row['user_id'], 'emergency_contact'),
-            'wwcc'              => events_get_user_field($row['user_id'], 'wwcc'),
+            'costumes'          => isset($costumes[$rsvp_id]) ? $costumes[$rsvp_id] : array(),
+            'days'              => isset($days[$rsvp_id]) ? $days[$rsvp_id] : array(),
         );
+
+        foreach($field_columns as $field => $column)
+        {
+            $attendee[$field] = ($column !== null && isset($row[$column])) ? (string)$row[$column] : '';
+        }
+
+        $attendees[] = $attendee;
     }
 
     return $attendees;

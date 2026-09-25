@@ -724,6 +724,28 @@ test.describe('front-end event management', () => {
     expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Ghost Exclusion Troop'`)).toHaveLength(0);
   });
 
+  test('an error quoting what was posted is escaped once, not twice', async ({ page }) => {
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+
+    await fillEventForm(page, {
+      title: 'Escaped Error Troop',
+      status: 'live',
+      start: relativeToTestNow({ days: 26 }),
+      end: relativeToTestNow({ days: 26, hours: 4 }),
+    });
+    await page.locator('input[name="exclusions"]').evaluate((input: HTMLInputElement) => {
+      input.value = 'Tom & <b>Jerry</b>';
+    });
+    await submitEventForm(page);
+
+    // The validator used to escape the name and the error box escaped it again, so the
+    // ampersand read as "&amp;". The markup has to stay text all the same.
+    const errors = page.locator('#manage_event_errors');
+    await expect(errors).toContainText("There is no member named 'Tom & <b>Jerry</b>'.");
+    await expect(errors.locator('b')).toHaveCount(0);
+  });
+
   test('rejects an end date before the start date and keeps what was typed', async ({ page }) => {
     await loginAs(page, 'gec');
     await page.goto('/manage_event.php');
@@ -933,6 +955,58 @@ test.describe('front-end event management', () => {
     await expect(page.locator('#manage_event_errors')).toContainText('is not a valid time');
     await expect(page.locator('body')).not.toContainText('MyBB SQL Error');
     expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Bad Hours Troop'`)).toHaveLength(0);
+  });
+
+  test('refuses a relative expression as a day time', async ({ page }) => {
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+
+    await fillEventForm(page, {
+      title: 'Relative Hours Troop',
+      status: 'live',
+      start: '2026-10-24 09:00:00',
+      end: '2026-10-25 17:00:00',
+    });
+
+    // strtotime() reads "now" and "+3 hours" as times, so they used to be saved as
+    // whatever the clock said when the form was submitted.
+    await page
+      .locator('[data-events-day-date="2026-10-24"] input[type="time"]')
+      .first()
+      .evaluate((input: HTMLInputElement) => {
+        input.type = 'text';
+        input.value = 'now';
+      });
+    await submitEventForm(page);
+
+    await expect(page.locator('#manage_event_errors')).toContainText("The start time 'now' for 2026-10-24 is not a valid time");
+    expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Relative Hours Troop'`)).toHaveLength(0);
+  });
+
+  test('refuses a day that ends before it starts', async ({ page }) => {
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+
+    await fillEventForm(page, {
+      title: 'Backwards Hours Troop',
+      status: 'live',
+      start: '2026-10-24 09:00:00',
+      end: '2026-10-25 17:00:00',
+    });
+
+    const times = page.locator('[data-events-day-date="2026-10-24"] input[type="time"]');
+    await times.nth(0).fill('15:00');
+    await times.nth(1).fill('10:00');
+    await submitEventForm(page);
+
+    await expect(page.locator('#manage_event_errors')).toContainText(
+      'The end time for 2026-10-24 must be after its start time.',
+    );
+    expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Backwards Hours Troop'`)).toHaveLength(0);
+
+    // What was typed comes back, so it can be corrected rather than retyped.
+    await expect(times.nth(0)).toHaveValue('15:00');
+    await expect(times.nth(1)).toHaveValue('10:00');
   });
 
   test('an apostrophe in the title and description survives the round trip', async ({ page }) => {
