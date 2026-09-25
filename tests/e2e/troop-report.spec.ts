@@ -1,5 +1,6 @@
 import { test, expect } from "../helpers/fixtures";
-import { loginAs } from "../helpers/auth";
+import { loginAs, logout } from "../helpers/auth";
+import { runPhp } from "../helpers/container";
 import { relativeToTestNow, setClock } from "../helpers/clock";
 import { withSettings } from "../helpers/settings";
 // The report box is MyBB's BBCode editor, which hides the textarea it binds to - so
@@ -13,6 +14,7 @@ import {
   countPostsInThread,
   findThreadBySubject,
   getEvent,
+  getThreadFirstPost,
   getTroopReport,
   setUserField,
   fixtures,
@@ -431,6 +433,48 @@ test.describe("troop reports", () => {
     await page.goto(`/showthread.php?tid=${discussionId}`);
     await expect(page.locator("body")).toContainText(
       "Troop report has been posted",
+    );
+  });
+
+  test("rewrites the event's announcement as over once the report is posted", async ({
+    page,
+  }) => {
+    // Posting the report is what archives an event, so it is also what has to rewrite
+    // the announcement. Members see the card, but guests and Tapatalk read the generated
+    // first post - and it went on inviting them to sign up to an event that had finished.
+    // Threads outlive a test, so the title is this attempt's own.
+    const title = `Announced Troop ${Math.random().toString(36).slice(2, 8)}`;
+    const eventId = await finishedEvent(title);
+    await createRsvp(eventId, "trooper1", { costumes: [TK] });
+
+    const threadId = Number(
+      (
+        await runPhp(`
+require_once MYBB_ROOT.'inc/plugins/events/inc/events_thread.php';
+echo events_sync_event_thread(${eventId});
+`)
+      ).trim(),
+    );
+    expect(threadId).toBeGreaterThan(0);
+    expect((await getThreadFirstPost(threadId)).message).not.toContain(
+      "This event is over",
+    );
+
+    await loginAs(page, "trooper1");
+    await page.goto(`/troop_report.php?id=${eventId}`);
+    await fillDescription(page, "troop_report_content", "Announced report body.");
+    await page.locator("#troop_report_submit").click();
+    await expect(page.locator("body")).toContainText("Announced report body.");
+
+    const firstPost = await getThreadFirstPost(threadId);
+    expect(firstPost.message).toContain(
+      "This event is over and signups are closed.",
+    );
+
+    await logout(page);
+    await page.goto(`/showthread.php?tid=${threadId}`);
+    await expect(page.locator(`#pid_${firstPost.pid}`)).toContainText(
+      "This event is over and signups are closed.",
     );
   });
 });

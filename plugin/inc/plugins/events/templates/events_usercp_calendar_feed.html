@@ -1,0 +1,25 @@
+<html>
+<head>
+<title>Calendar Subscription - {$mybb->settings['bbname']}</title>
+{$headerinclude}
+</head>
+<body>
+{$header}
+{$events_usercp_open}
+<div id="calendar_feed_page" class="events_page_wrap">
+{$events_print_header}
+<table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder">
+<tr>
+<td class="thead"><strong>Calendar Subscription</strong></td>
+</tr>
+<tr>
+<td class="trow1">
+{$feed_body}
+</td>
+</tr>
+</table>
+</div>
+{$events_usercp_close}
+{$footer}
+</body>
+</html>

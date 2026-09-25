@@ -1225,3 +1225,89 @@ function events_form_errors(array $errors, $id)
 
     return $html . '</ul></div>';
 }
+
+/**
+ * The theme's User CP frame, split around the spot where a page's content goes.
+ *
+ * MyBB has no layout template for a User CP page - each of its own pages repeats the
+ * frame in its template - and themes rebuild that frame entirely: MyBB's is a table with
+ * the nav in one cell and the page in the next, the garrison's a Bootstrap row of two
+ * columns. Rather than guess, the frame is lifted from the theme's own `usercp` template:
+ * everything from {$header} to the first element opened after {$usercpnav} is the opening
+ * half, and closing whatever that left open is the other. The content in between is the
+ * account summary, which is exactly what gets replaced.
+ *
+ * A theme whose template has no {$usercpnav} to anchor on gets MyBB's own frame.
+ *
+ * @return array(string $open, string $close) Both already evaluated
+ */
+function events_usercp_layout()
+{
+    global $mybb, $lang, $templates, $theme, $usercpnav;
+
+    // As MyBB stores it, before get() escapes it for eval.
+    $raw = $templates->get("usercp", 0, 0);
+    $head = strpos($raw, '{$header}');
+    $nav = strpos($raw, '{$usercpnav}');
+
+    $open = null;
+    if($head !== false && $nav !== false && $head < $nav
+        && preg_match('#<(?!/|!)[a-z][^>]*>#i', $raw, $first, PREG_OFFSET_CAPTURE, $nav + strlen('{$usercpnav}')))
+    {
+        $start = $head + strlen('{$header}');
+        $open = substr($raw, $start, $first[0][1] + strlen($first[0][0]) - $start);
+    }
+
+    if($open === null)
+    {
+        $open = '<table width="100%" border="0" align="center"><tr>{$usercpnav}<td valign="top">';
+    }
+
+    $close = '';
+    foreach(array_reverse(events_unclosed_tags(str_replace('{$usercpnav}', '', $open))) as $tag)
+    {
+        $close .= '</' . $tag . '>';
+    }
+
+    // The frame can carry template variables of its own ({$theme['tablespace']} and the
+    // like), so it is evaluated the way a template is.
+    $open = str_replace("\\'", "'", addslashes($open));
+    eval("\$open = \"" . $open . "\";");
+
+    return array($open, $close);
+}
+
+/**
+ * The elements a fragment of HTML opens and does not close, outermost first.
+ *
+ * @param string $html
+ * @return array of tag names
+ */
+function events_unclosed_tags($html)
+{
+    $void = array('area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr');
+
+    $html = preg_replace('#<!--.*?-->#s', '', $html);
+    preg_match_all('#<(/?)([a-z][a-z0-9]*)\b[^>]*?(/?)>#i', $html, $tags, PREG_SET_ORDER);
+
+    $stack = array();
+    foreach($tags as $tag)
+    {
+        $name = strtolower($tag[2]);
+        if($tag[1] === '/')
+        {
+            // Close back to the matching element; a stray closer matches nothing.
+            $at = array_search($name, array_reverse($stack, true), true);
+            if($at !== false)
+            {
+                $stack = array_slice($stack, 0, $at);
+            }
+        }
+        elseif($tag[3] !== '/' && !in_array($name, $void, true))
+        {
+            $stack[] = $name;
+        }
+    }
+
+    return $stack;
+}

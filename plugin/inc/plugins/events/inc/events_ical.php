@@ -15,8 +15,41 @@ if(!defined("IN_MYBB"))
 
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 // events_description_text(): the feed carries no markup, so the description's BBCode
-// has to be flattened rather than rendered.
+// has to be flattened rather than rendered. events_map_url() for the address's map link.
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
+
+/**
+ * The roles the member holds on one day, in events_rsvp_roles() order.
+ *
+ * @param array $roles role => day ids it covers
+ * @param int $day_id
+ * @return array
+ */
+function events_ical_day_roles(array $roles, $day_id)
+{
+    return array_keys(array_filter($roles, function($covered) use ($day_id) {
+        return in_array((int)$day_id, $covered, true);
+    }));
+}
+
+/**
+ * A day's SUMMARY: the event's title, led by what the member is doing that day, so the
+ * calendar grid says "Trooping: ..." without the entry having to be opened. A member who
+ * has not signed up gets the bare title.
+ *
+ * @param array $roles role => day ids it covers, empty when the member has not signed up
+ * @param string $title
+ * @param int $day_id
+ * @return string
+ */
+function events_ical_summary(array $roles, $title, $day_id)
+{
+    $doing = array_map(function($role) {
+        return $role === 'wrangler' ? 'Wrangling' : 'Trooping';
+    }, events_ical_day_roles($roles, $day_id));
+
+    return $doing ? implode(' and ', $doing) . ': ' . $title : $title;
+}
 
 /**
  * The sentence that opens a day's description: what the member is doing that day.
@@ -35,13 +68,8 @@ function events_ical_signup_line(array $roles, array $signup, $day_id, $multi_da
     }
 
     $doing = array();
-    foreach($roles as $role => $covered)
+    foreach(events_ical_day_roles($roles, $day_id) as $role)
     {
-        if(!in_array((int)$day_id, $covered, true))
-        {
-            continue;
-        }
-
         if($role === 'wrangler')
         {
             $doing[] = 'wrangling';
@@ -185,6 +213,10 @@ function events_ical_vevents(array $event, $user_id)
     if($address !== '')
     {
         $details[] = 'Address: ' . $address;
+        // The same Maps search the rest of the board links the address to. It does the
+        // lookup when opened, so the entry gets a map without the plugin geocoding
+        // anything, and every calendar app makes a URL in a description clickable.
+        $details[] = 'Map: ' . events_map_url($address);
     }
 
     $event_description = trim(events_description_text($event['description']));
@@ -233,7 +265,7 @@ function events_ical_vevents(array $event, $user_id)
         $lines[] = "DTSTAMP:" . gmdate('Ymd\THis\Z', TIME_NOW);
         $lines[] = "DTSTART:" . gmdate('Ymd\THis\Z', $start);
         $lines[] = "DTEND:" . gmdate('Ymd\THis\Z', $end);
-        $lines[] = "SUMMARY:" . events_ical_escape($event['title']);
+        $lines[] = "SUMMARY:" . events_ical_escape(events_ical_summary($role_days, $event['title'], $day['id']));
         $lines[] = "DESCRIPTION:" . events_ical_escape($description);
         $lines[] = "LOCATION:" . events_ical_escape($location);
         $lines[] = "URL:" . $url;

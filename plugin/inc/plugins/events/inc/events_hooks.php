@@ -22,6 +22,10 @@ function events_register_hooks()
 
     $plugins->add_hook("pre_output_page", "events_nav_menu");
 
+    // The calendar subscription page, inside the User CP as well as off the events toolbar.
+    $plugins->add_hook("usercp_menu_built", "events_usercp_nav");
+    $plugins->add_hook("usercp_start", "events_usercp_calendar_feed");
+
     // An event is read in its announcement thread, with the event card standing in for the
     // thread's first post - see events_thread_postbit().
     $plugins->add_hook("showthread_start", "events_thread_display");
@@ -494,6 +498,123 @@ function events_nav_menu(&$page)
     }
 
     return $page;
+}
+
+/**
+ * Add "Calendar Subscription" to the User CP's navigation.
+ *
+ * Like events_nav_menu(), and for the same reason: MyBB gives the nav no plugin
+ * placeholder, and themes rewrite it wholesale - MyBB's own is table rows, the garrison's
+ * is a column of Bootstrap buttons. So the new item is a copy of the theme's own Forum
+ * Subscriptions item, whatever shape that is, with its link, label and id changed, and
+ * it goes straight after it. A theme that uses Font Awesome gets its glyph swapped for a
+ * calendar; any other icon (MyBB's sprite) rides across unchanged, which keeps the item
+ * in line with its neighbours rather than leaving a gap where theirs are.
+ *
+ * Hooks: usercp_menu_built
+ *
+ * @return void
+ */
+function events_usercp_nav()
+{
+    global $usercpnav;
+
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
+
+    if(!events_can_view_events_page() || strpos($usercpnav, 'id="usercp_nav_events_calendar"') !== false)
+    {
+        return;
+    }
+
+    // The anchor, and the row or list item around it when it has one to itself - tried
+    // whole first, so a wrapper is only ever taken with both of its ends.
+    $anchor = '<a\b[^>]*\bhref="usercp\.php\?action=forumsubscriptions"[^>]*>.*?</a>';
+    $shapes = array(
+        '#<tr\b[^>]*>\s*<td\b[^>]*>\s*' . $anchor . '\s*</td>\s*</tr>#is',
+        '#<li\b[^>]*>\s*' . $anchor . '\s*</li>#is',
+        '#' . $anchor . '#is',
+    );
+
+    $match = null;
+    foreach($shapes as $shape)
+    {
+        if(preg_match($shape, $usercpnav, $match, PREG_OFFSET_CAPTURE))
+        {
+            break;
+        }
+        $match = null;
+    }
+
+    if(!$match)
+    {
+        return;
+    }
+
+    list($original, $offset) = $match[0];
+
+    $copy = preg_replace_callback('#<a\b([^>]*)>(.*?)</a>#is', function($anchor) {
+        $attributes = preg_replace('#\bhref="[^"]*"#i', 'href="usercp.php?action=events_calendar"', $anchor[1]);
+        $attributes = preg_replace('#\bid="[^"]*"#i', '', $attributes);
+        $attributes .= ' id="usercp_nav_events_calendar"';
+
+        // A leading icon element is kept; the label after it is ours.
+        $icon = '';
+        if(preg_match('#^\s*(<(i|span|svg)\b[^>]*>.*?</\2>\s*(?:&nbsp;|&\#160;|\s)*)#is', $anchor[2], $icon_match))
+        {
+            $icon = preg_replace_callback('#\bclass="([^"]*)"#i', function($class) {
+                $glyphs = '#\bfa-(?!solid\b|regular\b|light\b|thin\b|duotone\b|brands\b|fw\b|lg\b|xs\b|sm\b|[0-9]+x\b)[a-z0-9-]+#i';
+                return preg_match($glyphs, $class[1])
+                    ? 'class="' . preg_replace($glyphs, 'fa-calendar-days', $class[1], 1) . '"'
+                    : $class[0];
+            }, $icon_match[1], 1);
+        }
+
+        return '<a' . $attributes . '>' . $icon . 'Calendar Subscription</a>';
+    }, $original, 1);
+
+    $usercpnav = substr_replace($usercpnav, $original . $copy, $offset, strlen($original));
+}
+
+/**
+ * The calendar subscription page, served as usercp.php?action=events_calendar.
+ *
+ * The body is events_calendar_feed_body(), the same as calendar_feed.php's. What differs
+ * is the frame: the theme's own User CP layout, nav column included, taken from its
+ * `usercp` template by events_usercp_layout().
+ *
+ * Hooks: usercp_start
+ *
+ * @return void
+ */
+function events_usercp_calendar_feed()
+{
+    global $mybb, $lang, $templates, $theme, $headerinclude, $header, $footer, $usercpnav;
+
+    if($mybb->get_input('action') !== 'events_calendar')
+    {
+        return;
+    }
+
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_feed.php";
+
+    if(!events_can_view_events_page())
+    {
+        error_no_permission();
+    }
+
+    // usercp.php adds its own crumb after this hook has run, so it is added here.
+    add_breadcrumb($lang->nav_usercp, "usercp.php");
+    add_breadcrumb("Calendar Subscription", "usercp.php?action=events_calendar");
+
+    $feed_body = events_calendar_feed_body("usercp.php", array('action' => 'events_calendar'));
+    $events_print_header = events_print_header('Calendar Subscription', array());
+    list($events_usercp_open, $events_usercp_close) = events_usercp_layout();
+
+    eval("\$page = \"" . $templates->get("events_usercp_calendar_feed") . "\";");
+    output_page($page);
+    exit;
 }
 
 /**

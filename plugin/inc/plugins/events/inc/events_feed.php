@@ -171,3 +171,136 @@ function events_feed_webcal_url($token)
 {
     return preg_replace('#^https?://#i', 'webcal://', events_feed_url($token));
 }
+
+/**
+ * A one-button POST form. Actions that change the link are never GET links, so nothing
+ * can be tricked into resetting a member's feed by getting them to follow a URL.
+ *
+ * @param string $form_action Where the form posts
+ * @param array $hidden Extra fields the page needs to route the post back to itself
+ * @param string $feed_action create or revoke
+ * @param string $label
+ * @param string $id
+ * @param string $confirm Asked before submitting; empty for none
+ * @return string
+ */
+function events_calendar_feed_button($form_action, array $hidden, $feed_action, $label, $id, $confirm = '')
+{
+    global $mybb;
+
+    // json_encode makes the message a JS string literal, htmlspecialchars makes that safe
+    // inside the attribute; an apostrophe in the message would otherwise end the string.
+    $onsubmit = $confirm !== '' ? ' onsubmit="return confirm(' . htmlspecialchars(json_encode($confirm), ENT_QUOTES, 'UTF-8') . ');"' : '';
+
+    $fields = '';
+    foreach($hidden + array('my_post_key' => $mybb->post_code, 'feed_action' => $feed_action) as $name => $value)
+    {
+        $fields .= '<input type="hidden" name="' . htmlspecialchars_uni($name) . '" value="' . htmlspecialchars_uni($value) . '" />';
+    }
+
+    return '<form method="post" action="' . htmlspecialchars_uni($form_action) . '" class="events_feed_form"' . $onsubmit . '>'
+        . $fields
+        . '<input type="submit" class="button" id="' . $id . '" value="' . htmlspecialchars_uni($label) . '" />'
+        . '</form>';
+}
+
+/**
+ * Handle the subscription page's POST, if there is one, and build the page's body.
+ *
+ * The page exists twice - calendar_feed.php off the events toolbar, and a User CP page
+ * (events_usercp_calendar_feed()) - and only its surroundings differ, so everything the
+ * member sees and does lives here. Each posts back to itself: $form_action and $hidden
+ * say how.
+ *
+ * The link is shown once, in the response to the POST that made it: only its hash is
+ * kept, so there is nothing to show it from afterwards, and getting it again means
+ * making a new one.
+ *
+ * @param string $form_action
+ * @param array $hidden
+ * @return string HTML
+ */
+function events_calendar_feed_body($form_action, array $hidden = array())
+{
+    global $mybb;
+
+    $user_id = (int)$mybb->user['uid'];
+
+    $token = null;
+    if($mybb->request_method === 'post')
+    {
+        verify_post_check($mybb->get_input('my_post_key'));
+
+        $feed_action = $mybb->get_input('feed_action');
+        if($feed_action === 'create')
+        {
+            $token = events_feed_create_token($user_id);
+        }
+        elseif($feed_action === 'revoke')
+        {
+            events_feed_revoke_token($user_id);
+            $back = $form_action . ($hidden ? '?' . http_build_query($hidden) : '');
+            redirect($back, "Your calendar subscription link has been turned off.");
+        }
+    }
+
+    $status = events_feed_token_status($user_id);
+
+    $body = '<p>Subscribe your calendar app to a private link and every event you sign up for appears in it, '
+        . 'kept up to date: change which days you are coming to, or withdraw, and your calendar follows the next time '
+        . 'it refreshes. Google Calendar refreshes about once a day; Apple and Outlook more often.</p>';
+
+    if($token !== null)
+    {
+        // This response holds the link in the clear, and it is the only one that ever will.
+        header("Cache-Control: private, no-store");
+
+        $https = htmlspecialchars_uni(events_feed_url($token));
+        $webcal = htmlspecialchars_uni(events_feed_webcal_url($token));
+
+        $body .= '<div class="events_feed_link" id="calendar_feed_link">'
+            . '<p class="events_notice"><strong>Copy this link now.</strong> It is shown only this once. '
+            . 'If you lose it, make a new one - that also turns this one off.</p>'
+            . '<p><a href="' . $webcal . '" class="button" id="calendar_feed_subscribe">Subscribe in my calendar app</a></p>'
+            . '<label class="events_label" for="calendar_feed_url">Or paste this into your calendar\'s "subscribe by URL" option '
+            . '(in Google Calendar: Other calendars &rarr; From URL)</label>'
+            . '<input type="text" readonly="readonly" class="events_input events_feed_url" id="calendar_feed_url" value="' . $https . '" onfocus="this.select();" />'
+            . '<p class="events_hint">Treat it like a password: anyone who has it can see the events you have signed up for. '
+            . 'Do not post it or share it.</p>'
+            . '</div>';
+    }
+
+    if($status)
+    {
+        // An absolute instant, so my_date() and the member's own zone are right here -
+        // unlike an event's dates, which are wall clocks in the event zone.
+        $created = my_date('relative', (int)$status['created_at']);
+        $used = (int)$status['last_used_at'] ? my_date('relative', (int)$status['last_used_at']) : 'not yet';
+
+        // Labels rather than a sentence: my_date()'s relative forms are capitalised
+        // ("Less than 1 minute ago", "Yesterday") and read wrongly mid-sentence.
+        $body .= '<p id="calendar_feed_status">Your link is active.<br />'
+            . 'Made: ' . $created . '<br />'
+            . 'Last fetched by a calendar: <span id="calendar_feed_last_used">' . $used . '</span></p>'
+            . '<div class="events_feed_actions">'
+            . events_calendar_feed_button($form_action, $hidden, 'create', 'Make a new link', 'calendar_feed_reset',
+                'Your current link will stop working, and any calendar subscribed to it will stop updating. Continue?')
+            . events_calendar_feed_button($form_action, $hidden, 'revoke', 'Turn off', 'calendar_feed_revoke',
+                'Any calendar subscribed to your link will stop updating. Continue?')
+            . '</div>';
+
+        if($token === null)
+        {
+            $body .= '<p class="events_hint">The link itself is not stored, so it cannot be shown again. '
+                . 'If you need it again, make a new one and subscribe with that - the old one stops working.</p>';
+        }
+    }
+    else
+    {
+        $body .= '<div class="events_feed_actions">'
+            . events_calendar_feed_button($form_action, $hidden, 'create', 'Make my subscription link', 'calendar_feed_create')
+            . '</div>';
+    }
+
+    return $body;
+}

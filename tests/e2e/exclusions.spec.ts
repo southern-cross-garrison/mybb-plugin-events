@@ -1,5 +1,6 @@
 import { test, expect, expectMyBBError } from '../helpers/fixtures';
 import { loginAs } from '../helpers/auth';
+import type { Page } from '@playwright/test';
 import { relativeToTestNow } from '../helpers/clock';
 import { runPhp } from '../helpers/container';
 import { createEvent, createRsvp, execute, fixtures, getThread, getThreadFirstPost, getTroopReport, T } from '../helpers/db';
@@ -25,11 +26,28 @@ const FORUMS = fixtures().forums;
 const TK = fixtures().costumeOptions[0];
 
 /**
- * Threads outlive a test - resetPluginData() only truncates what the plugin owns - so a
- * retry would otherwise assert "this subject appears nowhere" against the announcement
- * its own first attempt posted. A suffix keeps each attempt's thread its own.
+ * The forums are put back before every test (restoreBoardContent()), but a retry runs in
+ * the same worker straight after its failed attempt - so a suffix keeps each attempt's
+ * thread its own, rather than asserting "this subject appears nowhere" against the one the
+ * first attempt posted.
  */
 const announcementTitle = (base: string) => `${base} ${Math.random().toString(36).slice(2, 8)}`;
+
+/**
+ * Open a forum's thread listing, and insist it is all on one page.
+ *
+ * "Not in the listing" is only a check when the listing is all there is: a thread pushed
+ * onto page 2 is not on page 1 whether it is hidden or not. restoreBoardContent() keeps
+ * every forum down to a handful of threads, so a second page here means that has stopped
+ * working, and the test says so rather than passing on a page that could not have shown it.
+ */
+async function openForumListing(page: Page, fid: number): Promise<void> {
+  await page.goto(`/forumdisplay.php?fid=${fid}`);
+  await expect(
+    page.locator(`a[href*="forumdisplay.php?fid=${fid}&page="]`),
+    'the forum listing runs to a second page, so page 1 cannot answer for it',
+  ).toHaveCount(0);
+}
 
 /** Announce an event the way saving it live does, and return its thread id. */
 async function announce(eventId: number): Promise<number> {
@@ -101,7 +119,7 @@ test.describe('per-event exclusions', () => {
 
     // And every way to find it: the forum it was posted into, and the board index, which
     // names each forum's newest thread by subject.
-    await page.goto(`/forumdisplay.php?fid=${FORUMS.events}`);
+    await openForumListing(page, FORUMS.events);
     await expect(page.locator('body')).not.toContainText(title);
 
     await page.goto('/index.php');
@@ -112,7 +130,7 @@ test.describe('per-event exclusions', () => {
     await page.goto(`/showthread.php?tid=${threadId}`);
     await expect(page.locator('body')).toContainText(title);
 
-    await page.goto(`/forumdisplay.php?fid=${FORUMS.events}`);
+    await openForumListing(page, FORUMS.events);
     await expect(page.locator('body')).toContainText(title);
   });
 
@@ -304,7 +322,7 @@ test.describe('per-event exclusions', () => {
     await page.goto(`/showthread.php?tid=${reportThreadId}`);
     await expect(page.locator('body')).toContainText(`Troop Report: ${title}`);
 
-    await page.goto(`/forumdisplay.php?fid=${FORUMS.troop_reports}`);
+    await openForumListing(page, FORUMS.troop_reports);
     await expect(page.locator('body')).toContainText(`Troop Report: ${title}`);
 
     // The event's own thread is still not, archived event or no - and writing the report

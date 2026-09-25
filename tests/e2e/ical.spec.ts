@@ -15,6 +15,16 @@ async function fetchCalendar(page: Page, eventId: number): Promise<string> {
   return body.replace(/\r\n[ \t]/g, '');
 }
 
+/** Each VEVENT's SUMMARY, keyed by DTSTART. */
+function summariesByStart(body: string): Record<string, string> {
+  const summaries: Record<string, string> = {};
+  for (const block of body.split('BEGIN:VEVENT').slice(1)) {
+    const start = block.match(/^DTSTART:(.*)$/m)?.[1] ?? '';
+    summaries[start] = (block.match(/^SUMMARY:(.*)$/m)?.[1] ?? '').trim();
+  }
+  return summaries;
+}
+
 /** The first line of each VEVENT's DESCRIPTION - the one saying what the member is doing - keyed by DTSTART. */
 function signupLinesByStart(body: string): Record<string, string> {
   const lines: Record<string, string> = {};
@@ -56,7 +66,7 @@ test.describe('iCal export', () => {
     const body = await response.text();
     expect(body).toContain('BEGIN:VCALENDAR');
     expect(body).toContain('END:VCALENDAR');
-    expect(body).toContain('SUMMARY:Calendar Export Troop');
+    expect(body).toContain('SUMMARY:Trooping: Calendar Export Troop');
     expect(body).toContain('LOCATION:Hunter');
     expect(body).toContain('DTSTART:20261020T100000Z');
     expect(body).toContain('DTEND:20261020T160000Z');
@@ -240,6 +250,11 @@ test.describe('iCal export', () => {
     expect(body.match(/BEGIN:VEVENT/g)).toHaveLength(2);
     expect(lines['20261017T090000Z']).toBe(`You're trooping (${TK}) this day.`);
     expect(lines['20261018T100000Z']).toBe(`You're trooping (${TK}) and wrangling this day.`);
+    // The title leads with the roles held that day, not across the whole signup.
+    expect(summariesByStart(body)).toEqual({
+      '20261017T090000Z': 'Trooping: Two Role Weekend Troop',
+      '20261018T100000Z': 'Trooping and Wrangling: Two Role Weekend Troop',
+    });
   });
 
   test('describes a single-day signup as the whole event', async ({ page }) => {
@@ -256,6 +271,7 @@ test.describe('iCal export', () => {
 
     expect(body.match(/BEGIN:VEVENT/g)).toHaveLength(1);
     expect(body).toContain("DESCRIPTION:You're wrangling at this event.");
+    expect(body).toContain('SUMMARY:Wrangling: Single Day Wrangle');
   });
 
   test('exports every day to a member who has not signed up, and says so', async ({ page }) => {
@@ -267,6 +283,8 @@ test.describe('iCal export', () => {
       "You haven't signed up for this event yet.",
       "You haven't signed up for this event yet.",
     ]);
+    // No role to lead with, so the title is left as it is.
+    expect(Object.values(summariesByStart(body))).toEqual(['Undecided Weekend Troop', 'Undecided Weekend Troop']);
   });
 
   test('carries the WWCC requirement, the address and the full description', async ({ page }) => {
@@ -286,7 +304,8 @@ test.describe('iCal export', () => {
     expect(body).toContain(
       "DESCRIPTION:You haven't signed up for this event yet.\\n" +
         'A Working With Children Check is required.\\n' +
-        'Address: 1 Showground Rd\\, Sydney Olympic Park NSW 2127\\n\\n' +
+        'Address: 1 Showground Rd\\, Sydney Olympic Park NSW 2127\\n' +
+        'Map: https://www.google.com/maps/search/?api=1&query=1%20Showground%20Rd%2C%20Sydney%20Olympic%20Park%20NSW%202127\\n\\n' +
         'Meet at the loading dock. '.repeat(6).trim(),
     );
 
@@ -303,6 +322,18 @@ test.describe('iCal export', () => {
     const body = await fetchCalendar(page, eventId);
 
     expect(body).not.toContain('Working With Children');
+  });
+
+  test('links the address to a map, and leaves the link out when there is no address', async ({ page }) => {
+    // The search URL does the lookup when it is opened, so no coordinates are needed.
+    const located = await createEvent({ title: 'Mapped Export Troop', address: "O'Connell St & Pitt St, Sydney" });
+    const unlocated = await createEvent({ title: 'Unmapped Export Troop' });
+
+    await loginAs(page, 'trooper1');
+    expect(await fetchCalendar(page, located)).toContain(
+      String.raw`\nMap: https://www.google.com/maps/search/?api=1&query=O%27Connell%20St%20%26%20Pitt%20St%2C%20Sydney`,
+    );
+    expect(await fetchCalendar(page, unlocated)).not.toContain('Map:');
   });
 
   test('is not available to guests', async ({ page }) => {

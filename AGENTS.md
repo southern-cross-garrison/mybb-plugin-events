@@ -47,10 +47,9 @@ baseline picks the change up.
   which surfaces as page views failing at random with "BIGINT UNSIGNED value is out of
   range", not as anything that points at the snapshot. Run `scripts/db-restore.sh` first
   (it resets the clock and realigns the timestamps), then re-provision, then snapshot. It
-  records the run's *content* as well: threads, posts and PMs the tests created are not
-  reset between tests, so a snapshot taken after a run bakes every announcement and troop
-  report it posted into the baseline that every later run starts from. Restoring first is
-  what clears them.
+  records the run's *content* as well: the last test's threads, posts and PMs are still on
+  the board when the run ends, so a snapshot taken after a run bakes them into the
+  baseline that every later run starts from. Restoring first is what clears them.
 - Everything runs in Docker. Log and file paths in debugging code must be container paths
   (`/var/www/html/...`); `test-forum/` on the host is the same directory.
 - MyBB's `insert_query()`/`update_query()` quote values but do **not** escape them. Every
@@ -357,3 +356,39 @@ baseline picks the change up.
   after the run that caused it. The suite pairs the two in `moveClock()`
   (`tests/helpers/fixtures.ts`) and once more in `tests/global-teardown.ts`;
   `scripts/db-restore.sh` is the manual repair.
+
+- The calendar subscription feed (`ical_feed.php`) is fetched by calendar servers with no
+  session, so it defines `ALLOWABLE_PAGE` and its token is the entire access check.
+  Everything it renders has to be asked *as the token's member*, by passing their uid -
+  `events_can_view_event($event, $uid)`, `events_get_user_signup($id, $uid)` - never
+  through a helper that reads `$mybb->user`, which on that page is a guest. The VEVENTs
+  are built by `events_ical_vevents()` (`events_ical.php`) for both it and `ical.php`, so
+  a change to what an entry says goes there once. Only the token's SHA-256 is stored
+  (`events_feed.php`), which is why `calendar_feed.php` can show a link only in the
+  response that made it.
+
+- The subscription page also lives in the User CP (`usercp.php?action=events_calendar`,
+  served from the `usercp_start` hook), and both halves of that have to survive a theme
+  that rebuilds the User CP - the garrison's replaces MyBB's table layout with Bootstrap
+  columns. `events_usercp_nav()` copies the theme's own Forum Subscriptions nav item,
+  whatever its markup, rather than writing one; `events_usercp_layout()` lifts the frame
+  around `{$usercpnav}` out of the theme's `usercp` template and closes what it opened.
+  Fetch that template with `$templates->get("usercp", 0, 0)`: escaped for eval and then
+  eval'd again, its attributes come out as `class=\"row\"` and the page falls out of the
+  theme's grid with no error. `calendar-feed.spec.ts` checks the layout on both the
+  garrison theme and MyBB's Default by position, not by markup.
+
+- Every test starts with the forums as the snapshot has them. `restoreBoardContent()`
+  (`tests/helpers/db.ts`, run by the `cleanBoard` fixture) puts back the threads, posts,
+  forum counters, read markers, search log and thread-derived caches that global setup
+  copied with `snapshotBoardContent()`. Threads used to outlive the test that posted them,
+  and since every test starts the clock at the same instant, a run's threads all shared
+  timestamps within seconds and where a new one sorted came down to how long earlier
+  tests took: by the exclusion tests the events forum ran to two pages, the thread a test
+  had just posted was on page 2, "it is listed" failed and "it is not listed" passed
+  without checking anything. A new MyBB table that holds threads, posts or anything
+  counted from them belongs in `BOARD_CONTENT_TABLES`. The datacache is restored only for
+  the rows built from posts: `tasks` holds each task's next run, and rewinding it sets the
+  reminder task off mid-test. A test that reads a listing to prove a thread is *absent*
+  should check the listing is one page first, as `openForumListing()` in
+  `exclusions.spec.ts` does.

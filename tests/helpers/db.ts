@@ -101,6 +101,89 @@ export async function snapshotUserFields(): Promise<void> {
   await conn.query(`CREATE TABLE ${USERFIELDS_BACKUP} AS SELECT * FROM ${T('userfields')}`);
 }
 
+/**
+ * The board's forum content: every table that holds a thread or post, or a count or cache
+ * derived from them.
+ *
+ * Tests post real threads - announcements, troop reports, ordinary threads the exclusion
+ * tests hide - and those used to outlive the test that posted them. Every test starts the
+ * clock at the same instant, so a run's threads all carry timestamps within seconds of
+ * each other, and where a new one sorted in a forum listing came down to how long the
+ * tests before it took. By the exclusion tests the events forum held over fifty, and the
+ * thread a test had just posted could be on page 2 - failing "it is listed" and quietly
+ * passing "it is not". Restored to the snapshot before every test, a listing holds the
+ * handful of threads the snapshot has plus whatever this test posts.
+ *
+ * `forums` carries each forum's cached thread and post counts and its "last post", so it
+ * comes back with the threads. Deleting rows does not rewind a MyISAM AUTO_INCREMENT, so
+ * a new thread never reuses an id an earlier test's thread had - nothing left holding an
+ * old tid (a read-marker cookie, a search result) can come to point at a new one.
+ */
+const BOARD_CONTENT_TABLES = [
+  'threads',
+  'posts',
+  'forums',
+  'threadsread',
+  'forumsread',
+  'threadsubscriptions',
+  'threadratings',
+  'threadviews',
+  'polls',
+  'pollvotes',
+  'attachments',
+  'moderatorlog',
+  'reportedcontent',
+  'delayedmoderation',
+  'searchlog',
+];
+
+/**
+ * The datacache rows built from threads and posts. Only these: the rest of the cache
+ * holds board configuration, and `tasks` in particular holds each task's next run -
+ * rewinding that would set the reminder task off in the middle of an unrelated test.
+ */
+const BOARD_CONTENT_CACHES = ['stats', 'statistics', 'most_replied_threads', 'most_viewed_threads'];
+
+const backupOf = (table: string) => `${TABLE_PREFIX}${table}_e2e_backup`;
+const USER_COUNTS_BACKUP = backupOf('user_post_counts');
+const CACHE_BACKUP = backupOf('datacache');
+
+/** Take a copy of the snapshot's forum content, for restoreBoardContent(). */
+export async function snapshotBoardContent(): Promise<void> {
+  const conn = await db();
+  for (const table of BOARD_CONTENT_TABLES) {
+    await conn.query(`DROP TABLE IF EXISTS ${backupOf(table)}`);
+    await conn.query(`CREATE TABLE ${backupOf(table)} AS SELECT * FROM ${T(table)}`);
+  }
+
+  // Posting bumps the author's counts on their users row, which cannot be restored
+  // whole: logging in writes to it too.
+  await conn.query(`DROP TABLE IF EXISTS ${USER_COUNTS_BACKUP}`);
+  await conn.query(`CREATE TABLE ${USER_COUNTS_BACKUP} AS SELECT uid, postnum, threadnum FROM ${T('users')}`);
+
+  await conn.query(`DROP TABLE IF EXISTS ${CACHE_BACKUP}`);
+  await conn.query(`CREATE TABLE ${CACHE_BACKUP} AS SELECT * FROM ${T('datacache')} WHERE title IN (?)`, [
+    BOARD_CONTENT_CACHES,
+  ]);
+}
+
+/** Put the forum content back the way snapshotBoardContent() found it. */
+export async function restoreBoardContent(): Promise<void> {
+  const conn = await db();
+  for (const table of BOARD_CONTENT_TABLES) {
+    await conn.query(`DELETE FROM ${T(table)}`);
+    await conn.query(`INSERT INTO ${T(table)} SELECT * FROM ${backupOf(table)}`);
+  }
+
+  await conn.query(
+    `UPDATE ${T('users')} u INNER JOIN ${USER_COUNTS_BACKUP} b ON b.uid = u.uid
+        SET u.postnum = b.postnum, u.threadnum = b.threadnum`,
+  );
+
+  await conn.query(`DELETE FROM ${T('datacache')} WHERE title IN (?)`, [BOARD_CONTENT_CACHES]);
+  await conn.query(`INSERT INTO ${T('datacache')} SELECT * FROM ${CACHE_BACKUP}`);
+}
+
 /** Clear everything the plugin owns so each test starts from an empty slate. */
 export async function resetPluginData(): Promise<void> {
   const conn = await db();

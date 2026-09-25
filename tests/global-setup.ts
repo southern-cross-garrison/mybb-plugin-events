@@ -5,7 +5,7 @@ import path from 'node:path';
 import { ALL_USERS, captureLoginState } from './helpers/auth';
 import { BASE_URL, DEVENV_DIR, FORUM_DIR, REPO_ROOT } from './helpers/config';
 import { resetClock, readContainerClock } from './helpers/clock';
-import { snapshotUserFields, closeDb } from './helpers/db';
+import { snapshotUserFields, snapshotBoardContent, closeDb } from './helpers/db';
 import { acquireSuiteLock } from './helpers/suite-lock';
 
 const run = promisify(execFile);
@@ -25,6 +25,8 @@ export default async function globalSetup(): Promise<void> {
 
   // Profile fields are mutated by the RSVP prerequisites tests; keep a pristine copy.
   await snapshotUserFields();
+  // And the forums, which every test that posts a thread adds to.
+  await snapshotBoardContent();
   await closeDb();
 
   fs.rmSync(path.join(DEVENV_DIR, 'auth'), { recursive: true, force: true });

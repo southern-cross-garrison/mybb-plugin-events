@@ -15,6 +15,8 @@ require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
 // events_description_editor() lives here; the report is BBCode written into the same
 // editor an ordinary post is.
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_form.php";
+// Posting the report archives the event, and its announcement has to say so.
+require_once MYBB_ROOT . "inc/plugins/events/inc/events_thread.php";
 
 if(!$mybb->user['uid'])
 {
@@ -159,6 +161,12 @@ if($mybb->request_method === 'post' && $mybb->get_input('action') === 'post')
 
     // Posting the report closes the event out.
     $db->update_query("event_plugin_events", array('status' => 'archived'), "id = " . $event_id);
+
+    // The announcement's first post is generated from the event, and guests, excluded
+    // members and Tapatalk read that post rather than the card - so without this it goes
+    // on reading as an open call for troopers. The report is already up, so a thread that
+    // cannot be rewritten is not a reason to stop here.
+    events_sync_event_thread($event_id);
 
     events_release_lock('troop_report:' . $event_id);
 

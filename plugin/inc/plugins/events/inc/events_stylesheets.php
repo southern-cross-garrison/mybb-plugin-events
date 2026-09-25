@@ -23,8 +23,10 @@ define('EVENTS_STYLESHEET', 'events.css');
 // attendance sheet and the coordinator RSVP list are actions on event.php, so they are
 // covered by it; ical.php and ical_feed.php render no HTML. showthread.php is there because an event is
 // read in its announcement thread - which means the sheet reaches every thread on the
-// board, so nothing in it may apply outside the plugin's own markup.
-define('EVENTS_STYLESHEET_ATTACHEDTO', 'events.php|event.php|manage_event.php|rsvp.php|troop_report.php|calendar_feed.php|showthread.php');
+// board, so nothing in it may apply outside the plugin's own markup. usercp.php is there
+// for the calendar subscription page the plugin adds to the User CP, and the same rule
+// holds: the sheet reaches every User CP page.
+define('EVENTS_STYLESHEET_ATTACHEDTO', 'events.php|event.php|manage_event.php|rsvp.php|troop_report.php|calendar_feed.php|usercp.php|showthread.php');
 
 /** The theme every other theme inherits from. */
 define('EVENTS_MASTER_THEME', 1);

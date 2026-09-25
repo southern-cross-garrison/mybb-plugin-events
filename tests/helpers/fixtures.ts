@@ -1,15 +1,17 @@
 import { test as base, expect, Page } from '@playwright/test';
-import { resetPluginData, deletePrivateMessages, alignUserActivityToClock } from './db';
+import { resetPluginData, restoreBoardContent, deletePrivateMessages, alignUserActivityToClock } from './db';
 import { resetToTestNow, resetClock, readContainerClock } from './clock';
 
 /**
- * Every test starts with no plugin data and the container clock parked at TEST_NOW, so
- * scenarios are built from absolute dates rather than the real wall clock.
+ * Every test starts with no plugin data, the forums as the snapshot has them, and the
+ * container clock parked at TEST_NOW, so scenarios are built from absolute dates rather
+ * than the real wall clock.
  */
 export const test = base.extend<{ cleanBoard: void }>({
   cleanBoard: [
     async ({}, use) => {
       await resetPluginData();
+      await restoreBoardContent();
       await deletePrivateMessages();
       await moveClock(resetToTestNow);
       await use();

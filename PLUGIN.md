@@ -24,6 +24,9 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 - **Print Layouts**: Every page prints as a document - no board chrome, a compact masthead,
   and an attendance sheet built for a clipboard
 - **iCal Export**: Export events to calendar applications
+- **Calendar Subscription**: Each member can make a private link their calendar app
+  subscribes to. It carries every event they have signed up for and follows their
+  signups: drop a day or withdraw, and it leaves their calendar on the next refresh
 - **Forum Announcements**: Every live event gets a generated thread in the forums, in the
   forum configured for its region, rewritten whenever the event changes
 - **Events Are Threads**: An announced event is read in its thread - members see the event
@@ -97,7 +100,7 @@ A board starts on UTC and names its own zone here. A setting naming a zone this 
 has never heard of falls back to UTC too, which is the one zone every build can resolve.
 
 The one place an absolute instant is written rather than a wall clock is the iCal feed
-(`ical.php`), which converts out of the event timezone into UTC so a member's calendar app
+(`ical.php` and `ical_feed.php`), which converts out of the event timezone into UTC so a member's calendar app
 shows the event at the right local time wherever they are.
 
 Changing the setting reinterprets the dates already stored rather than converting them: an
@@ -470,6 +473,44 @@ GECs can manage events and RSVPs directly from the event page (no Admin CP acces
 4. Post to the designated forum
 5. The plugin automatically comments on the event's announcement thread and archives the event
 
+## Calendar Subscription
+
+**Subscribe in Calendar** on the events toolbar opens `calendar_feed.php`, where a member
+makes a private link. The same page is in the User CP, as **Calendar Subscription** under
+Miscellaneous (`usercp.php?action=events_calendar`); both manage the one link. Opening it offers the calendar app's subscribe dialog (`webcal://`),
+and the same address can be pasted into Google Calendar's *Other calendars -> From URL*.
+The app then fetches `ical_feed.php` on its own schedule - Google roughly daily, Apple and
+Outlook more often - and keeps its copy in step with it, which is how a day the member
+drops, or an event they withdraw from, leaves their calendar. A downloaded `.ics` can only
+ever add. The feed covers every event they are signed up for that ended within the past
+year or has yet to happen, with the same entries and UIDs the one-event download produces.
+Each entry's title leads with the role the member holds that day - "Trooping: Sydney Royal
+Easter Show", or "Trooping and Wrangling: ..." for a day held in both - so the calendar grid
+says what the day is without the entry being opened. A one-event download for an event the
+member has not signed up for keeps the bare title.
+An event with an address also gets a Google Maps search link in its description, which
+every calendar app makes clickable. It does the lookup when opened, so nothing is geocoded
+here, and it is how a subscribed entry gets a map in apps that do nothing with a plain
+`LOCATION`.
+
+The link carries the member's only credential for the feed, since a calendar server has no
+session, so it is handled like a password:
+
+- The token is 64 bytes (512 bits) from the OS's secure random source, 86 characters in
+  the URL. Nothing about it can be guessed or narrowed.
+- Only its SHA-256 is stored. A backup or leaked copy of the database opens no feed.
+- It is shown once, on the page that makes it. The member can make a new one at any time,
+  which turns the old one off immediately, or turn the feed off altogether.
+- Every fetch is checked afresh as that member: a banned member's feed answers nothing,
+  a deleted member's token is removed with them, and an event they are excluded from or
+  that goes back to pending drops out.
+- Every refusal - malformed, unknown, revoked, banned - gets the same `404 Not found.`,
+  so a request cannot tell a token that once worked from one that never did.
+
+The token travels in the query string, as every calendar feed's does, so it appears in the
+web server's access log. Anyone with access to those logs can read it; treat them
+accordingly.
+
 ## File Structure
 
 ```
@@ -478,7 +519,9 @@ GECs can manage events and RSVPs directly from the event page (no Admin CP acces
 /manage_event.php                 # Event create / edit form for coordinators
 /rsvp.php                         # Signup wizard (also the edit form)
 /troop_report.php                 # Troop report drafting and posting
-/ical.php                         # iCal export
+/ical.php                         # iCal export of one event
+/ical_feed.php                    # A member's calendar subscription feed
+/calendar_feed.php                # Where a member makes, resets or turns off that link
 
 /inc/tasks/
   events_reminders.php            # Scheduled task entry point
@@ -490,6 +533,8 @@ GECs can manage events and RSVPs directly from the event page (no Admin CP acces
       events_functions.php        # Core helper functions
       events_form.php             # Reading, validating and saving an event
       events_render.php           # Shared HTML building helpers
+      events_ical.php             # iCal rendering shared by the export and the feed
+      events_feed.php             # Calendar subscription tokens
       events_thread.php           # Generating and maintaining event announcement threads
       events_hooks.php            # Hook callbacks and the reminder job
       events_install.php          # Database installation
