@@ -1089,9 +1089,18 @@ function events_send_reminders()
     require_once MYBB_ROOT . "inc/datahandlers/pm.php";
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 
-    $reminder_interval = 7 * 24 * 60 * 60;
     $now = events_date('Y-m-d H:i:s');
-    $resend_before = events_date('Y-m-d H:i:s', TIME_NOW - $reminder_interval);
+
+    // "A week" is counted in calendar days, not seconds. The task is daily, but MyBB runs
+    // it on the first page view after it falls due, so the hour moves from run to run -
+    // and against an exact seven-day cutoff, a run on day 7 that came a few minutes
+    // earlier in the day than day 0's was short of the week and left it to day 8, every
+    // week. So a reminder sent on any day up to and including seven days ago is due,
+    // whatever time today's run happens at. Stepped as a date in the event zone so a
+    // daylight saving change in between does not shift the midnight.
+    $resend_day = new DateTime(events_date('Y-m-d'), events_timezone());
+    $resend_day->modify('-6 days');
+    $resend_before = $resend_day->format('Y-m-d 00:00:00');
 
     $query = $db->query("
         SELECT e.id, e.title, tr.id AS report_id, tr.last_reminder_sent

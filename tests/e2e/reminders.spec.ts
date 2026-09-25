@@ -111,6 +111,36 @@ test.describe('troop report reminders', () => {
     expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(2);
   });
 
+  // The task runs on the first page view after midnight, so its hour drifts from run to
+  // run. Against an exact seven-day cutoff, a run on day 7 that came a few minutes
+  // earlier in the day than day 0's fell short of the week, and every reminder after
+  // the first went out on day 8.
+  test('reminds again on day seven even when that run is earlier in the day', async () => {
+    const eventId = await createEvent({
+      title: 'Weekly Troop',
+      start: relativeToTestNow({ days: -3 }),
+      end: relativeToTestNow({ days: -2 }),
+    });
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+
+    await runScheduledTask('events_reminders');
+    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+
+    // Late on day six is more than six days on, but still not a week of days.
+    await setClock(relativeToTestNow({ days: 6, hours: 14 }));
+    await runScheduledTask('events_reminders');
+    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+
+    await setClock(relativeToTestNow({ days: 7, minutes: -10 }));
+    await runScheduledTask('events_reminders');
+    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(2);
+
+    // And the week after counts from day seven, not from day eight.
+    await setClock(relativeToTestNow({ days: 14, minutes: -20 }));
+    await runScheduledTask('events_reminders');
+    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(3);
+  });
+
   test('stops reminding once the troop report has been posted', async () => {
     const eventId = await createEvent({
       title: 'Reported Troop',
