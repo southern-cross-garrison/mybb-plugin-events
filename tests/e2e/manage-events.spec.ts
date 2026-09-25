@@ -3,6 +3,7 @@ import { test, expect, expectMyBBError } from '../helpers/fixtures';
 import { loginAs } from '../helpers/auth';
 import {
   query,
+  execute,
   T,
   getEvent,
   getEventDays,
@@ -81,6 +82,16 @@ async function fillEventForm(page: Page, values: EventFormValues) {
 /** The submit is a navigation, so the assertion that follows has to auto-wait. */
 async function submitEventForm(page: Page) {
   await page.locator('#manage_event_submit').click();
+}
+
+// Waits for the POST to come back, so what is asserted next is the page it returned rather
+// than the one it replaced - which has the same warning on it.
+async function pressEnterToSubmit(page: Page, field: string) {
+  await Promise.all([
+    page.waitForResponse((response) => response.request().method() === 'POST'),
+    page.locator(field).press('Enter'),
+  ]);
+  await page.waitForLoadState();
 }
 
 test.describe('front-end event management', () => {
@@ -406,6 +417,14 @@ test.describe('front-end event management', () => {
     await expect(page.locator('#event_day_change_warning')).toBeVisible();
     expect(await getEventDays(eventId)).toHaveLength(3);
 
+    // Nor is pressing Enter in a field, which submits with the form's first submit button -
+    // and the confirm button sits above the form's own.
+    await pressEnterToSubmit(page, '#event_form_title');
+    await expect(page.locator('#event_day_change_warning')).toBeVisible();
+    expect(await getEventDays(eventId)).toHaveLength(3);
+    expect(await getSignupRoles(eventId, 'trooper2')).toEqual(['trooper', 'wrangler']);
+    expect(await countPrivateMessages('trooper2', 'Event changed:%')).toBe(0);
+
     await page.locator('#event_day_change_confirm').click();
     await expect(page.locator('#event_days li.event_day')).toHaveCount(2);
 
@@ -653,6 +672,34 @@ test.describe('front-end event management', () => {
       [eventId],
     );
     expect(rows.map((row: any) => Number(row.user_id))).toEqual([uid('excluded')]);
+  });
+
+  test('a username of digits excludes that member, not the member with that uid', async ({ page }) => {
+    // The field posts usernames, so "42" is the member called 42. Read as a uid first,
+    // it excluded whoever had uid 42 instead and withdrew their signup.
+    const eventId = await createEvent({ title: 'Numeric Name Troop' });
+    await createRsvp(eventId, 'trooper1');
+
+    const numericName = String(uid('trooper1'));
+    await execute(`UPDATE ${T('users')} SET username = ? WHERE uid = ?`, [numericName, uid('newbie')]);
+    try {
+      await loginAs(page, 'gec');
+      await page.goto(`/manage_event.php?id=${eventId}`);
+      await page.locator('input[name="exclusions"]').evaluate((input: HTMLInputElement, name: string) => {
+        input.value = name;
+      }, numericName);
+      await submitEventForm(page);
+      await expect(page.locator('#event_page')).toContainText('Numeric Name Troop');
+
+      const rows = await query(
+        `SELECT user_id FROM ${T('event_plugin_event_exclusions')} WHERE event_id = ?`,
+        [eventId],
+      );
+      expect(rows.map((row: any) => Number(row.user_id))).toEqual([uid('newbie')]);
+      expect(await getSignupRoles(eventId, 'trooper1')).toEqual(['trooper']);
+    } finally {
+      await execute(`UPDATE ${T('users')} SET username = 'newbie' WHERE uid = ?`, [uid('newbie')]);
+    }
   });
 
   test('refuses an excluded member who is nobody, with the field turned off', async ({ page }) => {

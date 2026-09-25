@@ -640,6 +640,37 @@ function events_hidden_event_ids($user_id = null)
 }
 
 /**
+ * The members an event is hidden from - events_hidden_event_ids() asked the other way
+ * round, for everything that has to reach those members from the event's side.
+ *
+ * @param int $event_id
+ * @return array of int user id
+ */
+function events_event_hidden_uids($event_id)
+{
+    global $db;
+
+    $uids = array();
+
+    $query = $db->query("
+        SELECT x.user_id
+        FROM " . TABLE_PREFIX . "event_plugin_event_exclusions x
+        INNER JOIN " . TABLE_PREFIX . "event_plugin_events e ON e.id = x.event_id
+        WHERE x.event_id = " . (int)$event_id . " AND x.user_id != e.gec_user_id
+    ");
+
+    while($row = $db->fetch_array($query))
+    {
+        if(!events_is_gec((int)$row['user_id']))
+        {
+            $uids[] = (int)$row['user_id'];
+        }
+    }
+
+    return $uids;
+}
+
+/**
  * The announcement threads this user is not allowed to know about.
  *
  * The board's members follow the forums rather than the events listing, so an event that
@@ -682,6 +713,24 @@ function events_hidden_thread_ids($user_id = null)
             while($row = $db->fetch_array($query))
             {
                 $thread_ids[] = (int)$row['thread_id'];
+            }
+        }
+
+        // A moderator moving the thread with MyBB's default "leave redirect" leaves a
+        // stub behind in the old forum: a thread of its own, with its own tid and the
+        // announcement's subject, which says "Moved:" in front of it in the listing.
+        if(!empty($thread_ids))
+        {
+            $stubs = array();
+            foreach($thread_ids as $thread_id)
+            {
+                $stubs[] = "'moved|" . $thread_id . "'";
+            }
+
+            $query = $db->simple_select("threads", "tid", "closed IN (" . implode(',', $stubs) . ")");
+            while($row = $db->fetch_array($query))
+            {
+                $thread_ids[] = (int)$row['tid'];
             }
         }
 

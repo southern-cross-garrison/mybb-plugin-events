@@ -3,7 +3,20 @@ import { loginAs } from '../helpers/auth';
 import type { Page } from '@playwright/test';
 import { relativeToTestNow } from '../helpers/clock';
 import { runPhp } from '../helpers/container';
-import { createEvent, createRsvp, execute, fixtures, getThread, getThreadFirstPost, getTroopReport, T } from '../helpers/db';
+import {
+  createEvent,
+  createRsvp,
+  createThread,
+  execute,
+  fixtures,
+  getThread,
+  getThreadFirstPost,
+  getTroopReport,
+  query,
+  queryOne,
+  T,
+  uid,
+} from '../helpers/db';
 
 /**
  * Being excluded from an event used to mean seeing the whole thing with the signup button
@@ -49,9 +62,16 @@ async function openForumListing(page: Page, fid: number): Promise<void> {
   ).toHaveCount(0);
 }
 
+/**
+ * The language file a front-end page loads in global.php and runPhp() does not. Posting
+ * writes subscription notices from it, and without it they are queued with an empty body.
+ */
+const LOAD_MESSAGES = `$lang->load('messages');`;
+
 /** Announce an event the way saving it live does, and return its thread id. */
 async function announce(eventId: number): Promise<number> {
   const output = await runPhp(`
+${LOAD_MESSAGES}
 require_once MYBB_ROOT.'inc/plugins/events/inc/events_thread.php';
 echo events_sync_event_thread(${eventId});
 `);
@@ -60,6 +80,58 @@ echo events_sync_event_thread(${eventId});
   expect(threadId).toBeGreaterThan(0);
 
   return threadId;
+}
+
+/** Reply to a thread as a member, the way MyBB's reply form writes it, and return the pid. */
+async function reply(threadId: number, username: string, message: string): Promise<number> {
+  const output = await runPhp(`
+${LOAD_MESSAGES}
+require_once MYBB_ROOT.'inc/datahandlers/post.php';
+$thread = get_thread(${threadId});
+$user = get_user(${uid(username)});
+$handler = new PostDataHandler('insert');
+$handler->admin_override = true;
+$handler->set_data(array(
+    'tid' => $thread['tid'], 'fid' => $thread['fid'], 'subject' => 'RE: ' . $thread['subject'],
+    'uid' => $user['uid'], 'username' => $user['username'], 'message' => ${JSON.stringify(message)},
+    'ipaddress' => '127.0.0.1', 'options' => array('signature' => 0, 'subscriptionmethod' => '', 'disablesmilies' => 0),
+));
+if(!$handler->validate_post()) { echo 'INVALID: ' . implode(' ', $handler->get_friendly_errors()); exit; }
+$post = $handler->insert_post();
+echo $post['pid'];
+`);
+
+  const postId = Number(output);
+  expect(postId, output).toBeGreaterThan(0);
+
+  return postId;
+}
+
+/** Put a poll on a thread, under a chosen id when one is given, and return its id. */
+async function addPoll(threadId: number, question: string, pollId?: number): Promise<number> {
+  if (pollId !== undefined) {
+    const taken = await queryOne(`SELECT pid FROM ${T('polls')} WHERE pid = ?`, [pollId]);
+    expect(taken, `poll ${pollId} already exists, so the test cannot give that id to its own`).toBeNull();
+  }
+
+  const result = await execute(
+    `INSERT INTO ${T('polls')} (${pollId === undefined ? '' : 'pid, '}tid, question, dateline, options, votes, numoptions)
+     VALUES (${pollId === undefined ? '' : '?, '}?, ?, UNIX_TIMESTAMP(), 'Yes||~|~||No', '0||~|~||0', 2)`,
+    [...(pollId === undefined ? [] : [pollId]), threadId, question],
+  );
+  await execute(`UPDATE ${T('threads')} SET poll = ? WHERE tid = ?`, [result.insertId, threadId]);
+
+  return result.insertId;
+}
+
+/** Who the mail queue holds a message for that names the subject. */
+async function mailedAbout(subject: string): Promise<string[]> {
+  const rows = await query(`SELECT mailto FROM ${T('mailqueue')} WHERE message LIKE ?`, [`%${subject}%`]);
+  return rows.map((row) => String(row.mailto));
+}
+
+async function email(username: string): Promise<string> {
+  return String((await queryOne(`SELECT email FROM ${T('users')} WHERE uid = ?`, [uid(username)]))?.email);
 }
 
 test.describe('per-event exclusions', () => {
@@ -283,16 +355,85 @@ test.describe('per-event exclusions', () => {
     const archive = await page.request.get(`/archive/index.php?thread-${threadId}.html`);
     expect(await archive.text()).not.toContain(title);
 
-    // edit_post rather than a quote endpoint: it is the xmlhttp action that names its
-    // post with a pid, which is how the hook recognises the thread behind a request.
-    const post = await getThreadFirstPost(threadId);
-    const inline = await page.request.get(`/xmlhttp.php?action=edit_post&pid=${post.pid}`);
-    expect(await inline.text()).not.toContain(title);
-
-    // The control, so neither assertion is passing because the endpoint answered nothing
+    // The control, so the assertion is not passing because the archive answered nothing
     // to anybody.
     await loginAs(page, 'trooper1');
     expect(await (await page.request.get(`/archive/index.php?thread-${threadId}.html`)).text()).toContain(title);
+
+    // Quick edit's get_post: the xmlhttp action that names its post with a pid, which is
+    // how the hook recognises the thread behind a request. It hands a post's source only
+    // to someone who may edit it, so the post has to be the member's own - a reply they
+    // wrote before they were excluded - or the endpoint refuses them whatever the hook
+    // does and the assertion proves nothing.
+    const message = `Bringing the spare helmet ${Math.random().toString(36).slice(2, 8)}`;
+    const postId = await reply(threadId, 'excluded', message);
+
+    await loginAs(page, 'excluded');
+    await page.goto('/index.php');
+    const postKey = await page.evaluate(() => (window as unknown as { my_post_key?: string }).my_post_key);
+    expect(postKey, 'the page carries no my_post_key').toMatch(/^[a-f0-9]+$/);
+    const getPost = () =>
+      page.request.get(`/xmlhttp.php?action=edit_post&do=get_post&pid=${postId}&my_post_key=${postKey}`);
+
+    expect(await (await getPost()).text()).not.toContain(message);
+
+    // The same member and the same request, with the exclusion lifted: the post comes back,
+    // so the refusal above was the hook's.
+    await execute(`DELETE FROM ${T('event_plugin_event_exclusions')} WHERE event_id = ?`, [eventId]);
+    expect(await (await getPost()).text()).toContain(message);
+  });
+
+  test('a pid or aid that names something else is not read as a post', async ({ page }) => {
+    // polls.php calls a poll's id pid, and announcements.php calls an announcement's id
+    // aid. Read as a post and an attachment, those turn away an unrelated poll or
+    // announcement whose id matches something in a hidden thread, and let a poll that
+    // really is in one through.
+    const title = announcementTitle('Crossed Wires Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    const threadId = await announce(eventId);
+    const post = await getThreadFirstPost(threadId);
+
+    const hiddenQuestion = `Hidden poll ${Math.random().toString(36).slice(2, 8)}`;
+    const hiddenPollId = await addPoll(threadId, hiddenQuestion);
+
+    // An ordinary thread's poll that shares its id with the announcement's post.
+    const otherThreadId = await createThread(announcementTitle('Costume Night'), FORUMS.general, 'trooper1');
+    const otherQuestion = `Open poll ${Math.random().toString(36).slice(2, 8)}`;
+    await addPoll(otherThreadId, otherQuestion, Number(post.pid));
+
+    // An attachment in the hidden thread, and a board-wide announcement sharing its id.
+    const attachment = await execute(
+      `INSERT INTO ${T('attachments')} (pid, uid, filename, filetype, filesize, thumbnail, visible, dateuploaded)
+       VALUES (?, ?, 'map.jpg', 'image/jpeg', 1, 'map_thumb.jpg', 1, UNIX_TIMESTAMP())`,
+      [post.pid, post.uid],
+    );
+    const announcementSubject = `Garrison notice ${Math.random().toString(36).slice(2, 8)}`;
+    await execute(
+      `INSERT INTO ${T('announcements')} (aid, fid, uid, subject, message) VALUES (?, -1, ?, ?, 'Read me.')`,
+      [attachment.insertId, uid('gec'), announcementSubject],
+    );
+
+    await loginAs(page, 'excluded');
+
+    await page.goto(`/polls.php?action=showresults&pid=${hiddenPollId}`);
+    await expect(page.locator('body')).not.toContainText(hiddenQuestion);
+    await expectMyBBError(page, /do not have permission/i);
+
+    await page.goto(`/polls.php?action=showresults&pid=${post.pid}`);
+    await expect(page.locator('body')).toContainText(otherQuestion);
+
+    await page.goto(`/announcements.php?aid=${attachment.insertId}`);
+    await expect(page.locator('body')).toContainText(announcementSubject);
+
+    // attachment.php takes a thumbnail's id in place of an aid. The row has no file behind
+    // it, so a request the hook waves through fails as an invalid attachment instead.
+    await page.goto(`/attachment.php?thumbnail=${attachment.insertId}`);
+    await expectMyBBError(page, /do not have permission/i);
+
+    // Everybody else gets the hidden thread's poll.
+    await loginAs(page, 'trooper1');
+    await page.goto(`/polls.php?action=showresults&pid=${hiddenPollId}`);
+    await expect(page.locator('body')).toContainText(hiddenQuestion);
   });
 
   test('the troop report is still theirs to read', async ({ page }) => {
@@ -349,5 +490,217 @@ test.describe('per-event exclusions', () => {
 
     await page.goto(`/manage_event.php?id=${eventId}`);
     await expect(page.locator('#event_form_title')).toHaveValue('Coordinated Troop');
+  });
+
+  test("the archive's forum listing does not name it", async ({ page }) => {
+    // The archive's thread page is gated with everything else, but its forum page is a
+    // listing of its own, printed line by line with no hook that can drop a line.
+    const title = announcementTitle('Archive Listed Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    await announce(eventId);
+
+    const listing = async (): Promise<string> =>
+      (await page.request.get(`/archive/index.php?forum-${FORUMS.events}.html`)).text();
+
+    await loginAs(page, 'excluded');
+    const hidden = await listing();
+    expect(hidden).toContain('class="listing"');
+    expect(hidden).not.toContain(title);
+
+    await loginAs(page, 'trooper1');
+    expect(await listing()).toContain(title);
+  });
+
+  test("Who's Online and a profile do not say which thread someone is reading", async ({ page }) => {
+    const title = announcementTitle('Watched Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    const threadId = await announce(eventId);
+
+    // Every session is stamped with the same instant when the clock is reset, so a
+    // member's older sessions would tie with the one this makes. Only this one is left.
+    await execute(`DELETE FROM ${T('sessions')} WHERE uid = ?`, [uid('trooper2')]);
+    await loginAs(page, 'trooper2');
+    await page.goto(`/showthread.php?tid=${threadId}`);
+    await expect(page.locator('body')).toContainText(title);
+
+    const surfaces = [
+      { url: '/online.php', proof: 'trooper2' },
+      { url: `/member.php?action=profile&uid=${uid('trooper2')}`, proof: 'Reading Thread' },
+    ];
+
+    await loginAs(page, 'excluded');
+    for (const { url, proof } of surfaces) {
+      await page.goto(url);
+      await expect(page.locator('body'), url).toContainText(proof);
+      await expect(page.locator('body'), url).not.toContainText(title);
+    }
+
+    await loginAs(page, 'trooper1');
+    for (const { url } of surfaces) {
+      await page.goto(url);
+      await expect(page.locator('body'), url).toContainText(title);
+    }
+  });
+
+  test('a thread subscription is dropped by the exclusion that hides the thread', async ({ page }) => {
+    // Subscribed before they were excluded: their User CP would go on listing the thread,
+    // every reply would mail them its subject and an excerpt, and the unsubscribe link -
+    // which names the thread - is refused by the gate, so they could never stop it.
+    const title = announcementTitle('Subscribed Troop');
+    const eventId = await createEvent({ title });
+    const threadId = await announce(eventId);
+
+    for (const username of ['excluded', 'trooper1'] as const) {
+      await execute(
+        `INSERT INTO ${T('threadsubscriptions')} (uid, tid, notification, dateline) VALUES (?, ?, 1, UNIX_TIMESTAMP())`,
+        [uid(username), threadId],
+      );
+    }
+
+    // Excluded the way both event forms do it.
+    await runPhp(`
+require_once MYBB_ROOT.'inc/plugins/events/inc/events_form.php';
+$input = events_event_form_values(events_get_event(${eventId}));
+$input['exclusions'] = 'excluded';
+events_save_event(${eventId}, $input, ${uid('gec')});
+`);
+
+    const subscriptions = async (): Promise<string> => {
+      await page.goto('/usercp.php?action=subscriptions');
+      return (await page.locator('body').textContent()) ?? '';
+    };
+
+    await loginAs(page, 'excluded');
+    expect(await subscriptions()).not.toContain(title);
+
+    await loginAs(page, 'trooper1');
+    expect(await subscriptions()).toContain(title);
+
+    // MyBB only notifies a subscriber who has been active since the thread's last post.
+    await execute(`UPDATE ${T('threads')} SET lastpost = lastpost - 3600 WHERE tid = ?`, [threadId]);
+    await reply(threadId, 'trooper2', 'Count me in for the second shift.');
+
+    const recipients = await mailedAbout(title);
+    expect(recipients).toContain(await email('trooper1'));
+    expect(recipients).not.toContain(await email('excluded'));
+  });
+
+  test("a forum subscription's new-thread notice is not sent to them", async () => {
+    // Announcing the event is a new thread in the forum, and MyBB mails its subject and an
+    // excerpt of the post to everybody subscribed to that forum.
+    for (const username of ['excluded', 'trooper1'] as const) {
+      await execute(`INSERT INTO ${T('forumsubscriptions')} (fid, uid) VALUES (?, ?)`, [FORUMS.events, uid(username)]);
+    }
+    // And only to a subscriber who has been active since the forum's last post - as the
+    // forum cache has it, which is what the notice reads, not the forums table.
+    await execute(`UPDATE ${T('forums')} SET lastpost = 0 WHERE fid = ?`, [FORUMS.events]);
+    await runPhp(`$cache->update_forums();`);
+
+    const title = announcementTitle('Notified Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    await announce(eventId);
+
+    const recipients = await mailedAbout(title);
+    expect(recipients).toContain(await email('trooper1'));
+    expect(recipients).not.toContain(await email('excluded'));
+  });
+
+  test("a moderator's move leaves no redirect naming it", async ({ page }) => {
+    // MyBB's default move leaves a "Moved:" stub in the old forum: a thread of its own,
+    // with its own tid and the announcement's subject.
+    const title = announcementTitle('Relocated Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    const threadId = await announce(eventId);
+
+    await runPhp(`
+require_once MYBB_ROOT.'inc/class_moderation.php';
+$moderation = new Moderation;
+$moderation->move_thread(${threadId}, ${FORUMS.general}, 'redirect');
+`);
+
+    await loginAs(page, 'excluded');
+    await openForumListing(page, FORUMS.events);
+    await expect(page.locator('body')).not.toContainText(title);
+
+    await loginAs(page, 'trooper1');
+    await openForumListing(page, FORUMS.events);
+    await expect(page.locator('body')).toContainText(title);
+  });
+
+  test('an announcement cannot be copied', async ({ page }) => {
+    // A copy is a whole readable thread under a tid nothing knows is the event's.
+    const title = announcementTitle('Duplicated Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    const threadId = await announce(eventId);
+
+    const ordinary = announcementTitle('Costume Swap');
+    const ordinaryId = await createThread(ordinary, FORUMS.general, 'trooper1');
+    await reply(ordinaryId, 'trooper1', 'Anyone got a spare TK chest plate?');
+
+    await loginAs(page, 'admin');
+    await page.goto('/index.php');
+    const postKey = await page.evaluate(() => (window as unknown as { my_post_key?: string }).my_post_key);
+
+    const copy = async (tid: number): Promise<string> =>
+      (
+        await page.request.post('/moderation.php', {
+          form: { action: 'do_move', tid, moveto: FORUMS.general, method: 'copy', my_post_key: postKey ?? '' },
+        })
+      ).text();
+
+    const copies = async (subject: string): Promise<number> =>
+      Number((await queryOne(`SELECT COUNT(*) AS n FROM ${T('threads')} WHERE subject = ?`, [subject]))?.n);
+
+    expect(await copy(threadId)).toContain('cannot be copied');
+    expect(await copies(title)).toBe(1);
+
+    // The control: the same request copies an ordinary thread.
+    await copy(ordinaryId);
+    expect(await copies(ordinary)).toBe(2);
+  });
+
+  test("the board statistics' top threads leave it out", async ({ page }) => {
+    const title = announcementTitle('Popular Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    const threadId = await announce(eventId);
+
+    // To the top of both lists, and the lists rebuilt the way the board builds them.
+    await execute(`UPDATE ${T('threads')} SET replies = 99999, views = 999999 WHERE tid = ?`, [threadId]);
+    await runPhp(`
+$cache->update_most_replied_threads();
+$cache->update_most_viewed_threads();
+`);
+
+    await loginAs(page, 'excluded');
+    await page.goto('/stats.php');
+    await expect(page.locator('body')).not.toContainText(title);
+
+    await loginAs(page, 'trooper1');
+    await page.goto('/stats.php');
+    await expect(page.locator('body')).toContainText(title);
+  });
+
+  test('a rating for the announcement does not name its thread', async ({ page }) => {
+    const title = announcementTitle('Rated Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    const threadId = await announce(eventId);
+    const post = await getThreadFirstPost(threadId);
+
+    const comment = `Great announcement ${Math.random().toString(36).slice(2, 8)}`;
+    await execute(
+      `INSERT INTO ${T('reputation')} (uid, adduid, pid, reputation, dateline, comments) VALUES (?, ?, ?, 1, UNIX_TIMESTAMP(), ?)`,
+      [post.uid, uid('trooper1'), post.pid, comment],
+    );
+
+    const url = `/reputation.php?uid=${post.uid}`;
+
+    await loginAs(page, 'excluded');
+    await page.goto(url);
+    await expect(page.locator('body')).toContainText(comment);
+    await expect(page.locator('body')).not.toContainText(title);
+
+    await loginAs(page, 'trooper1');
+    await page.goto(url);
+    await expect(page.locator('body')).toContainText(title);
   });
 });

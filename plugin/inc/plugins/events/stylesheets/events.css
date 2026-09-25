@@ -409,6 +409,11 @@ textarea.events_input { resize: vertical; }
 #field_event_form_description { max-width: none; }
 #event_form_days_hint { margin: 0 0 4px; }
 
+/* The day-change warning's stand-in for the Save button, there only so that Enter in a
+   field is not taken as agreeing to the warning - see events_day_change_warning(). Off
+   screen rather than display: none, which some browsers take as no default button. */
+.events_default_submit { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+
 /* ---------------------------------------------------------------------------
  * Events list - signup counts, action buttons, status pills
  * ------------------------------------------------------------------------ */

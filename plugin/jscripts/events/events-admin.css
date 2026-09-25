@@ -167,6 +167,19 @@ a.events_region_add:focus {
 	font-weight: bold;
 }
 
+/* ---------------------------------------------- the day-change warning ----- */
+
+/* The stand-in for the Save button, there only so that Enter in a field is not taken as
+   agreeing to the warning - see events_day_change_warning(). Off screen rather than
+   display: none, which some browsers take as no default button. */
+.events_default_submit {
+	position: absolute;
+	left: -9999px;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+}
+
 /* ------------------------------------------------- the description box ----- */
 
 /* MyBB's Admin CP stylesheet gives every textarea a flat `width: 400px`, whatever it is

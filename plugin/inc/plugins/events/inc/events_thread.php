@@ -257,7 +257,7 @@ function events_event_post_content(array $event)
  */
 function events_sync_event_thread($event_id, &$error = null)
 {
-    global $db, $mybb;
+    global $db, $mybb, $lang;
 
     $error = null;
 
@@ -376,10 +376,111 @@ function events_sync_event_thread($event_id, &$error = null)
         return 0;
     }
 
+    // insert_thread() mails everybody subscribed to the forum the new thread's subject and
+    // an excerpt of its first post, and offers no hook inside that loop - so the mail it
+    // queued for members the event is hidden from is taken back out of the queue after it.
+    // The queue is only ever sent by the mail queue task, never by the request that filled
+    // it, so nothing has gone out yet.
+    $queued_before = (int)$db->fetch_field($db->simple_select("mailqueue", "MAX(mid) AS mid"), "mid");
+
+    // That notice is worded from the front end's messages language file, which global.php
+    // loads on every page and the Admin CP never does - so an event announced from the
+    // Admin CP queued every subscriber an email with an empty body. It is loaded for the
+    // insert, and anything it overwrote put back straight after, since the Admin CP's own
+    // strings can share its keys.
+    $lang_before = null;
+    if(empty($lang->email_forumsubscription))
+    {
+        $lang_before = get_object_vars($lang);
+        $lang->load('messages', true, true);
+    }
+
     $thread = $handler->insert_thread();
+
+    if($lang_before !== null)
+    {
+        foreach(array_keys(get_object_vars($lang)) as $key)
+        {
+            if(array_key_exists($key, $lang_before))
+            {
+                $lang->$key = $lang_before[$key];
+            }
+            else
+            {
+                unset($lang->$key);
+            }
+        }
+    }
     $thread_id = (int)$thread['tid'];
 
     $db->update_query("event_plugin_events", array('thread_id' => $thread_id), "id = " . (int)$event['id']);
 
+    events_unqueue_hidden_forum_notices($event['id'], $queued_before);
+
     return $thread_id;
+}
+
+/**
+ * Take the new-thread notices an announcement queued for the members it is hidden from
+ * back out of the mail queue.
+ *
+ * @param int $event_id
+ * @param int $queued_before The newest mail queue id before the thread was posted
+ * @return void
+ */
+function events_unqueue_hidden_forum_notices($event_id, $queued_before)
+{
+    global $db, $cache;
+
+    $uids = events_event_hidden_uids($event_id);
+    if(empty($uids))
+    {
+        return;
+    }
+
+    $emails = array();
+    $query = $db->simple_select("users", "email", "uid IN (" . implode(',', $uids) . ") AND email != ''");
+    while($row = $db->fetch_array($query))
+    {
+        $emails[] = "'" . $db->escape_string($row['email']) . "'";
+    }
+
+    if(empty($emails))
+    {
+        return;
+    }
+
+    $db->delete_query("mailqueue", "mid > " . (int)$queued_before . " AND mailto IN (" . implode(',', $emails) . ")");
+    $cache->update_mailqueue();
+}
+
+/**
+ * Unsubscribe the members an event is hidden from from its announcement thread.
+ *
+ * A subscription made before the exclusion would otherwise go on emailing or PMing them
+ * the subject and an excerpt of every reply, and list the thread in their User CP - where
+ * the link to unsubscribe names the thread, so events_block_hidden_thread() refuses it
+ * and they could not get rid of it themselves. They cannot subscribe again: that link
+ * names the thread too.
+ *
+ * @param int $event_id
+ * @return void
+ */
+function events_drop_hidden_thread_subscriptions($event_id)
+{
+    global $db;
+
+    $event = events_get_event($event_id);
+    if(!$event || (int)$event['thread_id'] <= 0)
+    {
+        return;
+    }
+
+    $uids = events_event_hidden_uids($event_id);
+    if(empty($uids))
+    {
+        return;
+    }
+
+    $db->delete_query("threadsubscriptions", "tid = " . (int)$event['thread_id'] . " AND uid IN (" . implode(',', $uids) . ")");
 }

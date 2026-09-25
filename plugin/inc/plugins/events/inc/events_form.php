@@ -531,8 +531,9 @@ function events_poc_options(array $event = array())
  * be picked, and something that got past it is a mistake worth showing rather than an
  * exclusion that silently does not exist.
  *
- * A token of digits is read as a user id first and as a username second, because a
- * username of nothing but digits is a username somebody may well have.
+ * A token is read as a username first and as a user id only when no member has that
+ * name. The tag field posts usernames, so a member named "42" is who "42" means - reading
+ * it as uid 42 first excluded somebody else and withdrew their signup.
  *
  * @param string $input
  * @param array|null $unknown Set to the tokens that matched no member
@@ -552,17 +553,12 @@ function events_parse_exclusions($input, &$unknown = null)
             continue;
         }
 
-        if(ctype_digit($token))
+        $user = $db->fetch_array($db->simple_select("users", "uid", "username = '" . $db->escape_string($token) . "'"));
+        if(!$user && ctype_digit($token))
         {
             $user = $db->fetch_array($db->simple_select("users", "uid", "uid = " . (int)$token));
-            if($user)
-            {
-                $uids[] = (int)$user['uid'];
-                continue;
-            }
         }
 
-        $user = $db->fetch_array($db->simple_select("users", "uid", "username = '" . $db->escape_string($token) . "'"));
         if($user)
         {
             $uids[] = (int)$user['uid'];
@@ -991,6 +987,28 @@ function events_save_event_days($event_id, array $days)
     if($removed)
     {
         $ids = implode(',', array_map('intval', $removed));
+
+        // Going back to one day deletes the day it still runs on too, and the signups for
+        // it become day-less ones, queued by rsvp_date (events_signup_queues()). That is
+        // when each member first signed up, not when they claimed this day, so a member
+        // who switched to it late would jump everybody who was there first. The claim's
+        // claimed_at is carried onto the signup so the queue keeps its order. Every claim
+        // left is on that day: events_save_event() has cancelled the signups for the rest.
+        if(empty($days))
+        {
+            $db->write_query("
+                UPDATE " . TABLE_PREFIX . "event_plugin_rsvps r
+                INNER JOIN (
+                    SELECT rsvp_id, MIN(claimed_at) AS claimed_at
+                    FROM " . TABLE_PREFIX . "event_plugin_rsvp_days
+                    WHERE event_day_id IN (" . $ids . ")
+                    GROUP BY rsvp_id
+                ) d ON d.rsvp_id = r.id
+                SET r.rsvp_date = d.claimed_at
+                WHERE r.event_id = " . $event_id . "
+            ");
+        }
+
         $db->delete_query("event_plugin_rsvp_days", "event_day_id IN (" . $ids . ")");
         $db->delete_query("event_plugin_event_days", "id IN (" . $ids . ")");
     }
@@ -1279,8 +1297,14 @@ function events_day_change_warning(array $change, $button_class)
         $actions[] = 'move ' . $demoted_count . ' to the waitlist';
     }
 
+    // Pressing Enter in a field submits with the form's first submit button, and this
+    // warning sits above the form's own, so without the decoy in front of it Enter would
+    // agree to the cancellations. The decoy is unnamed, like both forms' Save buttons, so
+    // it is an ordinary save - which brings this warning straight back. Moved off screen
+    // rather than display: none, which some browsers take as "no default button".
     return $html
-        . '<p><button type="submit" class="' . htmlspecialchars_uni($button_class) . '" name="confirm_day_changes"'
+        . '<p><button type="submit" class="events_default_submit" tabindex="-1" aria-hidden="true">Save</button>'
+        . '<button type="submit" class="' . htmlspecialchars_uni($button_class) . '" name="confirm_day_changes"'
         . ' id="event_day_change_confirm" value="' . htmlspecialchars_uni($change['token']) . '">'
         . 'Save and ' . implode(' and ', $actions) . '</button></p>';
 }
@@ -1530,6 +1554,7 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
     // the database and losing it over a misconfigured forum would be worse than an
     // announcement the caller can report as missing.
     events_sync_event_thread($event_id, $thread_error);
+    events_drop_hidden_thread_subscriptions($event_id);
 
     events_send_day_change_pms($event_id, $removed_days, $cancelled_members, $user_id);
     events_send_waitlist_pms($event_id, $moves, $user_id);

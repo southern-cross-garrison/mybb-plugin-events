@@ -12,7 +12,9 @@ import {
   setAdditionalGroups,
   getSignupRoles,
   countPrivateMessages,
+  execute,
 } from '../helpers/db';
+import { runPhp } from '../helpers/container';
 import { relativeToTestNow } from '../helpers/clock';
 import { addTags, excludedValue, tag } from '../helpers/tag-field';
 import { descriptionValue, expectEditorAttached, fillDescription } from '../helpers/editor';
@@ -104,6 +106,32 @@ test.describe('admin event management', () => {
     // The two forms write the same row, so the Admin CP has to be posting the address
     // under the same name manage_event.php does.
     expect((rows[0] as any).address).toBe('12 Lonsdale St, Dandenong VIC 3175');
+  });
+
+  test("the announcement's forum-subscription notice has a body", async ({ page }) => {
+    // Announcing is a new thread, and MyBB mails its forum's subscribers a notice worded
+    // from the front end's messages language file. Every front-end page loads that file
+    // and the Admin CP never does, so an event created here used to queue each subscriber
+    // an email with nothing in it.
+    const forumId = fixtures().forums.events;
+    await execute(`INSERT INTO ${T('forumsubscriptions')} (fid, uid) VALUES (?, ?)`, [forumId, uid('trooper1')]);
+    // MyBB notifies only a subscriber active since the forum's last post, as its cache has it.
+    await execute(`UPDATE ${T('forums')} SET lastpost = 0 WHERE fid = ?`, [forumId]);
+    await runPhp(`$cache->update_forums();`);
+
+    await loginToAdminCp(page);
+    await gotoEventsAdmin(page, '&action=add');
+    await fillEventForm(page, {
+      title: 'Subscribed Forum Show',
+      start: relativeToTestNow({ days: 14 }),
+      end: relativeToTestNow({ days: 14, hours: 6 }),
+    });
+    await page.locator('input[type="submit"][value="Create Event"]').click();
+    await expect(page.locator('#flash_message')).toContainText('Event created successfully');
+
+    const mail = await query(`SELECT message FROM ${T('mailqueue')} WHERE mailto = 'trooper1@example.test'`);
+    expect(mail).toHaveLength(1);
+    expect(String((mail[0] as any).message)).toContain('Subscribed Forum Show');
   });
 
   test('the coordinator dropdown is drawn from the configured groups, alphabetically', async ({ page }) => {
@@ -215,6 +243,18 @@ test.describe('admin event management', () => {
 
     await expect(page.locator('#event_day_change_members li')).toHaveText(['trooper2']);
     expect(await getEventDays(eventId)).toHaveLength(2);
+
+    // Pressing Enter in a field submits with the form's first submit button, and the
+    // confirm button sits above the form's own - so Enter must not be taken as agreeing.
+    await Promise.all([
+      page.waitForResponse((response) => response.request().method() === 'POST'),
+      page.locator('#title').press('Enter'),
+    ]);
+    await page.waitForLoadState();
+    await expect(page.locator('#event_day_change_members li')).toHaveText(['trooper2']);
+    expect(await getEventDays(eventId)).toHaveLength(2);
+    expect(await getSignupRoles(eventId, 'trooper2')).toEqual(['trooper']);
+    expect(await countPrivateMessages('trooper2', 'Event changed:%')).toBe(0);
 
     await page.locator('#event_day_change_confirm').click();
     await expect(page.locator('#flash_message')).toContainText('1 signup was cancelled');

@@ -61,6 +61,12 @@ function events_register_hooks()
     $plugins->add_hook("search_do_search_process", "events_hide_threads_in_search");
     $plugins->add_hook("search_results_start", "events_hide_threads_in_saved_search");
     $plugins->add_hook("syndication_get_posts", "events_hide_threads_in_feed");
+    $plugins->add_hook("archive_forum_start", "events_archive_forum_start");
+    $plugins->add_hook("archive_forum_end", "events_hide_threads_in_archive_forum");
+    $plugins->add_hook("build_friendly_wol_location_end", "events_hide_thread_in_wol_location");
+    $plugins->add_hook("stats_end", "events_hide_threads_in_stats");
+    $plugins->add_hook("reputation_vote", "events_hide_thread_in_reputation");
+    $plugins->add_hook("class_moderation_copy_thread", "events_refuse_announcement_copy");
 }
 
 /**
@@ -89,12 +95,59 @@ function events_request_hidden_threads()
 }
 
 /**
+ * The thread, post, attachment and poll ids this request names, each 0 when it names none.
+ *
+ * pid and aid are not always a post and an attachment. MyBB reuses both names: polls.php
+ * calls a poll's id pid, report.php calls a profile's uid and a reputation's rid pid when
+ * the report is not about a post, and announcements.php and modcp.php call an
+ * announcement's id aid. Read as a post or an attachment, those refuse an unrelated poll or
+ * announcement whose id happens to match something in a hidden thread - and let a poll that
+ * really is in one through. So pid is a post everywhere but those two pages, and aid is an
+ * attachment only on attachment.php, which is the one page that serves attachments.
+ *
+ * @return array of int (thread id, post id, attachment id, poll id)
+ */
+function events_request_thread_refs()
+{
+    global $mybb;
+
+    $script = defined('THIS_SCRIPT') ? THIS_SCRIPT : '';
+
+    $thread_id = $mybb->get_input('tid', MyBB::INPUT_INT);
+    $post_id = $mybb->get_input('pid', MyBB::INPUT_INT);
+    $attachment_id = 0;
+    $poll_id = 0;
+
+    if($script === 'polls.php')
+    {
+        $poll_id = $post_id;
+        $post_id = 0;
+    }
+    else if($script === 'report.php' && !in_array($mybb->get_input('type'), array('', 'post'), true))
+    {
+        $post_id = 0;
+    }
+
+    // attachment.php takes a thumbnail's id in place of aid, and prefers it when both are sent.
+    if($script === 'attachment.php')
+    {
+        $attachment_id = isset($mybb->input['thumbnail'])
+            ? $mybb->get_input('thumbnail', MyBB::INPUT_INT)
+            : $mybb->get_input('aid', MyBB::INPUT_INT);
+    }
+
+    return array($thread_id, $post_id, $attachment_id, $poll_id);
+}
+
+/**
  * Turn away any request that names a hidden announcement thread.
  *
  * One gate for every page that renders a thread or one of its posts, rather than a hook
  * per script: showthread, printthread, newreply, editpost, showpost, sendthread,
- * ratethread, polls, report, moderation and attachment all identify their thread the same
- * three ways, and a page added by a later MyBB is covered the day it ships.
+ * ratethread, polls, report, moderation and attachment all name their thread by a tid, a
+ * post's pid or an attachment's aid, and a page added by a later MyBB that does the same
+ * is covered the day it ships. See events_request_thread_refs() for the pages where those
+ * names mean something else.
  *
  * Hooks: global_intermediate (every board page, once the theme is up and error_no_permission()
  * can render), xmlhttp and archive_start (neither of which loads global.php's furniture).
@@ -104,9 +157,7 @@ function events_block_hidden_thread()
     global $mybb, $db, $lang;
 
     // Read first: most page views carry none of these, and this runs on all of them.
-    $thread_id = $mybb->get_input('tid', MyBB::INPUT_INT);
-    $post_id = $mybb->get_input('pid', MyBB::INPUT_INT);
-    $attachment_id = $mybb->get_input('aid', MyBB::INPUT_INT);
+    list($thread_id, $post_id, $attachment_id, $poll_id) = events_request_thread_refs();
 
     // The archive names its thread in the URL *path* - archive/index.php?thread-12.html -
     // and archive/global.php parses that into its own $action and $id before archive_start
@@ -124,7 +175,7 @@ function events_block_hidden_thread()
         }
     }
 
-    if($thread_id <= 0 && $post_id <= 0 && $attachment_id <= 0)
+    if($thread_id <= 0 && $post_id <= 0 && $attachment_id <= 0 && $poll_id <= 0)
     {
         return;
     }
@@ -150,6 +201,13 @@ function events_block_hidden_thread()
     {
         $post = $db->fetch_array($db->simple_select("posts", "tid", "pid = " . $post_id));
         $thread_id = empty($post['tid']) ? 0 : (int)$post['tid'];
+    }
+
+    // A poll's results, its voters and its edit form are all reached by the poll's id.
+    if($thread_id <= 0 && $poll_id > 0)
+    {
+        $poll = $db->fetch_array($db->simple_select("polls", "tid", "pid = " . $poll_id));
+        $thread_id = empty($poll['tid']) ? 0 : (int)$poll['tid'];
     }
 
     if($thread_id <= 0 || !in_array($thread_id, $hidden, true))
@@ -387,6 +445,221 @@ function events_hide_threads_in_feed()
     {
         $firstposts = array_values(array_diff(array_map('intval', $firstposts), $hidden_posts));
     }
+}
+
+/**
+ * Start holding back the archive's forum listing, for events_hide_threads_in_archive_forum().
+ *
+ * Hooks: archive_forum_start
+ */
+function events_archive_forum_start()
+{
+    global $events_archive_buffering;
+
+    $events_archive_buffering = !empty(events_request_hidden_threads());
+    if($events_archive_buffering)
+    {
+        ob_start();
+    }
+}
+
+/**
+ * Take hidden threads out of the archive's forum listing.
+ *
+ * archive/index.php echoes each thread's line as it reads it, and the hook it offers per
+ * thread takes no arguments and runs before the echo, so there is nothing to change and
+ * no way to skip one. The listing is held back from archive_forum_start instead, and the
+ * lines naming a hidden thread are cut out of it here - along with a sticky or thread list
+ * left with nothing in it, so the page does not show a heading over an empty list.
+ *
+ * The page count above the listing still counts a hidden thread, as forumdisplay's does.
+ *
+ * Hooks: archive_forum_end
+ */
+function events_hide_threads_in_archive_forum()
+{
+    global $events_archive_buffering;
+
+    if(empty($events_archive_buffering))
+    {
+        return;
+    }
+    $events_archive_buffering = false;
+
+    $hidden = events_request_hidden_threads();
+    $listing = ob_get_clean();
+
+    $listing = preg_replace_callback('#<li><a href="[^"]*thread-(\d+)\.html">.*?</li>\n?#s', function($line) use ($hidden) {
+        return in_array((int)$line[1], $hidden, true) ? '' : $line[0];
+    }, $listing);
+
+    echo preg_replace('#<div class="threadlist">\s*<h3>[^<]*</h3>\s*<ol>\s*</ol>\s*</div>\n?#', '', $listing);
+}
+
+/**
+ * Keep a hidden thread's subject out of Who's Online and a profile's "Currently".
+ *
+ * The locations are built from one lookup of every thread they mention, kept in the
+ * global $threads for the rest of the page, and a location whose thread is missing from it
+ * reads the way MyBB words one the viewer cannot see - "Reading Thread" with no subject.
+ * So hidden threads are taken out of that lookup the first time one turns up, and this
+ * row's location is built again from what is left. Every row after it finds them gone.
+ *
+ * Hooks: build_friendly_wol_location_end
+ *
+ * @param array $args user_activity and location_name, by reference
+ */
+function events_hide_thread_in_wol_location(&$args)
+{
+    global $threads;
+
+    static $rebuilding = false;
+
+    if($rebuilding || empty($threads) || !is_array($threads))
+    {
+        return;
+    }
+
+    $hidden = array_intersect(events_request_hidden_threads(), array_map('intval', array_keys($threads)));
+    if(empty($hidden))
+    {
+        return;
+    }
+
+    foreach($hidden as $thread_id)
+    {
+        unset($threads[$thread_id]);
+    }
+
+    $rebuilding = true;
+    $args['location_name'] = build_friendly_wol_location($args['user_activity']);
+    $rebuilding = false;
+}
+
+/**
+ * Keep hidden threads out of stats.php's most replied to and most viewed lists.
+ *
+ * Both lists come from a cache shared by the whole board and are rendered into HTML well
+ * before the first hook that could change them, so they are rendered again here, from the
+ * same cache and with the same checks, less the hidden threads. That is also why this is
+ * not done to the cache on the way in: a list trimmed to nothing reads as a missing cache,
+ * and stats.php rebuilds it - hidden threads included.
+ *
+ * Hooks: stats_end
+ */
+function events_hide_threads_in_stats()
+{
+    global $mybb, $lang, $templates, $theme, $parser;
+    global $most_replied, $most_viewed, $mostreplies, $mostviews, $unviewableforumsarray, $onlyusfids;
+
+    $hidden = events_request_hidden_threads();
+    if(empty($hidden))
+    {
+        return;
+    }
+
+    $lists = array(
+        'mostreplies' => array('threads' => $most_replied, 'count' => 'replies', 'label' => $lang->replies),
+        'mostviews' => array('threads' => $most_viewed, 'count' => 'views', 'label' => $lang->views),
+    );
+
+    foreach($lists as $name => $list)
+    {
+        if(empty($list['threads']))
+        {
+            continue;
+        }
+
+        $tids = array_map('intval', array_column($list['threads'], 'tid'));
+        if(!array_intersect($tids, $hidden))
+        {
+            continue;
+        }
+
+        $html = '';
+        foreach($list['threads'] as $thread)
+        {
+            if(
+                in_array((int)$thread['tid'], $hidden, true) ||
+                in_array($thread['fid'], (array)$unviewableforumsarray) ||
+                (in_array($thread['fid'], (array)$onlyusfids) && (!$mybb->user['uid'] || $thread['uid'] != $mybb->user['uid']))
+            )
+            {
+                continue;
+            }
+
+            $thread['subject'] = htmlspecialchars_uni($parser->parse_badwords($thread['subject']));
+            $numberbit = my_number_format($thread[$list['count']]);
+            $numbertype = $list['label'];
+            $thread['threadlink'] = get_thread_link($thread['tid']);
+            eval("\$html .= \"" . $templates->get("stats_thread") . "\";");
+        }
+
+        if($name === 'mostreplies')
+        {
+            $mostreplies = $html;
+        }
+        else
+        {
+            $mostviews = $html;
+        }
+    }
+}
+
+/**
+ * Keep a hidden thread's subject out of a member's reputation page.
+ *
+ * A rating given for a post says "for <member>'s post in <subject>". For a post in a
+ * hidden thread it says what MyBB says for a post the viewer cannot see: whose post it
+ * was, with no link and no thread.
+ *
+ * Hooks: reputation_vote
+ */
+function events_hide_thread_in_reputation()
+{
+    global $lang, $reputation_vote, $post_reputation, $postrep_given, $user;
+
+    if(empty($reputation_vote['pid']) || !isset($post_reputation[$reputation_vote['pid']]))
+    {
+        return;
+    }
+
+    $hidden = events_request_hidden_threads();
+    if(empty($hidden) || !in_array((int)$post_reputation[$reputation_vote['pid']]['tid'], $hidden, true))
+    {
+        return;
+    }
+
+    $postrep_given = $lang->sprintf($lang->postrep_given_nolink, $user['username']);
+}
+
+/**
+ * Refuse to copy an event's announcement thread.
+ *
+ * A copy is a new thread with a tid nothing points at, so the exclusion hooks would not
+ * know it for the event's, and anybody excluded from the event would read the copy in
+ * full. It would not follow the event either: the announcement is rewritten from the
+ * event on every save, and the copy would go on advertising whatever the event said the
+ * day it was made. MyBB offers no hook after the copy that says which thread it made, so
+ * it is refused before rather than tidied up after. A move - with or without the redirect
+ * - is still allowed: the thread keeps its tid, and events_hidden_thread_ids() knows the
+ * redirect it leaves behind.
+ *
+ * Hooks: class_moderation_copy_thread
+ *
+ * @param array $args tid and new_fid
+ */
+function events_refuse_announcement_copy($args)
+{
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
+
+    if(empty($args['tid']) || !in_array((int)$args['tid'], events_announcement_thread_ids(), true))
+    {
+        return;
+    }
+
+    error("This thread is an event's announcement, which is written from the event and cannot be copied."
+        . " Move it instead, or link to it.");
 }
 
 /**

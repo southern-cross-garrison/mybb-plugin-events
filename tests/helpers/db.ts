@@ -126,11 +126,17 @@ const BOARD_CONTENT_TABLES = [
   'threadsread',
   'forumsread',
   'threadsubscriptions',
+  'forumsubscriptions',
+  // New-thread and reply notifications queue their mail here; only the mail queue task
+  // sends it, so it would otherwise pile up across tests.
+  'mailqueue',
+  'reputation',
   'threadratings',
   'threadviews',
   'polls',
   'pollvotes',
   'attachments',
+  'announcements',
   'moderatorlog',
   'reportedcontent',
   'delayedmoderation',

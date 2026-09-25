@@ -19,6 +19,9 @@ import {
   T,
   uid,
 } from '../helpers/db';
+import { createHash } from 'node:crypto';
+import { DB, TABLE_PREFIX } from '../helpers/config';
+import { db } from '../helpers/db';
 import type { Browser, Page } from '@playwright/test';
 import type { FixtureUser } from '../helpers/auth';
 
@@ -178,11 +181,41 @@ test.describe('signing up to a full event', () => {
     expect(await getRsvpStatus(eventId, 'newbie')).toBe('waitlisted');
   });
 
-  // Four members sit on the confirm step of an event with one place, and all four submit
-  // at the same instant - the requests are fired from each page together and awaited
-  // together, so they overlap at the server rather than queueing behind one another in
-  // the browser. Several rounds, because a race that only loses some of the time proves
-  // nothing by passing once.
+  // Whether two signups can both take the last place comes down to whether they hold the
+  // same lock. The window between reading the queue and writing the claim is too short for
+  // overlapping requests to land in reliably - the contest below passes with the lock
+  // broken - so this holds the event's lock from the test's own connection and watches
+  // both members' confirms wait for it. A lock per member, or none, lets them straight in.
+  test('every signup to an event waits for the one event-wide lock', async ({ browser }) => {
+    const eventId = await createEvent({ title: 'Held Lock Troop', maxTroopers: 1 });
+    const pages = await Promise.all((['trooper2', 'nowwcc'] as FixtureUser[]).map((username) => pageFor(browser, username)));
+    const lock = 'events_' + createHash('md5').update(`${DB.database}|${TABLE_PREFIX}|signup:${eventId}`).digest('hex');
+    const conn = await db();
+
+    try {
+      await Promise.all(pages.map((page) => openConfirmStep(page, eventId)));
+
+      await conn.query('SELECT GET_LOCK(?, 5)', [lock]);
+      const submits = Promise.all(pages.map((page) => submitFormAtOnce(page, '#rsvp_form', { times: 1 })));
+
+      await pages[0].waitForTimeout(2000);
+      const whileHeld = await query(`SELECT id FROM ${T('event_plugin_rsvps')} WHERE event_id = ?`, [eventId]);
+      expect(whileHeld).toHaveLength(0);
+
+      await conn.query('SELECT RELEASE_LOCK(?)', [lock]);
+      await submits;
+    } finally {
+      await conn.query('SELECT RELEASE_LOCK(?)', [lock]);
+      await Promise.all(pages.map((page) => page.close()));
+    }
+
+    const statuses = [await getRsvpStatus(eventId, 'trooper2'), await getRsvpStatus(eventId, 'nowwcc')];
+    expect(statuses.sort()).toEqual(['attending', 'waitlisted']);
+  });
+
+  // The same contest as it happens for real: four members on the confirm step of an event
+  // with one place, all submitting at once. It does not prove the lock (see above), but it
+  // does prove the outcome is a queue - one place, and three distinct waitlist positions.
   test('members contesting the last place: exactly one gets it, and the rest queue in turn', async ({ browser }) => {
     const contenders: FixtureUser[] = ['trooper2', 'nowwcc', 'excluded', 'gec'];
     const pages = await Promise.all(contenders.map((username) => pageFor(browser, username)));
@@ -416,7 +449,8 @@ test.describe('changing an event\'s maximum', () => {
     expect(Number(pm.fromid)).toBe(uid('gec'));
     expect(String(pm.message)).toContain('has been reduced');
     expect(String(pm.message)).toContain('given a place back automatically');
-    expect(String(pm.message)).toContain('/event.php?id=' + eventId);
+    // The save posted the event's announcement thread, so that is where the link goes.
+    expect(String(pm.message)).toMatch(/\[url=[^\]]+\/showthread\.php\?tid=\d+\]Lowered Troop\[\/url\]/);
     expect(await countPrivateMessages('nowwcc', 'Moved to the waitlist: Lowered Troop')).toBe(1);
     expect(await countPrivateMessages('trooper1', 'Moved to the waitlist:%')).toBe(0);
     // Already waiting before the change, so nothing about their signup moved.
@@ -438,7 +472,8 @@ test.describe('changing an event\'s maximum', () => {
     await expect(page.locator('#flash_message')).toContainText('1 member was moved to the waitlist');
     expect(await getRsvpStatus(eventId, 'trooper2')).toBe('waitlisted');
     const [pm] = await getPrivateMessages('trooper2', 'Moved to the waitlist: Admin Lowered Troop');
-    expect(Number(pm.fromid)).toBe(uid('admin'));
+    const admin = await query(`SELECT uid FROM ${T('users')} WHERE username = 'admin'`);
+    expect(Number(pm.fromid)).toBe(Number((admin[0] as any).uid));
   });
 
   for (const bad of ['ten', '-1', '2.5', '10000']) {
@@ -655,6 +690,33 @@ test.describe('keeping a place in the queue', () => {
     expect(await getClaimStatuses(eventId, 'trooper1')).toEqual({ [saturday]: 'attending', [sunday]: 'attending' });
     expect(await getClaimStatuses(eventId, 'trooper2')).toEqual({ [saturday]: 'waitlisted', [sunday]: 'waitlisted' });
     expect(await countPrivateMessages('trooper2', '%Grown Weekend Troop%')).toBe(0);
+  });
+
+  // trooper1 signed up first, for Sunday, and switched to Saturday after trooper2 had
+  // taken its one place. A day-less signup queues by its own row, so going back to one
+  // day has to carry the Saturday claim's time onto it, or trooper1's earlier signup
+  // would take trooper2's place.
+  test('a weekend cut back to one day keeps that day\'s queue in the order it was claimed', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Shrunk Weekend Troop', coordinator: 'gec', maxTroopers: 1, ...WEEKEND });
+    const [saturday] = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+    const early = await createRsvp(eventId, 'trooper1', { status: 'waitlisted', at: relativeToTestNow({ days: -4 }) });
+    await execute(
+      `INSERT INTO ${T('event_plugin_rsvp_days')} (rsvp_id, event_day_id, status, claimed_at) VALUES (?, ?, 'waitlisted', ?)`,
+      [early, saturday, relativeToTestNow({ days: -1 })],
+    );
+    await createRsvp(eventId, 'trooper2', { dayIds: [saturday], at: relativeToTestNow({ days: -2 }) });
+
+    await loginAs(page, 'gec');
+    await page.goto(`/manage_event.php?id=${eventId}`);
+    await fillDateTime(page, 'event_form_end_date', '2026-10-24 17:00:00');
+    await page.locator('#manage_event_submit').click();
+    await expect(page.locator('#event_day_change_confirm')).toHaveCount(0);
+    await expect.poll(async () => (await getEventDays(eventId)).length).toBe(0);
+
+    expect(await getRsvpStatus(eventId, 'trooper2')).toBe('attending');
+    expect(await getRsvpStatus(eventId, 'trooper1')).toBe('waitlisted');
+    expect(await countPrivateMessages('trooper2', '%Shrunk Weekend Troop%')).toBe(0);
+    expect(await countPrivateMessages('trooper1', '%Shrunk Weekend Troop%')).toBe(0);
   });
 });
 

@@ -256,9 +256,17 @@ baseline picks the change up.
   `forumdisplay_get_threads` for the thread list, `build_forumbits_forum` for the "last
   post" a forum row advertises, `search_do_search_process` for the search log,
   `search_results_start` for the saved query that View New Posts, Today's Posts and "Find
-  threads by user" re-run instead of reading that log, and `syndication_get_posts` for the
-  feeds. Adding a surface means another hook - there is no
-  central place to put this, and a missed one is a thread the excluded member can read.
+  threads by user" re-run instead of reading that log, `syndication_get_posts` for the
+  feeds, `archive_forum_start`/`archive_forum_end` for the archive's forum listing (buffered
+  and cut, since it echoes each line), `build_friendly_wol_location_end` for Who's Online
+  and a profile's "Currently", `stats_end` for the top-thread lists and `reputation_vote`
+  for "for post in thread". A move's "Moved:" redirect stub is in the hidden set
+  (`events_hidden_thread_ids()`), and copying an announcement is refused outright
+  (`class_moderation_copy_thread`), since no hook says which tid the copy got. Saving an
+  event drops the hidden members' thread subscriptions, and posting its announcement takes
+  their forum-subscription notices back out of the mail queue. Adding a surface means
+  another hook - there is no central place to put this, and a missed one is a thread the
+  excluded member can read.
 
 - Two of those surfaces do not identify their thread the way the rest do, and a hook
   registered on them is not the same thing as a hook that fires. The archive parses its
