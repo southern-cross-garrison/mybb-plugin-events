@@ -16,7 +16,12 @@ function task_events_reminders($task)
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_hooks.php";
 
-    $reminded = events_send_reminders();
+    $reminded = events_send_reminders($failures);
+
+    foreach($failures as $failure)
+    {
+        add_task_log($task, $failure);
+    }
 
     add_task_log($task, "Event reminder PMs sent for {$reminded} event(s).");
 }

@@ -32,6 +32,15 @@ if($events_action === 'add' || $events_action === 'edit')
                          . events_preview_assets('../jscripts/events/');
 }
 
+// The settings form is never served from the browser's cache, so its dropdowns show the
+// profile fields as they are after an add, edit or delete. Sent here because a header
+// sent once output_header() has written the page never reaches the browser.
+if($events_action === 'settings' && $mybb->request_method != "post")
+{
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
+}
+
 $page->add_breadcrumb_item("Event Management", "index.php?module=events");
 $page->output_header("Event Management");
 

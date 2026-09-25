@@ -1,7 +1,7 @@
 import { test, expect } from '../helpers/fixtures';
 import { loginAs, loginToAdminCp, gotoEventsAdmin } from '../helpers/auth';
 import { signUpThroughWizard } from '../helpers/rsvp';
-import { relativeToTestNow } from '../helpers/clock';
+import { advanceClock, relativeToTestNow } from '../helpers/clock';
 import { runPhp } from '../helpers/container';
 import { submitFormAtOnce } from '../helpers/double-submit';
 import { addTags } from '../helpers/tag-field';
@@ -10,9 +10,11 @@ import {
   createRsvp,
   countPrivateMessages,
   execute,
+  fixtures,
   getClaimStatuses,
   getEventDays,
   getPrivateMessages,
+  getRsvpCostumes,
   getRsvpStatus,
   getSignupRoles,
   query,
@@ -843,5 +845,394 @@ echo events_event_post_content(events_get_event(${eventId}));
     const body = (await (await request.get(url)).text()).replace(/\r\n[ \t]/g, '');
     expect(body).toContain('Feed Attending Troop');
     expect(body).not.toContain('Feed Waiting Troop');
+  });
+});
+
+/**
+ * Everything above builds its queues with createRsvp(), which writes whatever status it is
+ * told. These build them the way the board does - each member signing themselves up
+ * through rsvp.php - so every status asserted here is one the plugin worked out. The event
+ * has a maximum in both roles and runs three days, which is where a place stops being one
+ * thing: a member can hold a trooping place on one day, be waiting to wrangle on the next,
+ * and each of those is its own queue.
+ */
+const LONG_WEEKEND = {
+  start: '2026-10-24 09:00:00',
+  end: '2026-10-26 17:00:00',
+  days: [{ date: '2026-10-24' }, { date: '2026-10-25' }, { date: '2026-10-26' }],
+};
+
+type DayKey = 'sat' | 'sun' | 'mon';
+type Claims = Record<string, 'attending' | 'waitlisted'>;
+
+interface LongWeekend {
+  eventId: number;
+  day: Record<DayKey, number>;
+}
+
+async function createLongWeekend(title: string): Promise<LongWeekend> {
+  const eventId = await createEvent({ title, coordinator: 'gec', maxTroopers: 1, maxWranglers: 1, ...LONG_WEEKEND });
+  const [sat, sun, mon] = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+  return { eventId, day: { sat, sun, mon } };
+}
+
+const usernameOf = (userId: number): string =>
+  Object.entries(fixtures().users).find(([, id]) => Number(id) === userId)?.[0] ?? `uid ${userId}`;
+
+/**
+ * Every claim on the event, keyed "member role day", so a whole board can be compared in
+ * one assertion. That is what lets a test say a change touched one queue *and nothing
+ * else*: an assertion per member would only cover the members somebody thought to check.
+ */
+async function claimsOf(event: LongWeekend): Promise<Claims> {
+  const dayKeys = Object.fromEntries(Object.entries(event.day).map(([key, id]) => [id, key]));
+  const rows = await query<any>(
+    `SELECT r.user_id, r.role, d.event_day_id, d.status
+       FROM ${T('event_plugin_rsvp_days')} d
+       INNER JOIN ${T('event_plugin_rsvps')} r ON d.rsvp_id = r.id
+      WHERE r.event_id = ?`,
+    [event.eventId],
+  );
+  return Object.fromEntries(
+    rows.map((row) => [`${usernameOf(Number(row.user_id))} ${row.role} ${dayKeys[Number(row.event_day_id)]}`, row.status]),
+  );
+}
+
+/** Every signup row's own status, keyed "member role". */
+async function rowsOf(eventId: number): Promise<Record<string, string>> {
+  const rows = await query<any>(`SELECT user_id, role, status FROM ${T('event_plugin_rsvps')} WHERE event_id = ?`, [eventId]);
+  return Object.fromEntries(rows.map((row) => [`${usernameOf(Number(row.user_id))} ${row.role}`, row.status]));
+}
+
+/**
+ * What each signup row's status has to be, given its claims: attending if any of its days
+ * is attending, waitlisted if every one is waiting (AGENTS.md: a signup's own
+ * rsvps.status is kept in step with its claims).
+ */
+function rowsFor(claims: Claims): Record<string, string> {
+  const rows: Record<string, string> = {};
+  for (const [key, status] of Object.entries(claims)) {
+    const row = key.split(' ').slice(0, 2).join(' ');
+    rows[row] = rows[row] === 'attending' || status === 'attending' ? 'attending' : 'waitlisted';
+  }
+  return rows;
+}
+
+async function expectBoard(event: LongWeekend, claims: Claims, message?: string) {
+  expect(await claimsOf(event), message).toEqual(claims);
+  expect(await rowsOf(event.eventId), message).toEqual(rowsFor(claims));
+}
+
+interface WeekendSignup {
+  username: FixtureUser;
+  days: Partial<Record<DayKey, 'trooper' | 'wrangler' | 'none'>>;
+  /** The leading answer, when the member does the same thing every day. */
+  role?: 'wrangler';
+  costumes?: string[];
+  /** The claims this signup adds, as the plugin should settle them. */
+  adds: Claims;
+}
+
+/**
+ * The long weekend, filled one member at a time. With one place per role per day, the
+ * first claim on any queue is the place and everybody after it waits - so each step's
+ * `adds` can be read straight off who got to that queue first.
+ *
+ *              Sat           Sun           Mon
+ *   trooper1   T attending   W attending   -
+ *   trooper2   T waiting #1  T attending   W attending
+ *   nowwcc     T waiting #2  W waiting #1  W waiting #1
+ *   excluded   W attending   W waiting #2  T attending
+ *   wrangler   W waiting #1  W waiting #3  W waiting #2
+ *
+ * trooper1 is the only fixture member with two costumes, so the only one the wizard asks
+ * which to wear. Nobody here meets the prerequisites step: the event asks for no WWCC,
+ * and a wrangler is never asked for a TK ID.
+ */
+const WEEKEND_SIGNUPS: WeekendSignup[] = [
+  {
+    username: 'trooper1',
+    days: { sat: 'trooper', sun: 'wrangler', mon: 'none' },
+    costumes: [fixtures().costumeOptions[0]],
+    adds: { 'trooper1 trooper sat': 'attending', 'trooper1 wrangler sun': 'attending' },
+  },
+  {
+    // Waiting in one role and holding a place in the same role on another day: the
+    // trooper row is attending because Sunday is.
+    username: 'trooper2',
+    days: { sat: 'trooper', sun: 'trooper', mon: 'wrangler' },
+    adds: { 'trooper2 trooper sat': 'waitlisted', 'trooper2 trooper sun': 'attending', 'trooper2 wrangler mon': 'attending' },
+  },
+  {
+    // Waiting on every day, in both roles: both rows are waitlisted.
+    username: 'nowwcc',
+    days: { sat: 'trooper', sun: 'wrangler', mon: 'wrangler' },
+    adds: { 'nowwcc trooper sat': 'waitlisted', 'nowwcc wrangler sun': 'waitlisted', 'nowwcc wrangler mon': 'waitlisted' },
+  },
+  {
+    // Saturday's wrangling place is still free, though Saturday's trooping one is not.
+    username: 'excluded',
+    days: { sat: 'wrangler', sun: 'wrangler', mon: 'trooper' },
+    adds: { 'excluded wrangler sat': 'attending', 'excluded wrangler sun': 'waitlisted', 'excluded trooper mon': 'attending' },
+  },
+  {
+    username: 'wrangler',
+    days: {},
+    role: 'wrangler',
+    adds: { 'wrangler wrangler sat': 'waitlisted', 'wrangler wrangler sun': 'waitlisted', 'wrangler wrangler mon': 'waitlisted' },
+  },
+];
+
+/**
+ * Sign the given members up in turn, as themselves, checking the whole board after each.
+ *
+ * The clock moves five minutes before every signup. The queues are ordered by claimed_at
+ * and then by rsvp id, and signups a second apart can share a claimed_at - at which point
+ * the id, which is also signup order for a new row, decides. That would hide exactly the
+ * bug the queue-keeping test is after: a claim re-stamped on an edit ties with the claims
+ * after it and still sorts by its old id. Distinct times make claimed_at what decides.
+ */
+async function signUpInTurn(page: Page, event: LongWeekend, signups: WeekendSignup[], board: Claims = {}): Promise<Claims> {
+  for (const signup of signups) {
+    await advanceClock({ minutes: 5 });
+    await loginAs(page, signup.username);
+    const dayRoles = Object.fromEntries(
+      Object.entries(signup.days).map(([key, role]) => [event.day[key as DayKey], role!]),
+    );
+    await signUpThroughWizard(page, event.eventId, { role: signup.role, costumes: signup.costumes, dayRoles });
+    board = { ...board, ...signup.adds };
+    await expectBoard(event, board, `after ${signup.username} signed up`);
+  }
+  return board;
+}
+
+function without(board: Claims, ...keys: string[]): Claims {
+  return Object.fromEntries(Object.entries(board).filter(([key]) => !keys.includes(key)));
+}
+
+test.describe('real signups against trooper and wrangler limits on a multi-day event', () => {
+  test('each claim takes its place from its own day\'s queue for its own role', async ({ page }) => {
+    const event = await createLongWeekend('Long Weekend Queue Troop');
+
+    const board = await signUpInTurn(page, event, WEEKEND_SIGNUPS.slice(0, 4));
+
+    // Every place in both roles is now taken, so the last member in can only queue - and
+    // is told so before they pick anything.
+    await loginAs(page, 'wrangler');
+    await page.goto(`/event.php?id=${event.eventId}`);
+    await expect(page.locator('#event_signup')).toHaveText('Join the Waitlist');
+    await page.goto(`/rsvp.php?id=${event.eventId}`);
+    await expect(page.locator('label:has(#signup_role_wrangler)')).toContainText('full - join the waitlist');
+    await expect(page.locator('label:has(#signup_role_trooper)')).toContainText('full - join the waitlist');
+
+    await signUpInTurn(page, event, WEEKEND_SIGNUPS.slice(4), board);
+    await expect(page.locator('#rsvp_success')).toHaveAttribute('data-signup-mode', 'waitlist');
+  });
+
+  test('a member with a place on one day and a place in the queue on another sees both', async ({ page }) => {
+    const event = await createLongWeekend('Long Weekend Pills Troop');
+    await signUpInTurn(page, event, WEEKEND_SIGNUPS);
+
+    // Troops Sunday, waits to troop Saturday, wrangles Monday.
+    await loginAs(page, 'trooper2');
+    await page.goto(`/event.php?id=${event.eventId}`);
+    await expect(page.locator('#event_signup_status_trooper')).toContainText('Trooping: 25 Oct');
+    await expect(page.locator('#event_signup_waitlist_trooper')).toHaveText('Waitlisted: Trooping (24 Oct #1)');
+    await expect(page.locator('#event_signup_status_wrangler')).toContainText('Wrangling: 26 Oct');
+    await expect(page.locator('#event_signup_waitlist_wrangler')).toHaveCount(0);
+
+    // Both halves inside the one role: wrangles Saturday, second in line for Sunday.
+    await loginAs(page, 'excluded');
+    await page.goto(`/event.php?id=${event.eventId}`);
+    await expect(page.locator('#event_signup_status_trooper')).toContainText('Trooping: 26 Oct');
+    await expect(page.locator('#event_signup_waitlist_trooper')).toHaveCount(0);
+    await expect(page.locator('#event_signup_status_wrangler')).toContainText('Wrangling: 24 Oct');
+    await expect(page.locator('#event_signup_waitlist_wrangler')).toHaveText('Waitlisted: Wrangling (25 Oct #2)');
+
+    // Waiting for everything: no place claimed anywhere on the page.
+    await loginAs(page, 'nowwcc');
+    await page.goto(`/event.php?id=${event.eventId}`);
+    await expect(page.locator('#event_signup_status_trooper')).toHaveCount(0);
+    await expect(page.locator('#event_signup_status_wrangler')).toHaveCount(0);
+    await expect(page.locator('#event_signup_waitlist_trooper')).toHaveText('Waitlisted: Trooping (24 Oct #2)');
+    await expect(page.locator('#event_signup_waitlist_wrangler')).toHaveText('Waitlisted: Wrangling (25 Oct #1, 26 Oct #1)');
+
+    // A position is per day: the same member is first in one queue and third in another.
+    await loginAs(page, 'wrangler');
+    await page.goto(`/event.php?id=${event.eventId}`);
+    await expect(page.locator('#event_signup_waitlist_wrangler')).toHaveText(
+      'Waitlisted: Wrangling (24 Oct #1, 25 Oct #3, 26 Oct #2)',
+    );
+  });
+
+  test('a withdrawal promotes the next in that day\'s queue for that role, and nobody else', async ({ page }) => {
+    const event = await createLongWeekend('Long Weekend Dropout Troop');
+    const board = await signUpInTurn(page, event, WEEKEND_SIGNUPS);
+
+    // trooper1 stops trooping Saturday but keeps wrangling Sunday. Saturday's trooping
+    // place goes to trooper2, first in that queue; nowwcc stays behind them. Saturday's
+    // wrangler queue is a different queue, and Sunday's wrangling place is still held.
+    await advanceClock({ minutes: 5 });
+    await loginAs(page, 'trooper1');
+    await signUpThroughWizard(page, event.eventId, {
+      dayRoles: { [event.day.sat]: 'none', [event.day.sun]: 'wrangler', [event.day.mon]: 'none' },
+    });
+    const afterDrop: Claims = { ...without(board, 'trooper1 trooper sat'), 'trooper2 trooper sat': 'attending' };
+    await expectBoard(event, afterDrop);
+
+    const [pm] = await getPrivateMessages('trooper2', 'You have a place: Long Weekend Dropout Troop');
+    expect(pm, 'trooper2 is told about the place').toBeTruthy();
+    expect(String(pm.message)).toContain('Sat 24 Oct 2026');
+    expect(String(pm.message)).not.toContain('Sun 25 Oct 2026');
+    expect(String(pm.message)).not.toContain('Mon 26 Oct 2026');
+    for (const username of ['nowwcc', 'excluded', 'wrangler', 'trooper1']) {
+      expect(await countPrivateMessages(username, 'You have a place:%'), username).toBe(0);
+    }
+
+    // excluded withdraws altogether. Of the three places that frees, only Saturday's
+    // wrangling one had anybody waiting: the wrangler user takes it. Sunday's queue just
+    // shortens, and nobody was waiting to troop Monday.
+    await loginAs(page, 'excluded');
+    await withdrawThroughWizard(page, event.eventId);
+    await expectBoard(event, {
+      ...without(afterDrop, 'excluded wrangler sat', 'excluded wrangler sun', 'excluded trooper mon'),
+      'wrangler wrangler sat': 'attending',
+    });
+
+    const [wranglerPm] = await getPrivateMessages('wrangler', 'You have a place: Long Weekend Dropout Troop');
+    expect(wranglerPm, 'the wrangler user is told about the place').toBeTruthy();
+    expect(String(wranglerPm.message)).toContain('Sat 24 Oct 2026');
+    expect(await countPrivateMessages('nowwcc', 'You have a place:%')).toBe(0);
+
+    await loginAs(page, 'wrangler');
+    await page.goto(`/event.php?id=${event.eventId}`);
+    await expect(page.locator('#event_signup_status_wrangler')).toContainText('Wrangling: 24 Oct');
+    await expect(page.locator('#event_signup_waitlist_wrangler')).toHaveText('Waitlisted: Wrangling (25 Oct #2, 26 Oct #2)');
+  });
+
+  test('editing a signup keeps each day\'s place in its queue', async ({ page }) => {
+    const [TK, OTHER] = [fixtures().costumeOptions[0], fixtures().costumeOptions[2]];
+    const event = await createLongWeekend('Long Weekend Edit Troop');
+
+    // trooper1 queues first on Saturday (trooping) and Sunday (wrangling); excluded queues
+    // behind them on both, five minutes later.
+    const board = await signUpInTurn(page, event, [
+      {
+        username: 'trooper2',
+        days: { sat: 'trooper', sun: 'wrangler', mon: 'none' },
+        adds: { 'trooper2 trooper sat': 'attending', 'trooper2 wrangler sun': 'attending' },
+      },
+      {
+        username: 'trooper1',
+        days: { sat: 'trooper', sun: 'wrangler', mon: 'none' },
+        costumes: [TK],
+        adds: { 'trooper1 trooper sat': 'waitlisted', 'trooper1 wrangler sun': 'waitlisted' },
+      },
+      {
+        username: 'excluded',
+        days: { sat: 'trooper', sun: 'wrangler', mon: 'none' },
+        adds: { 'excluded trooper sat': 'waitlisted', 'excluded wrangler sun': 'waitlisted' },
+      },
+    ]);
+    const claimedAt = async () =>
+      query<any>(
+        `SELECT d.event_day_id, d.claimed_at FROM ${T('event_plugin_rsvp_days')} d
+           INNER JOIN ${T('event_plugin_rsvps')} r ON d.rsvp_id = r.id
+          WHERE r.event_id = ? AND r.user_id = ? ORDER BY d.event_day_id`,
+        [event.eventId, uid('trooper1')],
+      );
+    const before = await claimedAt();
+
+    // Five minutes after excluded joined, trooper1 adds a costume. Re-stamped claims
+    // would now be the newest in both queues and sort behind excluded.
+    await advanceClock({ minutes: 5 });
+    await loginAs(page, 'trooper1');
+    await signUpThroughWizard(page, event.eventId, {
+      costumes: [OTHER],
+      dayRoles: { [event.day.sat]: 'trooper', [event.day.sun]: 'wrangler', [event.day.mon]: 'none' },
+    });
+    await expect(page.locator('#rsvp_success')).toHaveAttribute('data-signup-mode', 'update');
+    expect(await getRsvpCostumes(event.eventId, 'trooper1')).toEqual([TK, OTHER].sort());
+    expect(await claimedAt()).toEqual(before);
+    await expectBoard(event, board);
+
+    await page.goto(`/event.php?id=${event.eventId}`);
+    await expect(page.locator('#event_signup_waitlist_trooper')).toHaveText('Waitlisted: Trooping (24 Oct #1)');
+    await expect(page.locator('#event_signup_waitlist_wrangler')).toHaveText('Waitlisted: Wrangling (25 Oct #1)');
+
+    // The proof that matters: when both places free up, they go to trooper1, not excluded.
+    await loginAs(page, 'trooper2');
+    await withdrawThroughWizard(page, event.eventId);
+    await expectBoard(event, {
+      'trooper1 trooper sat': 'attending',
+      'trooper1 wrangler sun': 'attending',
+      'excluded trooper sat': 'waitlisted',
+      'excluded wrangler sun': 'waitlisted',
+    });
+  });
+});
+
+test.describe('the calendar, for a member the plugin put on the waitlist', () => {
+  /** Make a feed link as the signed-in member and read it off the page (calendar-feed.spec.ts). */
+  async function makeFeedLink(page: Page): Promise<string> {
+    await page.goto('/calendar_feed.php');
+    await page.locator('#calendar_feed_create, #calendar_feed_reset').click();
+    const url = await page.locator('#calendar_feed_url').inputValue();
+    expect(url).toMatch(/\/ical_feed\.php\?token=/);
+    return url;
+  }
+
+  const unfold = (body: string) => body.replace(/\r\n[ \t]/g, '');
+  const summaries = (body: string) => [...body.matchAll(/^SUMMARY:(.*)$/gm)].map((match) => match[1].trim());
+  const starts = (body: string) => [...body.matchAll(/^DTSTART:(\d{8})/gm)].map((match) => match[1]);
+
+  // The feed test above hand-writes the waitlisted status; here the queue is the plugin's
+  // own, from two members signing up to an event with one trooping place.
+  test('a trooper waiting for the only place is not on their calendar; the one holding it is', async ({ page, request }) => {
+    const TK = fixtures().costumeOptions[0];
+    const eventId = await createEvent({ title: 'Feed Queue Troop', maxTroopers: 1 });
+
+    await loginAs(page, 'trooper1');
+    await signUpThroughWizard(page, eventId, { costumes: [TK] });
+    const holderFeed = await makeFeedLink(page);
+    await advanceClock({ minutes: 5 });
+    await loginAs(page, 'trooper2');
+    await signUpThroughWizard(page, eventId);
+    const waitingFeed = await makeFeedLink(page);
+    expect(await getRsvpStatus(eventId, 'trooper1')).toBe('attending');
+    expect(await getRsvpStatus(eventId, 'trooper2')).toBe('waitlisted');
+
+    // Fetched with no session, as a calendar server would.
+    const holder = unfold(await (await request.get(holderFeed)).text());
+    expect(summaries(holder)).toEqual(['Trooping: Feed Queue Troop']);
+    const waiting = unfold(await (await request.get(waitingFeed)).text());
+    expect(waiting).toContain('BEGIN:VCALENDAR');
+    expect(waiting).not.toContain('Feed Queue Troop');
+
+    // The one-event download still works for somebody waiting - it is how they put a
+    // possible event in their diary - but it does not say they are trooping.
+    const download = unfold(await (await page.request.get(`/ical.php?id=${eventId}`)).text());
+    expect(summaries(download)).toEqual(['Feed Queue Troop']);
+    expect(download).toContain("You're on the waitlist for this event");
+    await loginAs(page, 'trooper1');
+    const holderDownload = unfold(await (await page.request.get(`/ical.php?id=${eventId}`)).text());
+    expect(summaries(holderDownload)).toEqual(['Trooping: Feed Queue Troop']);
+  });
+
+  test('a member waiting on one day of a weekend has only the day they hold on their calendar', async ({ page, request }) => {
+    const TK = fixtures().costumeOptions[0];
+    const eventId = await createEvent({ title: 'Feed Weekend Queue Troop', maxTroopers: 1, ...WEEKEND });
+    const [saturday, sunday] = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+
+    await loginAs(page, 'trooper1');
+    await signUpThroughWizard(page, eventId, { costumes: [TK], dayRoles: { [saturday]: 'trooper', [sunday]: 'none' } });
+    await advanceClock({ minutes: 5 });
+    await loginAs(page, 'trooper2');
+    await signUpThroughWizard(page, eventId);
+    expect(await getClaimStatuses(eventId, 'trooper2')).toEqual({ [saturday]: 'waitlisted', [sunday]: 'attending' });
+
+    const feed = unfold(await (await request.get(await makeFeedLink(page))).text());
+    expect(starts(feed)).toEqual(['20261025']);
+    expect(summaries(feed)).toEqual(['Trooping: Feed Weekend Queue Troop']);
   });
 });

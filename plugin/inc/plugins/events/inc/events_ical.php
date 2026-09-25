@@ -225,7 +225,7 @@ function events_ical_vevents(array $event, $user_id)
     }
 
     $host = parse_url($mybb->settings['bburl'], PHP_URL_HOST);
-    $url = $mybb->settings['bburl'] . '/' . events_event_url($event);
+    $url = $mybb->settings['bburl'] . '/' . events_event_url($event, $user_id);
 
     // LOCATION is what a calendar app hands to its maps button, so the address is what
     // belongs in it. The region stays as the fallback: it is all an event without an

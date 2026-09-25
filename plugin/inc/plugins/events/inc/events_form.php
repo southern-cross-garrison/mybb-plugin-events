@@ -1082,6 +1082,12 @@ function events_save_event_days($event_id, array $days)
  * left with no day rows, which for a single-day event is exactly right, so it is not
  * counted here.
  *
+ * A single-day event has no day rows, but it still runs on a day, and moving it takes
+ * that day away just as surely. It comes back as a stand-in row with id 0 - the place
+ * events_signup_queues() files a day-less signup under - dated and timed from the event
+ * as it was before this save. Growing it into several days that still include that date
+ * removes nothing.
+ *
  * @param int $event_id
  * @param array $input From events_event_form_input(), already validated
  * @return array of event_day rows
@@ -1098,8 +1104,16 @@ function events_removed_event_days($event_id, array $input)
         $posted[events_date('Y-m-d', events_strtotime($input['start_date']))] = true;
     }
 
+    $days = events_get_event_days($event_id);
+    if(empty($days))
+    {
+        $day = events_single_event_day($event_id);
+
+        return ($day && !isset($posted[$day['date']])) ? array($day) : array();
+    }
+
     $removed = array();
-    foreach(events_get_event_days($event_id) as $day)
+    foreach($days as $day)
     {
         if(!isset($posted[$day['date']]))
         {
@@ -1111,10 +1125,46 @@ function events_removed_event_days($event_id, array $input)
 }
 
 /**
+ * The one day a single-day event runs on, as a stand-in event_day row with id 0.
+ *
+ * Read from the event as it is stored, so it has to be asked before a save writes the
+ * new dates over it.
+ *
+ * @param int $event_id
+ * @return array|null array('id', 'date', 'start_time', 'end_time'), or null for no such event
+ */
+function events_single_event_day($event_id)
+{
+    $event = events_get_event($event_id);
+    if(!$event)
+    {
+        return null;
+    }
+
+    $start = events_strtotime($event['start_date']);
+    $end = events_strtotime($event['end_date']);
+    $date = events_date('Y-m-d', $start);
+
+    // Hours are only given when both ends fall on that date; events_day_label() reads
+    // them against it, and an event running past midnight would come out backwards.
+    $same_day = events_date('Y-m-d', $end) === $date;
+
+    return array(
+        'id'         => 0,
+        'date'       => $date,
+        'start_time' => $same_day ? events_date('H:i:s', $start) : '',
+        'end_time'   => $same_day ? events_date('H:i:s', $end) : '',
+    );
+}
+
+/**
  * The members signed up for any of these days, and which of them each one holds.
  *
  * Waitlisted claims count: a place in the queue for a day that is going is a signup the
  * save cancels like any other, and its member is told the same way.
+ *
+ * The stand-in day 0 of a single-day event (events_single_event_day()) is held by every
+ * signup with no day claims, which on such an event is every signup.
  *
  * @param int $event_id
  * @param array $removed_days event_day rows, from events_removed_event_days()
@@ -1133,13 +1183,13 @@ function events_day_change_signups($event_id, array $removed_days)
 
     $members = array();
     $query = $db->query("
-        SELECT r.user_id, u.username, d.event_day_id
+        SELECT r.user_id, u.username, COALESCE(d.event_day_id, 0) AS event_day_id
         FROM " . TABLE_PREFIX . "event_plugin_rsvps r
-        INNER JOIN " . TABLE_PREFIX . "event_plugin_rsvp_days d ON d.rsvp_id = r.id
+        LEFT JOIN " . TABLE_PREFIX . "event_plugin_rsvp_days d ON d.rsvp_id = r.id
         LEFT JOIN " . TABLE_PREFIX . "users u ON u.uid = r.user_id
         WHERE r.event_id = " . (int)$event_id . "
-          AND d.event_day_id IN (" . $ids . ")
-        ORDER BY u.username ASC, d.event_day_id ASC
+          AND COALESCE(d.event_day_id, 0) IN (" . $ids . ")
+        ORDER BY u.username ASC, event_day_id ASC
     ");
     while($row = $db->fetch_array($query))
     {
@@ -1413,11 +1463,15 @@ function events_send_day_change_pms($event_id, array $removed_days, array $membe
     }
     if($now_runs === '')
     {
-        $now_runs = "[*]" . events_format_date($event['start_date']) . " - " . events_format_date($event['end_date']) . "\n";
+        // Labelled like the day it replaced when it starts and ends on one date, so a
+        // moved single-day event reads as one day to another.
+        $single = events_single_event_day($event_id);
+        $now_runs = $single['start_time'] !== ''
+            ? "[*]" . events_day_label($single) . "\n"
+            : "[*]" . events_format_date($event['start_date']) . " - " . events_format_date($event['end_date']) . "\n";
     }
 
     $title = events_escape_bbcode($event['title']);
-    $url = $mybb->settings['bburl'] . '/' . events_event_url($event);
 
     $subject = "Event changed: " . $event['title'];
     if(my_strlen($subject) > 85)
@@ -1431,6 +1485,9 @@ function events_send_day_change_pms($event_id, array $removed_days, array $membe
         {
             continue;
         }
+
+        // Asked as the recipient: whoever saved may read threads in a forum they cannot.
+        $url = $mybb->settings['bburl'] . '/' . events_event_url($event, $member['uid']);
 
         $held = '';
         foreach($member['day_ids'] as $day_id)
@@ -1536,6 +1593,11 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
         $nullable[] = 'signup_cutoff';
     }
 
+    // Read before anything is written: the days are reconciled further down, which deletes
+    // the rows this needs to name, and a single-day event's one day is read from the dates
+    // this update is about to overwrite.
+    $removed_days = $is_edit ? events_removed_event_days($event_id, $input) : array();
+
     if($is_edit)
     {
         $db->update_query("event_plugin_events", $data, "id = " . $event_id);
@@ -1562,6 +1624,15 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
     $lock = events_signup_lock($event_id);
     $locked = events_acquire_lock($lock);
 
+    // Written under the lock, and before the withdrawals: events_save_signup() re-reads
+    // the exclusion once it holds the same lock, so a signup racing this save either
+    // finished first and is withdrawn below, or runs after and is refused.
+    $db->delete_query("event_plugin_event_exclusions", "event_id = " . $event_id);
+    foreach($excluded as $uid)
+    {
+        $db->insert_query("event_plugin_event_exclusions", array('event_id' => $event_id, 'user_id' => $uid));
+    }
+
     // Withdrawn before the days are looked at, so a member being excluded is not also
     // counted - and PMed - as a signup the removed days cancelled.
     $withdrawn = 0;
@@ -1574,8 +1645,6 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
         }
     }
 
-    // Read before the days are reconciled, which deletes the rows this needs to name.
-    $removed_days = $is_edit ? events_removed_event_days($event_id, $input) : array();
     $cancelled_members = events_day_change_signups($event_id, $removed_days);
     foreach($cancelled_members as $member)
     {
@@ -1597,12 +1666,6 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
     $moved = events_group_waitlist_moves($moves);
     $promoted = count(array_filter($moved, function($member) { return !empty($member['promoted']); }));
     $demoted = count(array_filter($moved, function($member) { return !empty($member['demoted']); }));
-
-    $db->delete_query("event_plugin_event_exclusions", "event_id = " . $event_id);
-    foreach($excluded as $uid)
-    {
-        $db->insert_query("event_plugin_event_exclusions", array('event_id' => $event_id, 'user_id' => $uid));
-    }
 
     // The event's forum announcement is written from the event, so it is refreshed here
     // rather than by each form - a coordinator editing a date and the thread still

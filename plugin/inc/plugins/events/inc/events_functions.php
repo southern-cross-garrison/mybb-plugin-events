@@ -850,11 +850,15 @@ function events_thread_rows(array $thread_ids)
  * already checked events_can_view_event().
  *
  * @param array $event Event row
+ * @param int|null $user_id The member to ask for; the current one when omitted. The
+ *                          calendar feed is fetched as a guest and has to name its member.
  * @return array|null thread row
  */
-function events_event_thread(array $event)
+function events_event_thread(array $event, $user_id = null)
 {
     global $mybb;
+
+    $user_id = $user_id === null ? (int)$mybb->user['uid'] : (int)$user_id;
 
     $thread_id = empty($event['thread_id']) ? 0 : (int)$event['thread_id'];
     if(!$thread_id)
@@ -874,13 +878,15 @@ function events_event_thread(array $event)
         return null;
     }
 
-    $permissions = forum_permissions((int)$thread['fid']);
+    // forum_permissions() reads uid 0 as "the current member", which for a guest is the
+    // same thing.
+    $permissions = forum_permissions((int)$thread['fid'], $user_id);
     if(empty($permissions['canview']) || empty($permissions['canviewthreads']))
     {
         return null;
     }
 
-    if(!empty($permissions['canonlyviewownthreads']) && (int)$thread['uid'] !== (int)$mybb->user['uid'])
+    if(!empty($permissions['canonlyviewownthreads']) && (int)$thread['uid'] !== $user_id)
     {
         return null;
     }
@@ -896,11 +902,12 @@ function events_event_thread(array $event)
  * the hop, and puts the address the member actually lands on under their cursor.
  *
  * @param array $event Event row
+ * @param int|null $user_id Who the link is for; the current member when omitted
  * @return string URL relative to the board root
  */
-function events_event_url(array $event)
+function events_event_url(array $event, $user_id = null)
 {
-    $thread = events_event_thread($event);
+    $thread = events_event_thread($event, $user_id);
     if($thread)
     {
         return 'showthread.php?tid=' . (int)$thread['tid'];
@@ -1299,10 +1306,19 @@ function events_signup_lock($event_id)
  * @param int $user_id
  * @param array $role_days role => array of event_day_id (empty array for an event with no days)
  * @param array $costumes
- * @return bool false if the lock could not be had, in which case nothing was written
+ * The member's exclusion is read again once the lock is held, because the page checked it
+ * before the lock was taken and events_save_event() writes exclusions under this same
+ * lock: a member excluded while their form was open is refused here rather than left
+ * holding a signup the exclusion was meant to withdraw. Withdrawing is still allowed.
+ *
+ * @return bool|string true once written; false if the lock could not be had, or
+ *                     'excluded' if the member has been excluded - nothing is written
+ *                     in either case
  */
 function events_save_signup($event_id, $user_id, array $role_days, array $costumes)
 {
+    global $db;
+
     $event_id = (int)$event_id;
     $user_id = (int)$user_id;
     $lock = events_signup_lock($event_id);
@@ -1310,6 +1326,15 @@ function events_save_signup($event_id, $user_id, array $role_days, array $costum
     if(!events_acquire_lock($lock))
     {
         return false;
+    }
+
+    // Straight from the table: events_is_excluded() caches for the request, and what it
+    // cached was read before the lock.
+    if(!empty($role_days) && $db->fetch_field($db->simple_select("event_plugin_event_exclusions", "COUNT(*) AS excluded",
+        "event_id = " . $event_id . " AND user_id = " . $user_id), 'excluded'))
+    {
+        events_release_lock($lock);
+        return 'excluded';
     }
 
     events_write_signup($event_id, $user_id, $role_days, $costumes);
@@ -1785,7 +1810,6 @@ function events_send_waitlist_pms($event_id, array $moves, $from_uid = null, $sk
     }
 
     $title = events_escape_bbcode($event['title']);
-    $url = $mybb->settings['bburl'] . '/' . events_event_url($event);
 
     foreach(events_group_waitlist_moves($moves) as $uid => $member)
     {
@@ -1793,6 +1817,9 @@ function events_send_waitlist_pms($event_id, array $moves, $from_uid = null, $sk
         {
             continue;
         }
+
+        // Asked as the recipient: whoever saved may read threads in a forum they cannot.
+        $url = $mybb->settings['bburl'] . '/' . events_event_url($event, $uid);
 
         foreach(array('promoted', 'demoted') as $kind)
         {

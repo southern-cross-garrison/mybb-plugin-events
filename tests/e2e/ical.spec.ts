@@ -352,3 +352,160 @@ test.describe('iCal export', () => {
     expect(response.headers()['content-type']).not.toContain('text/calendar');
   });
 });
+
+/**
+ * RFC 5545 section 3.1: a content line is folded at 75 *octets*, by a CRLF followed by a
+ * single space, and a fold must not split a multi-octet UTF-8 sequence. Counting
+ * characters instead of bytes gives lines of up to 300 octets once the text is emoji;
+ * counting bytes but cutting blind gives lines that are not UTF-8 at all, which some
+ * calendar apps reject whole and others show as mojibake.
+ *
+ * Everything here is read from the raw bytes (response.body()), never .text(): decoding
+ * first would quietly replace a split sequence with U+FFFD and hide exactly the fault
+ * under test.
+ */
+test.describe('iCal line folding with multibyte text', () => {
+  // 1-, 2-, 3- and 4-byte characters, plus a ZWJ family (a run of 4-byte code points
+  // glued with 3-byte joiners). Folding may break a grapheme apart - the RFC only
+  // protects octet sequences - but unfolding must put it back byte for byte.
+  const JAPANESE = '東京ディズニーランドでポケモンのパレードを見ました';
+  const EMOJI = '🎉🚀👾🤖🦖🎂';
+  const FAMILY = '👨‍👩‍👧‍👦';
+
+  const title = (pad: string) => `${pad}Pokémon ${EMOJI} ${JAPANESE} Café Ω ${FAMILY}${EMOJI}`;
+  const address = (pad: string) => `${pad}渋谷区道玄坂1-2-3, 東京 🗼; Pokémon Center ${EMOJI}`;
+  const description = (pad: string) =>
+    `${pad}${JAPANESE}\n${EMOJI.repeat(4)}; naïve café, crème brûlée ${FAMILY}\n` + `${JAPANESE}${EMOJI}`.repeat(3);
+
+  /** The same escaping events_ical_escape() applies to a text value. */
+  const escapeText = (value: string) =>
+    value.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r\n|\n|\r/g, '\\n');
+
+  const CRLF = Buffer.from('\r\n');
+
+  /**
+   * Split the raw body on CRLF, as bytes, and check every physical line on the way: at
+   * most 75 octets, valid UTF-8 on its own, and no bare CR or LF inside it. Returns the
+   * decoded physical lines.
+   */
+  function physicalLines(raw: Buffer): string[] {
+    // The last line is terminated too: a calendar ends with CRLF, not with END:VCALENDAR.
+    expect(raw.subarray(raw.length - 2).equals(CRLF), 'body ends with CRLF').toBe(true);
+
+    const decoder = new TextDecoder('utf-8', { fatal: true });
+    const lines: string[] = [];
+    let from = 0;
+    while (from < raw.length) {
+      const at = raw.indexOf(CRLF, from);
+      const bytes = raw.subarray(from, at);
+      from = at + 2;
+
+      expect(bytes.length, `line ${lines.length + 1} is ${bytes.length} octets`).toBeLessThanOrEqual(75);
+      expect(bytes.includes(0x0d) || bytes.includes(0x0a), `line ${lines.length + 1} has a bare CR or LF`).toBe(false);
+
+      let text: string;
+      try {
+        text = decoder.decode(bytes);
+      } catch {
+        throw new Error(`line ${lines.length + 1} is not valid UTF-8 on its own: ${bytes.toString('hex')}`);
+      }
+      lines.push(text);
+    }
+    return lines;
+  }
+
+  /** Physical lines back into logical ones: a line opening with one space continues the last. */
+  function unfold(lines: string[]): string[] {
+    const logical: string[] = [];
+    for (const line of lines) {
+      if (line.startsWith(' ') && logical.length) {
+        logical[logical.length - 1] += line.slice(1);
+      } else {
+        logical.push(line);
+      }
+    }
+    return logical;
+  }
+
+  function property(logical: string[], name: string): string[] {
+    return logical.filter((line) => line.startsWith(`${name}:`)).map((line) => line.slice(name.length + 1));
+  }
+
+  /**
+   * Four copies of each value, padded with 0-3 ASCII characters, so a 4-byte character
+   * sits across the 75th octet at every alignment and a 3-byte one at every alignment too.
+   * One text, one position, would only prove the fold happened to land between characters.
+   */
+  const PADS = ['', 'a', 'ab', 'abc'];
+
+  async function createMultibyteEvents(): Promise<number[]> {
+    const ids: number[] = [];
+    for (const pad of PADS) {
+      ids.push(
+        await createEvent({
+          title: title(pad),
+          description: description(pad),
+          address: address(pad),
+          start: '2026-10-20 10:00:00',
+          end: '2026-10-20 16:00:00',
+        }),
+      );
+    }
+    return ids;
+  }
+
+  function expectFoldedValues(raw: Buffer, pad: string, summaryPrefix = '') {
+    const logical = unfold(physicalLines(raw));
+
+    // Folding had something to do: each of these values is well past 75 octets.
+    expect(Buffer.byteLength(`SUMMARY:${summaryPrefix}${escapeText(title(pad))}`)).toBeGreaterThan(75);
+
+    expect(property(logical, 'SUMMARY')).toEqual([summaryPrefix + escapeText(title(pad))]);
+    expect(property(logical, 'LOCATION')).toEqual([escapeText(address(pad))]);
+
+    const [desc] = property(logical, 'DESCRIPTION');
+    expect(desc.endsWith(escapeText(`\n\n${description(pad)}`)), `DESCRIPTION ends with the description:\n${desc}`).toBe(
+      true,
+    );
+    expect(desc).toContain(escapeText(`Address: ${address(pad)}`));
+  }
+
+  test('ical.php folds on octets without splitting a character', async ({ page }) => {
+    const ids = await createMultibyteEvents();
+
+    await loginAs(page, 'trooper1');
+    for (const [index, id] of ids.entries()) {
+      const response = await page.request.get(`/ical.php?id=${id}`);
+      expect(response.status()).toBe(200);
+      expectFoldedValues(await response.body(), PADS[index]);
+    }
+  });
+
+  test('ical_feed.php folds on octets without splitting a character', async ({ page, request }) => {
+    const ids = await createMultibyteEvents();
+    for (const id of ids) {
+      await createRsvp(id, 'trooper1', { costumes: [TK] });
+    }
+
+    await loginAs(page, 'trooper1');
+    await page.goto('/calendar_feed.php');
+    await page.locator('#calendar_feed_create, #calendar_feed_reset').click();
+    const url = await page.locator('#calendar_feed_url').inputValue();
+
+    // Fetched as a calendar server would, with no session.
+    const response = await request.get(url);
+    expect(response.status()).toBe(200);
+    const raw = await response.body();
+    const logical = unfold(physicalLines(raw));
+
+    // All four events share a start, so the feed orders them by id - the order they
+    // were created in, which is PADS order.
+    const summaries = property(logical, 'SUMMARY');
+    expect(summaries).toEqual(PADS.map((pad) => `Trooping: ${escapeText(title(pad))}`));
+    expect(property(logical, 'LOCATION')).toEqual(PADS.map((pad) => escapeText(address(pad))));
+    const descriptions = property(logical, 'DESCRIPTION');
+    PADS.forEach((pad, index) => {
+      expect(descriptions[index].endsWith(escapeText(`\n\n${description(pad)}`))).toBe(true);
+    });
+  });
+});

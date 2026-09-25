@@ -225,7 +225,7 @@ foreach($troopers as $attendee)
 
 $draft_content = "[b]Event:[/b] " . events_escape_bbcode($event['title']) . "\n";
 $draft_content .= "[b]Date:[/b] " . events_format_date($event['start_date']) . " - " . events_format_date($event['end_date']) . "\n";
-$draft_content .= "[b]Region:[/b] " . $event['region'] . "\n\n";
+$draft_content .= "[b]Region:[/b] " . events_escape_bbcode($event['region']) . "\n\n";
 
 foreach($buckets as $bucket)
 {

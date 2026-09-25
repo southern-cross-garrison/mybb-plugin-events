@@ -1,6 +1,7 @@
 import { test, expect } from '../helpers/fixtures';
 import { loginAs, logout, loginToAdminCp, gotoEventsAdmin } from '../helpers/auth';
 import { query, T, getSetting, fixtures } from '../helpers/db';
+import { runPhp } from '../helpers/container';
 
 test.describe('plugin installation', () => {
   test('ships every template it renders into the master template set', async () => {
@@ -41,6 +42,116 @@ test.describe('plugin installation', () => {
 
     await page.goto('/index.php');
     await expect(page.locator('link[href*="events.css"]')).toHaveCount(0);
+  });
+
+  test("re-activation brings a theme's own copy of events.css up to the page list, keeping its CSS", async ({ page }) => {
+    // A theme that customises an inherited stylesheet gets its own themestylesheets row -
+    // same name, the theme's tid, and its *own* attachedto - and MyBB serves that copy in
+    // place of the master's. Activation rewrites the master row, so without also touching
+    // the copies, a page added to EVENTS_STYLESHEET_ATTACHEDTO would render unstyled on
+    // exactly the themes that bothered to skin the plugin. Built on the board's default
+    // (the garrison theme), since that is the theme the rendered-page check runs against.
+    const [master] = await query(
+      `SELECT attachedto FROM ${T('themestylesheets')} WHERE name = 'events.css' AND tid = 1`,
+    );
+    const attachedto = String(master.attachedto);
+    const [theme] = await query(`SELECT tid, stylesheets, properties FROM ${T('themes')} WHERE def = 1`);
+    const tid = Number(theme.tid);
+    expect(tid).not.toBe(1);
+
+    // Only restore-exactly is safe if a copy is already there; this board ships none, so
+    // the test owns the row it makes and refuses to run over somebody else's.
+    const existing = await query(
+      `SELECT sid FROM ${T('themestylesheets')} WHERE name = 'events.css' AND tid = ?`, [tid],
+    );
+    expect(existing, 'the default theme already has its own events.css').toHaveLength(0);
+
+    // The stale list is the current one minus a page, as if the copy was made before that
+    // page existed. calendar_feed.php renders for any member, so it can be fetched below.
+    const stale = attachedto.split('|').filter((script) => script !== 'calendar_feed.php').join('|');
+    expect(stale).not.toBe(attachedto);
+    // No quotes or dollars, so it can be embedded in the PHP below as-is.
+    const themeCss = `/* e2e theme copy of events.css */\n.events_page_wrap { outline: 1px solid #123456; }\n`;
+
+    const settingsBefore = await query(
+      `SELECT name, value FROM ${T('settings')} WHERE name LIKE 'events\\_%' ORDER BY name`,
+    );
+
+    try {
+      // Written the way the Admin CP stylesheet editor writes one: the row, its flat cache
+      // file, then the theme's stylesheet list, which is what global.php actually reads.
+      await runPhp(`
+require_once MYBB_ROOT.'admin/inc/functions_themes.php';
+$css = ${JSON.stringify(themeCss)};
+$db->insert_query('themestylesheets', array(
+  'name' => 'events.css',
+  'tid' => ${tid},
+  'attachedto' => $db->escape_string(${JSON.stringify(stale)}),
+  'stylesheet' => $db->escape_string($css),
+  'cachefile' => 'events.css',
+  'lastmodified' => TIME_NOW,
+));
+cache_stylesheet(${tid}, 'events.css', $css);
+update_theme_stylesheet_list(${tid}, false, true);
+`);
+
+      // Precondition: the copy really is what the theme serves, and it really is stale.
+      // Without these the assertions after activation could pass against the master's row.
+      await loginAs(page, 'trooper1');
+      await page.goto('/events.php');
+      await expect(page.locator(`link[href*="theme${tid}/events.css"]`)).toHaveCount(1);
+      await page.goto('/calendar_feed.php');
+      await expect(page.locator('link[href*="events.css"]')).toHaveCount(0);
+
+      // Activation exactly as scripts/provision.php runs it: the plugin file at global
+      // scope (it registers hooks there), then events_activate().
+      await runPhp(`
+require_once MYBB_ROOT.'inc/plugins/events.php';
+events_activate();
+`);
+
+      const [copy] = await query(
+        `SELECT attachedto, stylesheet FROM ${T('themestylesheets')} WHERE name = 'events.css' AND tid = ?`, [tid],
+      );
+      expect(copy, "activation removed the theme's copy").toBeTruthy();
+      expect(copy.attachedto).toBe(attachedto);
+      // The page list is the plugin's to own; the CSS is the theme's. Overwriting it would
+      // throw away the very customisation that made the theme keep a copy.
+      expect(copy.stylesheet).toBe(themeCss);
+
+      // And the page itself: the list only matters once it reaches the theme's built
+      // stylesheet list, which is a separate column that has to be rebuilt.
+      await page.goto('/calendar_feed.php');
+      const link = page.locator('link[href*="events.css"]');
+      await expect(link).toHaveCount(1);
+      const href = await link.getAttribute('href');
+      const served = await page.request.get(new URL(href!, page.url()).toString());
+      expect(await served.text()).toContain('e2e theme copy of events.css');
+
+      // Activation also re-syncs templates and tops up settings, as it does on every
+      // provision. That must leave every setting the board has already chosen alone.
+      const settingsAfter = await query(
+        `SELECT name, value FROM ${T('settings')} WHERE name LIKE 'events\\_%' ORDER BY name`,
+      );
+      expect(settingsAfter).toEqual(settingsBefore);
+    } finally {
+      // A stray stylesheet row, cache file or stylesheet list would restyle every later
+      // test on this shared board, so put all three back: drop the copy and its cache
+      // files, rebuild the theme's list from what is left, then restore the theme row's
+      // two built columns byte-for-byte from before the test.
+      await runPhp(`
+require_once MYBB_ROOT.'admin/inc/functions_themes.php';
+$db->delete_query('themestylesheets', "name = 'events.css' AND tid = ${tid}");
+@unlink(MYBB_ROOT.'cache/themes/theme${tid}/events.css');
+@unlink(MYBB_ROOT.'cache/themes/theme${tid}/events.min.css');
+update_theme_stylesheet_list(${tid}, false, true);
+`);
+      await query(`UPDATE ${T('themes')} SET stylesheets = ?, properties = ? WHERE tid = ?`, [
+        theme.stylesheets,
+        theme.properties,
+        tid,
+      ]);
+    }
   });
 
   test('carries the signup role column and a role-aware unique key', async () => {

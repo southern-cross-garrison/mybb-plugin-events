@@ -4,12 +4,14 @@ import type { Page } from '@playwright/test';
 import { relativeToTestNow } from '../helpers/clock';
 import { runPhp } from '../helpers/container';
 import {
+  countPrivateMessages,
   createEvent,
   createRsvp,
   createThread,
   execute,
   fixtures,
   getThread,
+  getRsvpStatus,
   getThreadFirstPost,
   getTroopReport,
   query,
@@ -132,6 +134,27 @@ async function mailedAbout(subject: string): Promise<string[]> {
 
 async function email(username: string): Promise<string> {
   return String((await queryOne(`SELECT email FROM ${T('users')} WHERE uid = ?`, [uid(username)]))?.email);
+}
+
+/** The post key the logged-in member's pages carry, for the endpoints that check one. */
+async function postKeyFor(page: Page): Promise<string> {
+  await page.goto('/index.php');
+  const postKey = await page.evaluate(() => (window as unknown as { my_post_key?: string }).my_post_key);
+  expect(postKey, 'the page carries no my_post_key').toMatch(/^[a-f0-9]+$/);
+
+  return postKey as string;
+}
+
+/**
+ * What MyBB's no-permission page says, for matching it in a response body as well as on a
+ * page: the endpoints that answer a download or a redirect when they succeed are fetched
+ * with page.request, and have no page to hand expectMyBBError().
+ */
+const NO_PERMISSION = /do not have permission/i;
+
+/** Lift every exclusion on an event, for a control that reuses the member it just refused. */
+async function liftExclusions(eventId: number): Promise<void> {
+  await execute(`DELETE FROM ${T('event_plugin_event_exclusions')} WHERE event_id = ?`, [eventId]);
 }
 
 test.describe('per-event exclusions', () => {
@@ -702,5 +725,320 @@ $cache->update_most_viewed_threads();
     await loginAs(page, 'trooper1');
     await page.goto(url);
     await expect(page.locator('body')).toContainText(title);
+  });
+
+  test('a post, its report form, its who-posted list and its send-to-a-friend page refuse', async ({ page }) => {
+    // Four pages that name the thread without being showthread.php, each by a different
+    // input: the single-post view and the report form by the post's pid, who-posted and
+    // send-to-a-friend by the tid. MyBB 1.8 has no showpost.php - a post is shown alone
+    // by showthread.php?pid=, which is what a "#pid" permalink opens. Who-posted and
+    // send-to-a-friend both put the subject in the page's <title>, and the report form
+    // hands back a form keyed to the post, so none of them is harmless to let through.
+    const title = announcementTitle('Singled Out Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    const threadId = await announce(eventId);
+    const post = await getThreadFirstPost(threadId);
+
+    // Each with what the page shows a member it does not refuse, so the control below is
+    // checking that the page did its job and not merely that it rendered something.
+    const pages = [
+      { url: `/showthread.php?pid=${post.pid}`, proof: title },
+      { url: `/report.php?type=post&pid=${post.pid}`, proof: `name="pid" value="${post.pid}"` },
+      { url: `/misc.php?action=whoposted&tid=${threadId}`, proof: title },
+      { url: `/sendthread.php?tid=${threadId}`, proof: title },
+    ];
+
+    // The refusal has to be the no-permission page, not just a page without the title: an
+    // invalid-thread error, or a report form that failed for its own reasons, would pass
+    // "does not name it" without the hook having done anything.
+    await loginAs(page, 'excluded');
+    for (const { url } of pages) {
+      await page.goto(url);
+      await expectMyBBError(page, NO_PERMISSION);
+      expect(await page.content(), url).not.toContain(title);
+    }
+
+    // The same pages for a member the event is not hidden from.
+    await loginAs(page, 'trooper1');
+    for (const { url, proof } of pages) {
+      await page.goto(url);
+      expect(await page.content(), url).toContain(proof);
+      await expect(page.locator('body'), url).not.toContainText(NO_PERMISSION);
+    }
+  });
+
+  test('an attachment in the announcement is not served, by aid or by pid', async ({ page }) => {
+    // attachment.php looks an attachment up by its aid, or - given only a pid - by the post
+    // it belongs to, and the gate has to follow either back to the thread. The row needs a
+    // real file behind it: MyBB answers "invalid attachment" for a row with none, which
+    // would make the control fail and could make a waved-through request look refused.
+    const title = announcementTitle('Attached Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    const threadId = await announce(eventId);
+    const post = await getThreadFirstPost(threadId);
+
+    const suffix = Math.random().toString(36).slice(2, 8);
+    const attachname = `e2e_exclusions_${suffix}.attach`;
+    const contents = `Muster at the loading dock ${suffix}`;
+
+    // .txt is one of MyBB's stock attachment types; an extension it does not know is
+    // refused as invalid before any permission is looked at.
+    await runPhp(`file_put_contents(MYBB_ROOT.'uploads/${attachname}', ${JSON.stringify(contents)});`);
+    try {
+      const attachment = await execute(
+        `INSERT INTO ${T('attachments')} (pid, posthash, uid, filename, filetype, filesize, attachname, downloads, dateuploaded, visible, thumbnail)
+         VALUES (?, '', ?, 'orders.txt', 'text/plain', ?, ?, 0, UNIX_TIMESTAMP(), 1, '')`,
+        [post.pid, post.uid, contents.length, attachname],
+      );
+
+      const urls = [`/attachment.php?aid=${attachment.insertId}`, `/attachment.php?pid=${post.pid}`];
+      const fetch = async (url: string): Promise<string> => (await page.request.get(url)).text();
+
+      // page.request rather than a navigation: served, the file is a download, which a
+      // goto() reports as an error rather than as a page.
+      await loginAs(page, 'excluded');
+      for (const url of urls) {
+        const body = await fetch(url);
+        expect(body, url).toMatch(NO_PERMISSION);
+        expect(body, url).not.toContain(contents);
+      }
+
+      await loginAs(page, 'trooper1');
+      for (const url of urls) {
+        expect(await fetch(url), url).toBe(contents);
+      }
+    } finally {
+      // The attachments table is put back before every test; the file is not.
+      await runPhp(`@unlink(MYBB_ROOT.'uploads/${attachname}');`);
+    }
+  });
+
+  test('the announcement cannot be rated', async ({ page }) => {
+    // ratethread.php is a POST that names its thread by tid, and a successful one both
+    // writes a rating and redirects to the thread. The gate runs before MyBB's own post
+    // key check, so the key is sent properly: a refusal for want of one would not be the
+    // hook's.
+    const title = announcementTitle('Rated Thread Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    const threadId = await announce(eventId);
+
+    const rate = async (): Promise<string> => {
+      const postKey = await postKeyFor(page);
+      const response = await page.request.post('/ratethread.php', {
+        form: { tid: threadId, rating: 5, my_post_key: postKey },
+        maxRedirects: 0,
+      });
+      return response.text();
+    };
+    const ratedBy = async (username: string): Promise<number> =>
+      Number(
+        (await queryOne(`SELECT COUNT(*) AS n FROM ${T('threadratings')} WHERE tid = ? AND uid = ?`, [threadId, uid(username)]))
+          ?.n,
+      );
+
+    await loginAs(page, 'excluded');
+    const refused = await rate();
+    expect(refused).toMatch(NO_PERMISSION);
+    expect(refused).not.toContain(title);
+    expect(await ratedBy('excluded')).toBe(0);
+
+    // The control: the same POST rates the thread for a member it is not hidden from.
+    await loginAs(page, 'trooper1');
+    const accepted = await rate();
+    expect(accepted).not.toMatch(NO_PERMISSION);
+    expect(await ratedBy('trooper1')).toBe(1);
+  });
+
+  test("a moderator excluded from the event cannot moderate its thread", async ({ page }) => {
+    // Administrators and general coordinators are never hidden from an event (see
+    // events_hidden_event_ids()), so the member has to be an ordinary member who is a
+    // forum moderator of the announcements forum - a garrison's forum moderators need not
+    // be coordinators. Without moderator rights the moderation pages refuse anybody with
+    // the same no-permission page the hook uses, and the refusal would prove nothing.
+    const title = announcementTitle('Moderated Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    const threadId = await announce(eventId);
+
+    // `moderators` is board configuration, not content, so restoreBoardContent() does not
+    // put it back; the row comes out in the finally below. is_moderator() reads the
+    // moderators cache, not the table, so the cache is rebuilt both ways.
+    const moderator = await execute(
+      `INSERT INTO ${T('moderators')} (fid, id, isgroup, canopenclosethreads, canmanagethreads)
+       VALUES (?, ?, 0, 1, 1)`,
+      [FORUMS.events, uid('excluded')],
+    );
+    await runPhp(`$cache->update_moderators();`);
+
+    try {
+      await loginAs(page, 'excluded');
+
+      // moderation.php refuses a GET for almost every action - MyBB's own check, and one
+      // that answers with the same no-permission page as the hook - so both requests are
+      // POSTs, the way the thread tools send them.
+      const moderate = async (form: Record<string, string | number>): Promise<string> => {
+        const postKey = await postKeyFor(page);
+        const response = await page.request.post('/moderation.php', {
+          form: { ...form, tid: threadId, my_post_key: postKey },
+          maxRedirects: 0,
+        });
+        return response.text();
+      };
+
+      // The move form, which names the thread by tid and puts its subject in the breadcrumb.
+      const moveForm = () => moderate({ action: 'move' });
+
+      // Closing it, which changes the thread, so the check is on the thread rather than on
+      // what the page said.
+      const openClose = () => moderate({ action: 'openclosethread' });
+      const closed = async (): Promise<string> => String((await getThread(threadId)).closed);
+
+      const form = await moveForm();
+      expect(form).toMatch(NO_PERMISSION);
+      expect(form).not.toContain(title);
+
+      expect(await openClose()).toMatch(NO_PERMISSION);
+      expect(await closed()).not.toBe('1');
+
+      // The same moderator and the same requests with the exclusion lifted: the move form
+      // comes back and the thread closes, so the refusals above were the hook's and not
+      // MyBB's moderator checks.
+      await liftExclusions(eventId);
+
+      const allowed = await moveForm();
+      expect(allowed).toContain('name="moveto"');
+      expect(allowed).toContain(title);
+
+      expect(await openClose()).not.toMatch(NO_PERMISSION);
+      expect(await closed()).toBe('1');
+    } finally {
+      await execute(`DELETE FROM ${T('moderators')} WHERE mid = ?`, [moderator.insertId]);
+      await runPhp(`$cache->update_moderators();`);
+    }
+  });
+});
+
+test.describe('excluding a member from an event already under way', () => {
+  test('withdraws their signup, gives the place to the waitlist, and closes the thread and the feed to them', async ({
+    page,
+  }) => {
+    // The exclusion tests above all start from an event the member was excluded from
+    // before anything happened. The harder case is the one a coordinator actually meets:
+    // the event is announced, the member has signed up, subscribed and replied, and only
+    // then is excluded. events_save_event() says what that does - their signup is withdrawn
+    // for them as if they had withdrawn it, silently, since a PM about the event would
+    // tell them what the exclusion hides; the place it held goes to the head of the
+    // waitlist, who is PMed; and their subscription to the announcement is dropped.
+    const title = announcementTitle('Already Rolling Troop');
+    const eventId = await createEvent({ title, maxTroopers: 2 });
+
+    // Two places: the excluded member and trooper1 hold them, trooper2 is next in line.
+    await createRsvp(eventId, 'excluded', { at: relativeToTestNow({ hours: -3 }) });
+    await createRsvp(eventId, 'trooper1', { at: relativeToTestNow({ hours: -2 }) });
+    await createRsvp(eventId, 'trooper2', { at: relativeToTestNow({ hours: -1 }), status: 'waitlisted' });
+
+    const threadId = await announce(eventId);
+    for (const username of ['excluded', 'trooper1'] as const) {
+      await execute(
+        `INSERT INTO ${T('threadsubscriptions')} (uid, tid, notification, dateline) VALUES (?, ?, 1, UNIX_TIMESTAMP())`,
+        [uid(username), threadId],
+      );
+    }
+    const replyId = await reply(threadId, 'excluded', `I can bring the banner ${Math.random().toString(36).slice(2, 8)}`);
+
+    // Calendar subscriptions for both, made the way calendar_feed.php makes them. The feed
+    // lists the events a member is going to, so it is the listing the withdrawn signup
+    // would otherwise keep the event in.
+    const tokens = JSON.parse(
+      await runPhp(`
+require_once MYBB_ROOT.'inc/plugins/events/inc/events_feed.php';
+echo json_encode(array(
+    'excluded' => events_feed_create_token(${uid('excluded')}),
+    'trooper1' => events_feed_create_token(${uid('trooper1')}),
+));
+`),
+    ) as Record<'excluded' | 'trooper1', string>;
+    const feed = async (username: 'excluded' | 'trooper1'): Promise<string> =>
+      (await page.request.get(`/ical_feed.php?token=${tokens[username]}`)).text();
+
+    // Before: the member reads the thread and has the event in their calendar - so what
+    // changes below is the exclusion's doing, not a thread or feed that never worked.
+    await loginAs(page, 'excluded');
+    await page.goto(`/showthread.php?tid=${threadId}`);
+    await expect(page.locator('body')).toContainText(title);
+    expect(await feed('excluded')).toContain(title);
+
+    // Excluded the way both event forms do it, by gec, the event's coordinator.
+    const saved = JSON.parse(
+      await runPhp(`
+${LOAD_MESSAGES}
+require_once MYBB_ROOT.'inc/plugins/events/inc/events_form.php';
+$input = events_event_form_values(events_get_event(${eventId}));
+$input['exclusions'] = 'excluded';
+$thread_error = null;
+$cancelled = $withdrawn = $promoted = $demoted = 0;
+events_save_event(${eventId}, $input, ${uid('gec')}, $thread_error, $cancelled, $withdrawn, $promoted, $demoted);
+echo json_encode(compact('cancelled', 'withdrawn', 'promoted', 'demoted'));
+`),
+    );
+    expect(saved).toEqual({ cancelled: 0, withdrawn: 1, promoted: 1, demoted: 0 });
+
+    // Their signup is gone, not left standing: a signup they can no longer see or withdraw
+    // would go on holding a place, counting toward the maximum and putting their name on
+    // the attendance sheet for an event they have been told nothing about.
+    const theirRows = await query(`SELECT id FROM ${T('event_plugin_rsvps')} WHERE event_id = ? AND user_id = ?`, [
+      eventId,
+      uid('excluded'),
+    ]);
+    expect(theirRows).toHaveLength(0);
+
+    // The place it held goes to the head of the waitlist, and the one who already had a
+    // place keeps it.
+    expect(await getRsvpStatus(eventId, 'trooper1')).toBe('attending');
+    expect(await getRsvpStatus(eventId, 'trooper2')).toBe('attending');
+    expect(await countPrivateMessages('trooper2', `You have a place: ${title}`)).toBe(1);
+    expect(await countPrivateMessages('trooper1', `%${title}%`)).toBe(0);
+
+    // And nothing reaches the member it was withdrawn for.
+    expect(await countPrivateMessages('excluded', `%${title}%`)).toBe(0);
+
+    // Their subscription to the announcement is dropped; trooper1's is not.
+    const subscribed = async (username: string): Promise<number> =>
+      Number(
+        (
+          await queryOne(`SELECT COUNT(*) AS n FROM ${T('threadsubscriptions')} WHERE tid = ? AND uid = ?`, [
+            threadId,
+            uid(username),
+          ])
+        )?.n,
+      );
+    expect(await subscribed('excluded')).toBe(0);
+    expect(await subscribed('trooper1')).toBe(1);
+
+    // The thread is closed to them now, including their own reply by its pid, and the
+    // event is gone from the listing, its page and their calendar.
+    await loginAs(page, 'excluded');
+    for (const url of [`/showthread.php?tid=${threadId}`, `/showthread.php?pid=${replyId}`, `/event.php?id=${eventId}`]) {
+      await page.goto(url);
+      await expectMyBBError(page, NO_PERMISSION);
+      await expect(page.locator('body'), url).not.toContainText(title);
+    }
+
+    await page.goto('/events.php?view=list');
+    await expect(page.locator(`[data-event-id="${eventId}"]`)).toHaveCount(0);
+    await expect(page.locator('body')).not.toContainText(title);
+
+    expect(await feed('excluded')).not.toContain(title);
+
+    // Everybody else's view: the event, its thread and trooper1's calendar as they were,
+    // with trooper2 on the attendee list and the excluded member off it.
+    await loginAs(page, 'trooper1');
+    expect(await feed('trooper1')).toContain(title);
+
+    await page.goto(`/event.php?id=${eventId}`);
+    await expect(page.locator('body')).toContainText(title);
+    await expect(page.locator(`.rsvp_row[data-uid="${uid('trooper1')}"]`)).toHaveCount(1);
+    await expect(page.locator(`.rsvp_row[data-uid="${uid('trooper2')}"]`)).toHaveCount(1);
+    await expect(page.locator(`.rsvp_row[data-uid="${uid('excluded')}"]`)).toHaveCount(0);
+    await expect(page.locator(`.waitlist_row[data-uid="${uid('trooper2')}"]`)).toHaveCount(0);
   });
 });

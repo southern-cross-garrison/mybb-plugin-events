@@ -75,14 +75,7 @@ function events_admin_settings_version()
 function events_admin_settings()
 {
     global $mybb, $db, $page, $lang;
-    
-    // Prevent browser from serving cached form so dropdowns show latest profile fields after add/edit/delete
-    if($mybb->request_method != "post")
-    {
-        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-        header('Pragma: no-cache');
-    }
-    
+
     // Adding and deleting a region are actions of their own on this page rather than
     // edits to the form below: each asks a question of its own first, and a deletion's
     // question - where its events go - has to be answered before anything happens.

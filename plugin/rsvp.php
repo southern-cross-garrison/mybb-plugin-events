@@ -433,7 +433,12 @@ if($mybb->request_method === 'post')
         }
         else
         {
-            if(!events_save_signup($event_id, $mybb->user['uid'], $role_days, $selected_costumes))
+            $saved = events_save_signup($event_id, $mybb->user['uid'], $role_days, $selected_costumes);
+            if($saved === 'excluded')
+            {
+                error(events_signup_lock_message('excluded'));
+            }
+            if(!$saved)
             {
                 error("Your signup is still being saved from another request. Please try again in a moment.");
             }

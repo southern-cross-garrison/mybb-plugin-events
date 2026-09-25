@@ -1,9 +1,14 @@
 import { test, expect } from '../helpers/fixtures';
 import { advanceClock, relativeToTestNow, setClock } from '../helpers/clock';
 import { runPhp, runScheduledTask } from '../helpers/container';
+import { loginAs } from '../helpers/auth';
+import { signUpThroughWizard } from '../helpers/rsvp';
 import {
   createEvent,
   createRsvp,
+  getClaimStatuses,
+  getEventDays,
+  getRsvpStatus,
   countRsvps,
   query,
   createThread,
@@ -201,6 +206,72 @@ test.describe('troop report reminders', () => {
     await setClock(relativeToTestNow({ days: 2 }));
     await runScheduledTask('events_reminders');
     expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+  });
+
+  // The troop report is written by somebody who went. A trooper still waiting when the
+  // event ended never had a place, so they are not asked to write it up. The queues here
+  // are built by the members signing up through rsvp.php against a full event, so the
+  // waitlisted status is the plugin's own rather than one the test wrote. Signups have to
+  // happen while the event is still ahead - signups close, and the queues stop being
+  // settled, once it has ended - so the clock is moved past its end afterwards.
+  test.describe('waitlisted troopers', () => {
+    test('a trooper who never got off the waitlist is not reminded; the one with the place is', async ({ page }) => {
+      const eventId = await createEvent({
+        title: 'Queued Overdue Troop',
+        start: relativeToTestNow({ days: 2 }),
+        end: relativeToTestNow({ days: 2, hours: 6 }),
+        maxTroopers: 1,
+      });
+
+      await loginAs(page, 'trooper1');
+      await signUpThroughWizard(page, eventId, { costumes: [TK] });
+      // Apart in time, so the queue order is claimed_at rather than a tie.
+      await advanceClock({ minutes: 5 });
+      await loginAs(page, 'trooper2');
+      await signUpThroughWizard(page, eventId);
+      expect(await getRsvpStatus(eventId, 'trooper1')).toBe('attending');
+      expect(await getRsvpStatus(eventId, 'trooper2')).toBe('waitlisted');
+
+      await setClock(relativeToTestNow({ days: 4 }));
+      const output = await runScheduledTask('events_reminders');
+      expect(output).toContain('Event reminder PMs sent for 1 event(s)');
+
+      expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+      expect(await countPrivateMessages('trooper2', SUBJECT)).toBe(0);
+    });
+
+    test('on a weekend, trooping any one day is enough to be reminded; waiting for every day is not', async ({ page }) => {
+      const eventId = await createEvent({
+        title: 'Queued Overdue Weekend Troop',
+        start: '2026-10-03 09:00:00',
+        end: '2026-10-04 17:00:00',
+        days: [{ date: '2026-10-03' }, { date: '2026-10-04' }],
+        maxTroopers: 1,
+      });
+      const [saturday, sunday] = (await getEventDays(eventId)).map((day) => Number(day.id));
+
+      // trooper1 takes Saturday's place; trooper2 waits for Saturday but gets Sunday's;
+      // nowwcc wants only Saturday and waits behind trooper2 for it.
+      await loginAs(page, 'trooper1');
+      await signUpThroughWizard(page, eventId, { costumes: [TK], dayRoles: { [sunday]: 'none' } });
+      await advanceClock({ minutes: 5 });
+      await loginAs(page, 'trooper2');
+      await signUpThroughWizard(page, eventId);
+      await advanceClock({ minutes: 5 });
+      await loginAs(page, 'nowwcc');
+      await signUpThroughWizard(page, eventId, { dayRoles: { [sunday]: 'none' } });
+
+      expect(await getClaimStatuses(eventId, 'trooper2')).toEqual({ [saturday]: 'waitlisted', [sunday]: 'attending' });
+      expect(await getClaimStatuses(eventId, 'nowwcc')).toEqual({ [saturday]: 'waitlisted' });
+      expect(await getRsvpStatus(eventId, 'nowwcc')).toBe('waitlisted');
+
+      await setClock('2026-10-06 09:00:00');
+      await runScheduledTask('events_reminders');
+
+      expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+      expect(await countPrivateMessages('trooper2', SUBJECT)).toBe(1);
+      expect(await countPrivateMessages('nowwcc', SUBJECT)).toBe(0);
+    });
   });
 
   // The reminder is one PM to every attendee, and MyBB refuses the whole PM if any one

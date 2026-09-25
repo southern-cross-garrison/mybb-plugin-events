@@ -480,6 +480,57 @@ test.describe('front-end event management', () => {
     expect(await countPrivateMessages('trooper1', 'Event changed:%')).toBe(1);
   });
 
+  // A single-day event has no day rows, so there was nothing for the day diff to find:
+  // moving one used to carry every signup over to the new date without a word.
+  test('moving a single-day event to another date cancels its signups and PMs them', async ({ page }) => {
+    const eventId = await createEvent({
+      title: 'Moved Single Day Troop',
+      status: 'live',
+      coordinator: 'gec',
+      start: '2026-10-24 09:00:00',
+      end: '2026-10-24 17:00:00',
+    });
+    await createRsvp(eventId, 'trooper1');
+    await createRsvp(eventId, 'wrangler', { role: 'wrangler' });
+
+    await loginAs(page, 'gec');
+    await page.goto(`/manage_event.php?id=${eventId}`);
+
+    // New hours on the same day are not a move, and ask nothing.
+    await fillEventForm(page, { start: '2026-10-24 10:00:00', end: '2026-10-24 16:00:00' });
+    await submitEventForm(page);
+    await expect(page.locator('#event_day_change_confirm')).toHaveCount(0);
+    await expect.poll(async () => String((await getEvent(eventId)).start_date)).toContain('10:00:00');
+    expect(await countRsvps(eventId)).toBe(2);
+
+    await page.goto(`/manage_event.php?id=${eventId}`);
+    await fillEventForm(page, { start: '2026-10-31 10:00:00', end: '2026-10-31 16:00:00' });
+    await submitEventForm(page);
+
+    await expect(page.locator('#event_day_change_warning')).toContainText('Sat 24 Oct 2026 (10:00 - 16:00)');
+    await expect(page.locator('#event_day_change_members li')).toHaveText(['trooper1', 'wrangler']);
+    await expect(page.locator('#event_day_change_confirm')).toHaveText('Save and cancel 2 signups');
+    expect(await countRsvps(eventId)).toBe(2);
+
+    await page.locator('#event_day_change_confirm').click();
+    await expect.poll(async () => countRsvps(eventId)).toBe(0);
+    expect(String((await getEvent(eventId)).start_date)).toContain('2026-10-31');
+
+    const [pm] = await getPrivateMessages('trooper1', 'Event changed: Moved Single Day Troop');
+    expect(String(pm.message)).toContain('Sat 24 Oct 2026');
+    expect(String(pm.message)).toContain('Sat 31 Oct 2026 (10:00 - 16:00)');
+    expect(String(pm.message)).toMatch(/sign up again/);
+    expect(Number(pm.fromid)).toBe(uid('gec'));
+    expect(await countPrivateMessages('wrangler', 'Event changed: Moved Single Day Troop')).toBe(1);
+
+    // A signup made after the move is for the new date, and saving again leaves it be.
+    await createRsvp(eventId, 'trooper2');
+    await page.goto(`/manage_event.php?id=${eventId}`);
+    await submitEventForm(page);
+    await expect(page.locator('#event_day_change_confirm')).toHaveCount(0);
+    expect(await getSignupRoles(eventId, 'trooper2')).toEqual(['trooper']);
+  });
+
   test('the date boxes carry a calendar, and picking from it drives the day grid', async ({ page }) => {
     await loginAs(page, 'gec');
     await page.goto('/manage_event.php');

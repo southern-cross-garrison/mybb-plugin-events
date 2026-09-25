@@ -329,7 +329,10 @@ baseline picks the change up.
   none. Both forms stop at `events_day_change_to_confirm()` first and save only when its
   button is clicked. The button posts a token of the days and members it listed, so a
   form changed in between is warned about again. When an event goes back to one day, the
-  day it still runs on doesn't count as removed, even though its row is deleted.
+  day it still runs on doesn't count as removed, even though its row is deleted. A
+  single-day event has no rows to diff, so its one day is a stand-in with id 0
+  (`events_single_event_day()`, read from the stored dates *before* the save overwrites
+  them): moving it to another date cancels and PMs every signup the same way.
 
 - A PM to several recipients is all-or-nothing: `PMDataHandler` refuses the whole message
   if any one `toid` is not a user, even with `admin_override`. The troop-report reminder is

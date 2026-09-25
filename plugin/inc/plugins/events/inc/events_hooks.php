@@ -1080,9 +1080,11 @@ function events_user_deleted($handler)
  * and the wall clocks they are compared against are the event timezone's, which is the
  * zone the dates in those columns were written in.
  *
+ * @param array $failures Set to a line for every event that could not be reminded about,
+ *                        for the task log
  * @return int number of events reminded about
  */
-function events_send_reminders()
+function events_send_reminders(&$failures = array())
 {
     global $db, $mybb;
 
@@ -1118,6 +1120,7 @@ function events_send_reminders()
         $events[] = $row;
     }
 
+    $failures = array();
     $reminded = 0;
     foreach($events as $event)
     {
@@ -1165,29 +1168,57 @@ function events_send_reminders()
             continue;
         }
 
+        // Taken before the PM goes, and the report re-read once it is held: one posted
+        // since the query above has already done what this PM asks for, and the row it
+        // wrote is the one this would otherwise insert again, into a unique key. A report
+        // that is being posted right now holds the lock, so this event waits for the next
+        // run rather than being nagged about in the same second it is closed out.
+        $lock = 'troop_report:' . (int)$event['id'];
+        if(!events_acquire_lock($lock))
+        {
+            $failures[] = "Event #" . (int)$event['id'] . ": skipped, its troop report was being posted.";
+            continue;
+        }
+
+        $report = events_get_troop_report($event['id']);
+        if($report && (!empty($report['posted_at'])
+            || (!empty($report['last_reminder_sent']) && $report['last_reminder_sent'] >= $resend_before)))
+        {
+            events_release_lock($lock);
+            continue;
+        }
+
+        // MyBB refuses a PM whose subject runs past 85 characters, and a long event title
+        // is enough to get there.
+        $subject = "Troop Report Needed: " . $event['title'];
+        if(my_strlen($subject) > 85)
+        {
+            $subject = my_substr($subject, 0, 82) . "...";
+        }
+
         $pmhandler = new PMDataHandler();
         $pmhandler->admin_override = true;
         $pmhandler->set_data(array(
-            'subject' => "Troop Report Needed: " . $event['title'],
+            'subject' => $subject,
             'message' => "The event '" . $event['title'] . "' has finished, but no troop report has been posted yet.\n\n" .
                          "Please create one here: " . $mybb->settings['bburl'] . "/troop_report.php?id=" . $event['id'],
             'fromid'  => 0,
             'toid'    => $user_ids,
-            'ipaddress' => '127.0.0.1',
+            'ipaddress' => my_inet_pton('127.0.0.1'),
         ));
 
+        // Nothing records a refused PM but this: last_reminder_sent is left alone, so the
+        // event is tried again tomorrow, and the task log says why it keeps failing.
         if(!$pmhandler->validate_pm())
         {
+            events_release_lock($lock);
+            $failures[] = "Event #" . (int)$event['id'] . ": reminder PM refused - "
+                . implode(' ', $pmhandler->get_friendly_errors());
             continue;
         }
 
         $pmhandler->insert_pm();
         $reminded++;
-
-        // Re-read under troop_report.php's lock: a report posted since the query above
-        // has inserted the row this would otherwise insert again, into a unique key.
-        $locked = events_acquire_lock('troop_report:' . (int)$event['id']);
-        $report = events_get_troop_report($event['id']);
 
         if($report)
         {
@@ -1205,10 +1236,7 @@ function events_send_reminders()
             ));
         }
 
-        if($locked)
-        {
-            events_release_lock('troop_report:' . (int)$event['id']);
-        }
+        events_release_lock($lock);
     }
 
     return $reminded;
