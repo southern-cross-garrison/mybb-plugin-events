@@ -191,6 +191,75 @@ function events_strtotime($value, $base = null)
 }
 
 /**
+ * The time of day before which an event's end belongs to the night before: a troop that
+ * finishes at 01:00 on Sunday was a Saturday night out. Late enough for any night, early
+ * enough that no event is only its last few hours.
+ */
+define('EVENTS_NIGHT_ENDS', '06:00:00');
+
+/**
+ * The dates an event runs on, first to last, as Y-m-d in the event timezone.
+ *
+ * Every date from the start's to the end's, except where the event finishes in the night
+ * after one of them. A 22:00 to 01:00 troop is one night out, not a Saturday and a Sunday:
+ * counted by date it became a two-day event, and the form offered a whole-day row for each,
+ * to be signed up for separately. So:
+ *
+ * - an event shorter than a day is on the date it starts, wherever it ends;
+ * - an event that ends before EVENTS_NIGHT_ENDS finished the night before, so the date it
+ *   ends on is not one of its own. Two nights of 22:00 to 01:00 are two dates, not three,
+ *   and the third would otherwise be a row starting at midnight that the second night
+ *   runs into.
+ *
+ * Lengths and times are read off the wall clock rather than counted in seconds, so the
+ * answer does not move by an hour on the night the clocks change, and the form's script,
+ * which knows nothing about the zone, can reach the same one.
+ *
+ * The dates are walked in UTC, where every day is the same length - a date has no hours
+ * for a daylight saving change to move, and stepping 86400 seconds skips or repeats one.
+ *
+ * @param string $start_date
+ * @param string $end_date
+ * @param int $limit Most dates to return
+ * @return array empty when either end is not a date or the end is before the start
+ */
+function events_event_dates($start_date, $end_date, $limit = 400)
+{
+    $start = events_strtotime($start_date);
+    $end = events_strtotime($end_date);
+
+    if($start === false || $end === false || $end < $start)
+    {
+        return array();
+    }
+
+    $utc = new DateTimeZone('UTC');
+    $cursor = new DateTime(events_date('Y-m-d', $start), $utc);
+    $last = new DateTime(events_date('Y-m-d', $end), $utc);
+
+    $wall_start = new DateTime(events_date('Y-m-d H:i:s', $start), $utc);
+    $wall_end = new DateTime(events_date('Y-m-d H:i:s', $end), $utc);
+    if($wall_end->getTimestamp() - $wall_start->getTimestamp() < 86400)
+    {
+        $last = clone $cursor;
+    }
+    elseif(events_date('H:i:s', $end) < EVENTS_NIGHT_ENDS)
+    {
+        // At least a day long, so the date before the end's is never before the start's.
+        $last->modify('-1 day');
+    }
+
+    $dates = array();
+    while($cursor <= $last && count($dates) < $limit)
+    {
+        $dates[] = $cursor->format('Y-m-d');
+        $cursor->modify('+1 day');
+    }
+
+    return $dates;
+}
+
+/**
  * Every timezone the admin can choose from, as identifier => label.
  *
  * The label carries the offset the zone is on *now*, which is what makes a list of 400

@@ -246,7 +246,7 @@ $manage_details .= '<div class="events_field">'
 $manage_details .= events_form_field(
     'event_form_gec_user_id',
     'Coordinator',
-    events_form_select('gec_user_id', 'event_form_gec_user_id', $coordinators, $values['gec_user_id'], true),
+    events_form_select('gec_user_id', 'event_form_gec_user_id', events_coordinator_select_options($coordinators), $values['gec_user_id'], true, array('required' => 'required')),
     'The member who manages this event.',
     true
 );

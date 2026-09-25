@@ -21,7 +21,7 @@
  * there is to show.
  *
  * Do not run scripts/db-snapshot.sh after seeding. The snapshot is a plain dump, so it
- * would bake sixteen demo events, eighteen demo members and their announcement threads
+ * would bake eighteen demo events, eighteen demo members and their announcement threads
  * into the baseline that every later e2e run starts from - where they are not fixtures the
  * suite knows about, but rows its assertions have to compete with. Run
  * scripts/db-restore.sh first if a snapshot is needed.
@@ -318,6 +318,9 @@ function demo_event(array $spec)
         'address'       => '',
         'signup_cutoff' => '',
         'requires_wwcc' => 0,
+        // 0 is no limit, which is what every event without a waitlist to show wants.
+        'max_troopers'  => 0,
+        'max_wranglers' => 0,
         'gec_user_id'   => demo_uid('gec'),
         'days'          => array(),
         'exclusions'    => '',
@@ -1061,6 +1064,50 @@ demo_signup($id, 'OscarBright', array('days' => array(0)));
 demo_signup($id, 'PiaSolano', array('days' => array(1)));
 demo_signup($id, 'TeganMoss', array('roles' => array('wrangler')));
 note('6 troopers + 1 wrangler, mixed days', $id);
+
+// 17. Full, with a waitlist already forming. Places go in signup order, so the first four
+//     troopers here are attending and the fifth is waitlisted. The single wrangler place
+//     is taken as well, so anybody signing up in either role joins the back of a queue.
+//     trooper1 and trooper2 are deliberately left off, so either can sign in and see it.
+$id = demo_event(array(
+    'title'         => 'Castle Hill Showground Fun Day',
+    'region'        => 'Sydney',
+    'address'       => 'Castle Hill Showground, Doran Dr, Castle Hill NSW 2154',
+    'description'   => "A small community fair. [b]The organisers can only fit four of us[/b] in the photo tent,"
+                     . " plus one handler.\n\nIf you are on the waitlist and a place opens up, you will be"
+                     . " moved up automatically and sent a PM.",
+    'start_date'    => demo_at(12, '10:00:00'),
+    'end_date'      => demo_at(12, '14:00:00'),
+    'days'          => demo_days(12, 12, '10:00:00', '14:00:00'),
+    'max_troopers'  => 4,
+    'max_wranglers' => 1,
+));
+foreach(array('DanaOkoye', 'FreyaLind', 'HanaMorrow', 'KaiWhitfield', 'OscarBright') as $username)
+{
+    demo_signup($id, $username);
+}
+demo_signup($id, 'TeganMoss', array('roles' => array('wrangler')));
+note('full - 4/4 troopers + 1 waitlisted, 1/1 wranglers', $id);
+
+// 18. One place left: the next trooper to sign up takes it, and the one after that is
+//     waitlisted - which is how the waitlist is shown happening rather than already there.
+//     Sign in as trooper1 to take the last place, then as trooper2 to be waitlisted behind them.
+$id = demo_event(array(
+    'title'        => 'Hornsby Library Star Wars Day',
+    'region'       => 'Sydney',
+    'address'      => '28-44 George St, Hornsby NSW 2077',
+    'description'  => "Photos and a story session in the children's section. The library has room for"
+                    . " [b]four troopers[/b] - once those places are taken, further signups go on the waitlist.",
+    'start_date'   => demo_at(16, '10:00:00'),
+    'end_date'     => demo_at(16, '13:00:00'),
+    'days'         => demo_days(16, 16, '10:00:00', '13:00:00'),
+    'max_troopers' => 4,
+));
+foreach(array('BriannaKade', 'GusHolloway', 'PiaSolano') as $username)
+{
+    demo_signup($id, $username);
+}
+note('3/4 troopers - one place left before the waitlist', $id);
 
 // ---------------------------------------------------------------------------
 

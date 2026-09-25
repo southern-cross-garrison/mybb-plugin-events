@@ -435,7 +435,12 @@ test.describe('deleting an event\'s coordinator or point of contact', () => {
     expect(log, `PHP or MyBB logged errors:\n${log}`).toBe('');
   });
 
-  test('an event whose coordinator is gone can still be saved, from either form, and ends up with a real one', async ({ page }) => {
+  test('an event whose coordinator is gone asks for a new one, on either form, rather than picking one', async ({ page }) => {
+    // The deleted coordinator is no longer on the select's list, and a select with nothing
+    // matching its value falls back to its first option. That used to be whoever sorted
+    // first, so saving the event for any other reason quietly made them its coordinator.
+    // The first option is now a blank one, which the browser will not submit (it is
+    // required) and the server refuses if it arrives anyway.
     test.setTimeout(90_000);
     const { eventId, coordinator, contact } = await coordinatedEvent('Reassigned Troop');
     await deleteMemberThroughAdminCp(page, coordinator.uid);
@@ -445,30 +450,45 @@ test.describe('deleting an event\'s coordinator or point of contact', () => {
     // Front end, as a general coordinator, changing nothing but the title.
     await loginAs(page, 'gec');
     await page.goto(`/manage_event.php?id=${eventId}`);
-    await page.locator('#event_form_title').fill('Reassigned Troop (front end)');
-    await page.locator('#manage_event_submit').click();
-    await expect(page.locator('body')).not.toContainText(/Choose an event coordinator|Choose a point of contact/);
-    await expect.poll(async () => String((await getEvent(eventId)).title)).toBe('Reassigned Troop (front end)');
+    const frontSelect = page.locator('#event_form_gec_user_id');
+    await expect(frontSelect).toHaveValue('');
+    await expect(frontSelect.locator('option:checked')).toHaveText('Choose a coordinator');
+    await expect(frontSelect).toHaveAttribute('required', 'required');
 
-    // Whoever it names now has to be somebody: a coordinator nobody can be PMed as or
-    // reach is the same problem again.
+    // Posted with the browser's check taken off, as a form with the script off in an old
+    // browser, or a forged post, would arrive.
+    await page.locator('#event_form_title').fill('Reassigned Troop (front end)');
+    await frontSelect.evaluate((select: HTMLSelectElement) => select.removeAttribute('required'));
+    await page.locator('#manage_event_submit').click();
+    await expect(page.locator('#manage_event_errors')).toContainText('Choose an event coordinator from the list.');
+    expect(String((await getEvent(eventId)).title)).toBe('Reassigned Troop');
+
+    // Picking somebody saves it, under the coordinator actually picked.
+    await page.locator('#event_form_gec_user_id').selectOption(String(uid('gec')));
+    await page.locator('#manage_event_submit').click();
+    await expect.poll(async () => String((await getEvent(eventId)).title)).toBe('Reassigned Troop (front end)');
     const afterFront = await getEvent(eventId);
-    const frontCoordinator = await queryOne<any>(`SELECT uid FROM ${T('users')} WHERE uid = ?`, [afterFront.gec_user_id]);
-    expect(frontCoordinator, `saved coordinator uid ${afterFront.gec_user_id} should exist`).not.toBeNull();
+    expect(Number(afterFront.gec_user_id)).toBe(uid('gec'));
     expect(Number(afterFront.poc_user_id)).not.toBe(contact.uid);
 
-    // Put the dead coordinator back and save from the Admin CP too.
+    // Put the dead coordinator back and do the same from the Admin CP, which has no
+    // required attribute to lean on - the server's refusal is the whole check there.
     await setEventPeople(eventId, { coordinator: coordinator.uid, poc: contact.uid });
     await loginToAdminCp(page);
     await gotoEventsAdmin(page, `&action=edit&id=${eventId}`);
+    await expect(page.locator('#gec_user_id')).toHaveValue('');
     await page.locator('#title').fill('Reassigned Troop (Admin CP)');
+    await page.locator('input[type="submit"][value="Update Event"]').click();
+    await expect(page.locator('body')).toContainText('Choose an event coordinator from the list.');
+    expect(String((await getEvent(eventId)).title)).toBe('Reassigned Troop (front end)');
+
+    await page.locator('#gec_user_id').selectOption(String(uid('gec')));
     await page.locator('input[type="submit"][value="Update Event"]').click();
     await expect(page.locator('#flash_message')).toContainText('Event updated successfully');
 
     const afterAdmin = await getEvent(eventId);
     expect(String(afterAdmin.title)).toBe('Reassigned Troop (Admin CP)');
-    const adminCoordinator = await queryOne<any>(`SELECT uid FROM ${T('users')} WHERE uid = ?`, [afterAdmin.gec_user_id]);
-    expect(adminCoordinator, `saved coordinator uid ${afterAdmin.gec_user_id} should exist`).not.toBeNull();
+    expect(Number(afterAdmin.gec_user_id)).toBe(uid('gec'));
     expect(Number(afterAdmin.poc_user_id)).not.toBe(contact.uid);
 
     const log = await readErrorLogs();

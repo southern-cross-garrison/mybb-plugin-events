@@ -1034,30 +1034,102 @@ test.describe('front-end event management', () => {
     expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Relative Hours Troop'`)).toHaveLength(0);
   });
 
-  test('refuses a day that ends before it starts', async ({ page }) => {
+  test('a day that ends earlier than it starts runs overnight, and must be over before the next one begins', async ({ page }) => {
+    // A day stores only its hours, so a 22:00 to 01:00 night can only be written as an
+    // end earlier than the start. That used to be refused outright as a day ending
+    // before it starts, which made a late troop impossible to enter.
     await loginAs(page, 'gec');
     await page.goto('/manage_event.php');
 
     await fillEventForm(page, {
-      title: 'Backwards Hours Troop',
+      title: 'Late Nights Troop',
       status: 'live',
-      start: '2026-10-24 09:00:00',
-      end: '2026-10-25 17:00:00',
+      start: '2026-10-24 22:00:00',
+      end: '2026-10-26 01:00:00',
     });
 
-    const times = page.locator('[data-events-day-date="2026-10-24"] input[type="time"]');
-    await times.nth(0).fill('15:00');
-    await times.nth(1).fill('10:00');
-    await submitEventForm(page);
+    const times = (date: string) => page.locator(`[data-events-day-date="${date}"] input[type="time"]`);
 
+    // Saturday night runs into Sunday, which has been left to start at midnight - the two
+    // rows would claim the same hours.
+    await times('2026-10-24').nth(0).fill('22:00');
+    await times('2026-10-24').nth(1).fill('01:00');
+    await times('2026-10-25').nth(0).fill('00:00');
+    await times('2026-10-25').nth(1).fill('01:00');
+    await submitEventForm(page);
     await expect(page.locator('#manage_event_errors')).toContainText(
-      'The end time for 2026-10-24 must be after its start time.',
+      'The hours for 2026-10-24 run past midnight into 2026-10-25, which starts at 00:00.',
     );
-    expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Backwards Hours Troop'`)).toHaveLength(0);
+    expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Late Nights Troop'`)).toHaveLength(0);
 
     // What was typed comes back, so it can be corrected rather than retyped.
-    await expect(times.nth(0)).toHaveValue('15:00');
-    await expect(times.nth(1)).toHaveValue('10:00');
+    await expect(times('2026-10-24').nth(0)).toHaveValue('22:00');
+    await expect(times('2026-10-24').nth(1)).toHaveValue('01:00');
+
+    // The same time at both ends is no length at all.
+    await times('2026-10-25').nth(0).fill('01:00');
+    await submitEventForm(page);
+    await expect(page.locator('#manage_event_errors')).toContainText('The start and end times for 2026-10-25 are the same.');
+
+    // Two nights out, each ending after midnight, neither running into the next.
+    await times('2026-10-25').nth(0).fill('22:00');
+    await submitEventForm(page);
+    await expect(page.locator('#manage_event_errors')).toHaveCount(0);
+
+    const saved = await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Late Nights Troop'`);
+    expect(saved).toHaveLength(1);
+    const days = await getEventDays(Number(saved[0].id));
+    // Two rows, not three: the event ends at 01:00 on the 26th, which is the second night
+    // finishing rather than a day of its own - a whole-day row for it would start at
+    // midnight, and the second night would run into it.
+    expect(days.map((day) => [day.date, day.start_time, day.end_time])).toEqual([
+      ['2026-10-24', '22:00:00', '01:00:00'],
+      ['2026-10-25', '22:00:00', '01:00:00'],
+    ]);
+  });
+
+  test('an event that runs past midnight but is shorter than a day is one night, not two days', async ({ page }) => {
+    // The day grid follows the event's dates, and a Saturday 22:00 to Sunday 01:00 troop
+    // touches two of them. Counted by date it became a two-day event: a whole-day row for
+    // each, signed up for separately, and the event on both days of the calendar.
+    await loginAs(page, 'gec');
+    await page.goto('/manage_event.php');
+
+    await fillEventForm(page, {
+      title: 'One Late Night Troop',
+      status: 'live',
+      start: '2026-10-24 22:00:00',
+      end: '2026-10-25 01:00:00',
+    });
+
+    // The script draws no grid for it...
+    await expect(page.locator('[data-events-day-date]')).toHaveCount(0);
+
+    // ...but a later end time takes it past a day, and the grid appears; putting the time
+    // back takes it away again. The times decide it, not only the dates.
+    await fillDateTime(page, 'event_form_end_date', '2026-10-25 23:00:00');
+    await expect(page.locator('[data-events-day-date]')).toHaveCount(2);
+    await fillDateTime(page, 'event_form_end_date', '2026-10-25 01:00:00');
+    await expect(page.locator('[data-events-day-date]')).toHaveCount(0);
+
+    await submitEventForm(page);
+    await expect(page.locator('#manage_event_errors')).toHaveCount(0);
+
+    const saved = await query(`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'One Late Night Troop'`);
+    expect(saved).toHaveLength(1);
+    const eventId = Number(saved[0].id);
+    expect(await getEventDays(eventId)).toHaveLength(0);
+
+    // The server draws the same (empty) grid when the form comes back to be edited.
+    await page.goto(`/manage_event.php?id=${eventId}`);
+    await expect(page.locator('[data-events-day-date]')).toHaveCount(0);
+
+    // And the calendar puts it on the night it starts, not the morning it finishes.
+    await page.goto('/events.php?view=calendar&month=2026-10');
+    const cell = (day: number) =>
+      page.locator('td').filter({ has: page.locator('strong', { hasText: new RegExp(`^${day}$`) }) });
+    await expect(cell(24).locator(`[data-event-id="${eventId}"]`)).toHaveCount(1);
+    await expect(cell(25).locator(`[data-event-id="${eventId}"]`)).toHaveCount(0);
   });
 
   test('an apostrophe in the title and description survives the round trip', async ({ page }) => {

@@ -657,22 +657,14 @@ function events_calendar_grid($month_start, array $events, array $user_rsvps)
     $year = (int)events_date('Y', $month_start);
     $days_in_month = (int)events_date('t', $month_start);
 
-    // Bucket events by every date they span so multi-day events appear on each day.
-    //
-    // The cursor walks dates rather than timestamps, in UTC: a date has no hours to be
-    // moved by a daylight saving change, and stepping a midnight in a zone that has one
-    // skips or repeats a day of the calendar.
-    $utc = new DateTimeZone('UTC');
+    // Bucket events by every date they run on so multi-day events appear on each day, and
+    // a night that runs past midnight only on the night it starts.
     $by_date = array();
     foreach($events as $event)
     {
-        $cursor = new DateTime(events_date('Y-m-d', events_strtotime($event['start_date'])), $utc);
-        $last = new DateTime(events_date('Y-m-d', events_strtotime($event['end_date'])), $utc);
-        $guard = 0;
-        while($cursor <= $last && $guard++ < 400)
+        foreach(events_event_dates($event['start_date'], $event['end_date']) as $date)
         {
-            $by_date[$cursor->format('Y-m-d')][] = $event;
-            $cursor->modify('+1 day');
+            $by_date[$date][] = $event;
         }
     }
 
@@ -1321,12 +1313,20 @@ function events_form_text($name, $id, $value, array $attributes = array(), $desc
  * @param array $options value => label
  * @param string|int $selected
  * @param bool $described
+ * @param array $attributes name => value, added to the select
  * @return string
  */
-function events_form_select($name, $id, array $options, $selected, $described = false)
+function events_form_select($name, $id, array $options, $selected, $described = false, array $attributes = array())
 {
     $html = '<select class="events_select" name="' . $name . '" id="' . $id . '"'
-          . ($described ? ' aria-describedby="hint_' . $id . '"' : '') . '>';
+          . ($described ? ' aria-describedby="hint_' . $id . '"' : '');
+
+    foreach($attributes as $attribute => $attribute_value)
+    {
+        $html .= ' ' . $attribute . '="' . htmlspecialchars_uni((string)$attribute_value) . '"';
+    }
+
+    $html .= '>';
 
     foreach($options as $value => $label)
     {

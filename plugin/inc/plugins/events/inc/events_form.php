@@ -440,6 +440,23 @@ function events_coordinator_choices($extra_uids = array())
 }
 
 /**
+ * The coordinator select's options: the choices, led by a blank one.
+ *
+ * An event whose coordinator has been deleted names a uid that is no longer on the list,
+ * and a select with nothing matching its value falls back to its first option. Without a
+ * blank one that was whoever sorts first, so anybody who saved the event without looking
+ * at the field made that member its coordinator. The blank option posts 0, which the
+ * validator refuses like any other uid not on the list.
+ *
+ * @param array $choices From events_coordinator_choices()
+ * @return array value => label
+ */
+function events_coordinator_select_options(array $choices)
+{
+    return array('' => 'Choose a coordinator') + $choices;
+}
+
+/**
  * Members who can be named as an event's point of contact.
  *
  * Anybody signed up to the event - in either role, since a wrangler is on the day as much
@@ -905,6 +922,9 @@ function events_validate_event_input(array $input, array $event = array())
         $errors[] = "There is no member named '" . $token . "'.";
     }
 
+    // Each valid day's hours, by date, for the overnight check below.
+    $hours = array();
+
     foreach($input['days'] as $day)
     {
         if(!preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $day['date'], $ymd)
@@ -929,11 +949,31 @@ function events_validate_event_input(array $input, array $event = array())
         }
 
         // Compared as the strings they are stored as, with the same defaults a blank box
-        // saves as. A day ending before it starts would otherwise be saved as written, and
-        // the calendar feed would hand out an event with a negative length.
-        if($valid && events_day_time($day, 'end_time') <= events_day_time($day, 'start_time'))
+        // saves as. A day stores only its hours, so one that ends earlier than it starts
+        // is a night that runs past midnight - a 22:00 to 01:00 troop - and every reader
+        // of a day (the feed, the labels) finishes it on the following date. The same time
+        // at both ends is either no time at all or a whole day, and a whole day is what a
+        // blank pair of boxes already says, so that one is refused as the mistake it is.
+        if($valid && events_day_time($day, 'end_time') === events_day_time($day, 'start_time'))
         {
-            $errors[] = "The end time for " . htmlspecialchars_uni($day['date']) . " must be after its start time.";
+            $errors[] = "The start and end times for " . $day['date'] . " are the same.";
+        }
+        elseif($valid)
+        {
+            $hours[$day['date']] = array(events_day_time($day, 'start_time'), events_day_time($day, 'end_time'));
+        }
+    }
+
+    // A night running past midnight must be over before the next day begins, or the two
+    // rows claim the same hours and a member signed up for both is booked twice at once.
+    // A blank start box is midnight, so the next day has to be given its hours.
+    foreach($hours as $date => $times)
+    {
+        $next = events_date('Y-m-d', events_strtotime($date . ' +1 day'));
+        if($times[1] < $times[0] && isset($hours[$next]) && $times[1] > $hours[$next][0])
+        {
+            $errors[] = "The hours for " . $date . " run past midnight into " . $next
+                . ", which starts at " . substr($hours[$next][0], 0, 5) . ".";
         }
     }
 
@@ -1783,8 +1823,9 @@ define('EVENTS_MAX_PLACES', 9999);
  * rows as a one-day event (the signup wizard asks one question instead of one per day),
  * so there is nothing for a one-row grid to add and the form hides it instead.
  *
- * Both bounds are reduced to dates before counting, so an event that starts at 22:00 and
- * ends at 02:00 covers two days - which is what it does.
+ * The dates are events_event_dates()'s, so an event that starts at 22:00 and ends at
+ * 01:00 is one night rather than two days, and two such nights are two rows, not three. The script in events_event_days_script()
+ * applies the same rule, and the two have to agree.
  *
  * @param string $start_date Anything events_strtotime() accepts
  * @param string $end_date
@@ -1792,28 +1833,7 @@ define('EVENTS_MAX_PLACES', 9999);
  */
 function events_event_day_span($start_date, $end_date)
 {
-    $start = events_strtotime($start_date);
-    $end = events_strtotime($end_date);
-
-    if($start === false || $end === false || $end < $start)
-    {
-        return array();
-    }
-
-    // DateTime rather than adding 86400 to a timestamp: a day is not always 86400 seconds
-    // long, and on the two that are not, arithmetic skips or repeats a date. The dates
-    // are reduced in the event's timezone and then walked in UTC, where every day is the
-    // same length - a date has no hours for a daylight saving change to move.
-    $utc = new DateTimeZone('UTC');
-    $cursor = new DateTime(events_date('Y-m-d', $start), $utc);
-    $last = new DateTime(events_date('Y-m-d', $end), $utc);
-
-    $dates = array();
-    while($cursor <= $last && count($dates) < EVENTS_MAX_EVENT_DAYS)
-    {
-        $dates[] = $cursor->format('Y-m-d');
-        $cursor->modify('+1 day');
-    }
+    $dates = events_event_dates($start_date, $end_date, EVENTS_MAX_EVENT_DAYS);
 
     return count($dates) > 1 ? $dates : array();
 }
@@ -1942,6 +1962,10 @@ function events_event_days_script()
 	var template = grid.querySelector('[data-events-day-template]');
 	var startInput = document.getElementById(grid.getAttribute('data-events-day-start'));
 	var endInput = document.getElementById(grid.getAttribute('data-events-day-end'));
+	// Each date box's time box, which events_datetime_field() names after it. The times
+	// decide whether an event that crosses midnight is one night or two days.
+	var startTimeInput = startInput ? document.getElementById(startInput.id + '_time') : null;
+	var endTimeInput = endInput ? document.getElementById(endInput.id + '_time') : null;
 
 	// 'content' in template is the feature test for <template> itself; without it the
 	// server-rendered grid is left exactly as it is.
@@ -1949,6 +1973,7 @@ function events_event_days_script()
 
 	var max = parseInt(grid.getAttribute('data-events-day-max'), 10) || 31;
 	var sections = document.querySelectorAll('[data-events-day-section]');
+	var NIGHT_ENDS = 6 * 3600000; // EVENTS_NIGHT_ENDS
 	var DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 	var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -1960,6 +1985,12 @@ function events_event_days_script()
 	function parseDate(value) {
 		var parts = /^\s*(\d{4})-(\d{2})-(\d{2})(?![\d-])/.exec(value || '');
 		return parts ? Date.UTC(+parts[1], +parts[2] - 1, +parts[3]) : null;
+	}
+
+	// A time box's value as milliseconds into its day; blank, as on the server, is midnight.
+	function parseTime(input) {
+		var parts = /^\s*(\d{1,2}):(\d{2})/.exec(input ? input.value : '');
+		return parts ? (+parts[1] * 60 + +parts[2]) * 60000 : 0;
 	}
 
 	function pad(number) {
@@ -2000,7 +2031,17 @@ function events_event_days_script()
 		var i;
 
 		if(start !== null && end !== null && end >= start) {
-			for(var stamp = start; stamp <= end && dates.length < max; stamp += 86400000) {
+			// events_event_dates()'s rules, which the two have to share: shorter than a day on
+			// the wall clock is the night it starts, and an end before NIGHT_ENDS belongs to
+			// the night before, so a 22:00 to 01:00 troop is not drawn as two days.
+			var last = end;
+			var endTime = parseTime(endTimeInput);
+			if(end + endTime - (start + parseTime(startTimeInput)) < 86400000) {
+				last = start;
+			} else if(endTime < NIGHT_ENDS) {
+				last = end - 86400000;
+			}
+			for(var stamp = start; stamp <= last && dates.length < max; stamp += 86400000) {
 				dates.push(stamp);
 			}
 		}
@@ -2062,6 +2103,15 @@ function events_event_days_script()
 	endInput.addEventListener('input', onInput);
 	startInput.addEventListener('change', onChange);
 	endInput.addEventListener('change', onChange);
+	// A time can take an event over or under a day. Unsettled, so a change to one while a
+	// date box is still half typed leaves the grid alone rather than clearing it.
+	var timeInputs = [startTimeInput, endTimeInput];
+	for(var t = 0; t < timeInputs.length; t++) {
+		if(timeInputs[t]) {
+			timeInputs[t].addEventListener('input', onInput);
+			timeInputs[t].addEventListener('change', onInput);
+		}
+	}
 })();
 </script>
 SCRIPT;
