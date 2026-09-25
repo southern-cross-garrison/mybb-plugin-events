@@ -20,12 +20,8 @@ BASE_URL="${BASE_URL:-http://localhost:${WEB_PORT}}"
 
 # The forum's custom theme, imported by scripts/install-theme.sh. Pinned to a commit so
 # the provisioned database snapshot is reproducible; override in .env to track a branch.
-#
-# Currently pinned to the branch behind mybb-custom-theme PR #2, which gives the theme the
-# MyBB table classes the plugin's pages are built from, and vendors the SCEditor style its
-# `editortheme` property names. Repoint at main once it merges.
 THEME_REPO="${THEME_REPO:-https://github.com/southern-cross-garrison/mybb-custom-theme.git}"
-THEME_REF="${THEME_REF:-dcfdb15817dc43caf63e184975f9e415f7a4b77d}"
+THEME_REF="${THEME_REF:-d9c45014d0d859bc21bd046ea403444b377b73df}"
 THEME_XML="${THEME_XML:-SCG-Responsive.xml}"
 
 # Smart Thread Link, the companion plugin the custom theme's thread listings need. The

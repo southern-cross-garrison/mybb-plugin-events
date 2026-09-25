@@ -483,6 +483,41 @@ test.describe("configurable regions", () => {
     );
     expect(String((column as any).Type)).toBe("varchar(64)");
   });
+
+  test("the Admin CP event form offers and saves a region whose name needs escaping", async ({
+    page,
+  }) => {
+    // A quote cut the option's value short, so the form posted a region that is not on
+    // the list and refused its own event; the markup would have run as script.
+    const region = 'The "Shire" <script>alert(1)</script>';
+    const dialogs: string[] = [];
+    page.on("dialog", (dialog) => {
+      dialogs.push(dialog.message());
+      void dialog.dismiss();
+    });
+
+    await gotoSettings(page);
+    await addRegion(page, region);
+    await expect(page.locator("#flash_message")).toContainText("added");
+    expect(await getSetting("events_regions")).toBe(
+      `${DEFAULT_REGIONS},${region}`,
+    );
+
+    const eventId = await createEvent({ title: "Shire Troop", region });
+    await gotoEventsAdmin(page, `&action=edit&id=${eventId}`);
+
+    await expect(page.locator("#region")).toHaveValue(region);
+    await expect(
+      page.locator("#region option", { hasText: region }),
+    ).toHaveCount(1);
+
+    await page.locator('input[type="submit"][value="Update Event"]').click();
+    await expect(page.locator("#flash_message")).toContainText(
+      "Event updated successfully",
+    );
+    expect((await getEvent(eventId)).region).toBe(region);
+    expect(dialogs).toEqual([]);
+  });
 });
 
 /**

@@ -240,7 +240,15 @@ function events_admin_edit_event()
         "description"
     );
     $container->output_row("Status", "Pending events are only visible to coordinators; setting an event live posts its announcement thread", $form->generate_select_box("status", events_event_statuses(), $values['status'], array("id" => "status")), "status");
-    $container->output_row("Region", "Used by the region filter", $form->generate_select_box("region", array_combine(events_regions(), events_regions()), $values['region'], array("id" => "region")), "region");
+    // generate_select_box() interpolates both the value and the label straight into the
+    // markup, and a region name is free text. It matches the selected value against the
+    // keys as they are, so that is escaped too; the browser decodes it again on submit.
+    $region_choices = array();
+    foreach(events_regions() as $region)
+    {
+        $region_choices[htmlspecialchars_uni($region)] = htmlspecialchars_uni($region);
+    }
+    $container->output_row("Region", "Used by the region filter", $form->generate_select_box("region", $region_choices, htmlspecialchars_uni((string)$values['region']), array("id" => "region")), "region");
     $container->output_row("Address", "Optional. Where the event happens; shown as a Google Maps link on the event pages and in the announcement thread", $form->generate_text_box("address", $values['address'], array("id" => "address", "maxlength" => 255)), "address");
     // The date boxes are not generate_text_box(): it can set a class, an id and a style and
     // nothing else, so it cannot produce the time input beside each one. events_datetime_field()
