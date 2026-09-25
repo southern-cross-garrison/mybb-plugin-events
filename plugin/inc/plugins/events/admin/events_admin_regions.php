@@ -105,9 +105,12 @@ function events_admin_region_name_error($name, array $taken = array())
         return "\"" . htmlspecialchars_uni($name) . "\" is too long for a region name (" . EVENTS_REGION_MAX_LENGTH . " characters at most).";
     }
 
+    // Case only, and not accents: "Cafe" and "Café" are different names to the region
+    // column (see events_install_database()), but two regions a letter's case apart would
+    // just be the same place typed twice.
     foreach($taken as $other)
     {
-        if(strtolower($other) === strtolower($name))
+        if(mb_strtolower($other, 'UTF-8') === mb_strtolower($name, 'UTF-8'))
         {
             return "\"" . htmlspecialchars_uni($name) . "\" is already a region.";
         }
@@ -417,7 +420,7 @@ function events_admin_plan_regions(array $rows, array &$errors)
 
     $final   = array();
     $renames = array();  // original => the name it now has
-    $seen    = array();  // lowercased name => the row that claimed it
+    $seen    = array();  // names claimed by the rows so far
 
     foreach($rows as $row)
     {
@@ -432,14 +435,14 @@ function events_admin_plan_regions(array $rows, array &$errors)
             return false;
         }
 
-        $error = events_admin_region_name_error($row['name'], array_values($seen));
+        $error = events_admin_region_name_error($row['name'], $seen);
         if($error !== '')
         {
             $errors[] = $error;
             continue;
         }
 
-        $seen[strtolower($row['name'])] = $row['name'];
+        $seen[] = $row['name'];
         $final[] = $row['name'];
         $renames[$row['original']] = $row['name'];
     }

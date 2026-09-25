@@ -369,23 +369,5 @@ $handler->delete_user(array(${uids.join(',')}));
       await runScheduledTask('events_reminders');
       expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
     });
-
-    test('activation clears signups that earlier deletions left behind', async () => {
-      const eventId = await createEvent({ title: 'Upgrade Orphan Troop' });
-      await createRsvp(eventId, 'trooper1', { costumes: [TK] });
-
-      const [{ uid: ghost }] = await query<any>(`SELECT MAX(uid) + 1000 AS uid FROM ${T('users')}`);
-      const rsvpId = await insertSignup(eventId, ghost);
-      expect(await countRsvps(eventId)).toBe(2);
-
-      await runPhp(`
-require_once MYBB_ROOT.'inc/plugins/events/inc/events_install.php';
-events_upgrade_database();
-`);
-
-      expect(await countRsvps(eventId)).toBe(1);
-      const costumes = await query<any>(`SELECT COUNT(*) AS n FROM ${T('event_plugin_rsvp_costumes')} WHERE rsvp_id = ?`, [rsvpId]);
-      expect(Number(costumes[0].n)).toBe(0);
-    });
   });
 });

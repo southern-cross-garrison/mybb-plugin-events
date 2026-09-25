@@ -196,6 +196,14 @@ baseline picks the change up.
   anybody saves it, so it reads as "the event vanished" rather than as a settings bug.
   That is the whole reason deleting a region asks where its events go first.
 
+- The events table's `region` column is `utf8mb4_bin`, unlike every other text column.
+  The region list is exact strings in PHP, and under the table's `general_ci` the database
+  treated `Cafe` and `Café` as one value in every GROUP BY, WHERE and CASE the region code
+  runs: renaming one dragged the other's events along, and deleting one found no events of
+  its own and skipped the "where do they go" step. Keep it binary - a `CONVERT TO` over
+  that table would reset it. The duplicate-name check (`mb_strtolower()`) is only there to
+  stop the same place being typed twice; it does not have to agree with the database.
+
 - The settings form writes every setting on it at once, so a save from a page opened
   before someone else's change silently reverts it - and for a region added meanwhile,
   that drops it from the list while its events stay filed under it. The form carries

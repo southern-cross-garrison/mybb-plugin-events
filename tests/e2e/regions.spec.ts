@@ -249,6 +249,71 @@ test.describe("configurable regions", () => {
     expect(await getSetting("events_regions")).toBe(DEFAULT_REGIONS);
   });
 
+  test("keeps regions whose names differ only by an accent apart", async ({
+    page,
+  }) => {
+    await gotoSettings(page);
+    await addRegion(page, "Cafe");
+    await expect(page.locator("#flash_message")).toContainText('"Cafe" added');
+    await addRegion(page, "Café");
+    await expect(page.locator("#flash_message")).toContainText('"Café" added');
+    expect(await getSetting("events_regions")).toBe(
+      `${DEFAULT_REGIONS},Cafe,Café`,
+    );
+
+    const plain = await createEvent({ title: "Plain Cafe Troop", region: "Cafe" });
+    const accented = await createEvent({
+      title: "Accented Cafe Troop",
+      region: "Café",
+    });
+
+    // The region column compared under general_ci, which treats these as one value:
+    // renaming one dragged the other's events along with it.
+    await gotoSettings(page);
+    await renameRegion(page, "Cafe", "Coffee");
+    await save(page);
+    await expect(page.locator(".error")).toHaveCount(0);
+    expect((await getEvent(plain)).region).toBe("Coffee");
+    expect((await getEvent(accented)).region).toBe("Café");
+
+    // And deleting one found no events of its own, so skipped the step that asks where
+    // they go and left them filed under a region that was gone.
+    await gotoSettings(page);
+    await page.locator('.events_region_delete[data-region="Café"]').click();
+    await expect(page.locator("#events_region_modal_message")).toContainText(
+      "1 event is associated with this region",
+    );
+    await modalSubmit(page).click();
+    await expect(page.locator("#events_region_modal_move")).toBeVisible();
+    await page.locator("#events_region_modal_move_to").selectOption("Sydney");
+    await modalSubmit(page).click();
+
+    await expect(page.locator("#flash_message")).toContainText(
+      '1 event was moved to "Sydney"',
+    );
+    expect((await getEvent(accented)).region).toBe("Sydney");
+    expect((await getEvent(plain)).region).toBe("Coffee");
+  });
+
+  test("renames a region to an accented spelling of its own name", async ({
+    page,
+  }) => {
+    const eventId = await createEvent({
+      title: "Accented Region Troop",
+      region: "Canberra",
+    });
+
+    await gotoSettings(page);
+    await renameRegion(page, "Canberra", "Cánberra");
+    await save(page);
+
+    await expect(page.locator(".error")).toHaveCount(0);
+    expect(await getSetting("events_regions")).toBe(
+      "Sydney,Hunter,Cánberra,Other",
+    );
+    expect((await getEvent(eventId)).region).toBe("Cánberra");
+  });
+
   test("renames a region and its events follow it", async ({ page }) => {
     const eventId = await createEvent({
       title: "Renamed Region Troop",
@@ -616,6 +681,16 @@ test.describe("configurable regions", () => {
       `SHOW COLUMNS FROM ${T("event_plugin_events")} LIKE 'region'`,
     );
     expect(String((column as any).Type)).toBe("varchar(64)");
+  });
+
+  test("compares region names exactly, the way the region list in PHP does", async () => {
+    // Every other text column is general_ci, which folds case and accents. The region
+    // list is a list of exact strings, and a column that disagreed with it about which
+    // names are the same one refiled and counted events under the wrong region.
+    const [column] = await query(
+      `SHOW FULL COLUMNS FROM ${T("event_plugin_events")} LIKE 'region'`,
+    );
+    expect(String((column as any).Collation)).toBe("utf8mb4_bin");
   });
 
   test("the Admin CP event form offers and saves a region whose name needs escaping", async ({
