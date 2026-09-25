@@ -176,7 +176,12 @@ Either way the details are:
 - WWCC requirement
 - GEC assignment - see below
 - Event days - the hours the event runs on each of its days. The rows follow the start
-  and end dates rather than being typed, and a single-day event has none at all
+  and end dates rather than being typed, and a single-day event has none at all. A night
+  that runs past midnight is not a second day: an event shorter than a day is on the
+  date it starts, and one that ends before 06:00 finished the night before, so a
+  22:00 to 01:00 troop is one night and two such nights are two rows. A day whose end
+  time is earlier than its start runs overnight, and has to be over before the next
+  day's start time
 - Excluded users (optional) - a tag field: type part of a username, pick the member from
   the list it filters down, and they appear as a lozenge with an X to take them off again.
   Only a member who exists can be added, and an excluded member is not shown the event at
@@ -243,6 +248,11 @@ valid. Neither shortcut widens the list for anybody else, and an event handed to
 outside the groups is rejected as a forged post rather than saved.
 
 With no groups configured, the only choice offered is the person creating the event.
+
+The list opens with a blank **Choose a coordinator**. An event whose coordinator has since
+been deleted shows that instead of a name, and cannot be saved until somebody is picked -
+otherwise the box would fall back to whoever sorts first, and saving the event for any
+other reason would quietly hand it to them.
 
 ### Announcement Threads
 

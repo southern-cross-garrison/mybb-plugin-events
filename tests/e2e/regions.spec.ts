@@ -128,9 +128,10 @@ async function restoreRegions(page: Page): Promise<void> {
   // back: a region re-added under the same name starts with no forum.
   if ((await getSetting("events_event_forums")) !== DEFAULT_REGION_FORUMS()) {
     await gotoSettings(page);
-    for (const select of await page.locator('select[name^="event_forums["]').all()) {
+    const hunter = await rowIndex(page, "Hunter");
+    for (const select of await page.locator('select[id^="region_forum_"]').all()) {
       await select.selectOption(
-        (await select.getAttribute("name")) === "event_forums[Hunter]"
+        (await select.getAttribute("id")) === `region_forum_${hunter}`
           ? String(fixtures().forums.events_hunter)
           : "",
       );
@@ -283,6 +284,45 @@ test.describe("configurable regions", () => {
     expect(await getSetting("events_event_forums")).toBe(
       `Newcastle=${f.forums.events_hunter}`,
     );
+  });
+
+  test("keeps the forum of a region whose name has square brackets in it", async ({
+    page,
+  }) => {
+    const f = fixtures();
+
+    // PHP reads a field called event_forums[North]Coast] as event_forums[North], so a
+    // dropdown named after its region handed a bracketed region's forum to a name the
+    // board does not have. Both halves: a forum chosen for such a region, and one that
+    // a region already had surviving an ordinary save after it gained the bracket.
+    await gotoSettings(page);
+    await addRegion(page, "North]Coast");
+    await expect(page.locator("#flash_message")).toContainText(
+      '"North]Coast" added',
+    );
+
+    await page
+      .locator(`#region_forum_${await rowIndex(page, "North]Coast")}`)
+      .selectOption(String(f.forums.events));
+    await save(page);
+    expect(await getSetting("events_event_forums")).toBe(
+      `${DEFAULT_REGION_FORUMS()},North]Coast=${f.forums.events}`,
+    );
+
+    await renameRegion(page, "Hunter", "[Hunter] Valley");
+    await save(page);
+    await save(page);
+    expect(await getSetting("events_event_forums")).toBe(
+      `[Hunter] Valley=${f.forums.events_hunter},North]Coast=${f.forums.events}`,
+    );
+
+    // And the dropdowns come back showing what was saved.
+    await expect(
+      page.locator(`#region_forum_${await rowIndex(page, "[Hunter] Valley")}`),
+    ).toHaveValue(String(f.forums.events_hunter));
+    await expect(
+      page.locator(`#region_forum_${await rowIndex(page, "North]Coast")}`),
+    ).toHaveValue(String(f.forums.events));
   });
 
   test("a rename rewrites the announcements of the events it moves", async ({

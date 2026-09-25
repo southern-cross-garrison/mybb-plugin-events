@@ -243,7 +243,9 @@ test.describe('front-end event management', () => {
       await page.goto('/manage_event.php');
 
       const options = page.locator('#event_form_gec_user_id option');
-      await expect(options).toHaveText(['gec', 'newbie', 'trooper2']);
+      // Led by a blank option, which is what an event whose coordinator has been deleted
+      // falls back to instead of whoever sorts first (member-deletion.spec.ts).
+      await expect(options).toHaveText(['Choose a coordinator', 'gec', 'newbie', 'trooper2']);
     } finally {
       for (const undo of restore) await undo();
     }
@@ -262,11 +264,11 @@ test.describe('front-end event management', () => {
       await page.goto(`/manage_event.php?id=${eventId}`);
 
       const options = page.locator('#event_form_gec_user_id option');
-      await expect(options).toHaveText(['gec', 'trooper2']);
+      await expect(options).toHaveText(['Choose a coordinator', 'gec', 'trooper2']);
       await expect(page.locator('#event_form_gec_user_id')).toHaveValue(String(uid('trooper2')));
 
       await page.goto('/manage_event.php');
-      await expect(page.locator('#event_form_gec_user_id option')).toHaveText(['gec']);
+      await expect(page.locator('#event_form_gec_user_id option')).toHaveText(['Choose a coordinator', 'gec']);
     } finally {
       await restore();
     }
@@ -1126,10 +1128,9 @@ test.describe('front-end event management', () => {
 
     // And the calendar puts it on the night it starts, not the morning it finishes.
     await page.goto('/events.php?view=calendar&month=2026-10');
-    const cell = (day: number) =>
-      page.locator('td').filter({ has: page.locator('strong', { hasText: new RegExp(`^${day}$`) }) });
-    await expect(cell(24).locator(`[data-event-id="${eventId}"]`)).toHaveCount(1);
-    await expect(cell(25).locator(`[data-event-id="${eventId}"]`)).toHaveCount(0);
+    const entry = (date: string) => page.locator(`td[data-date="${date}"] .calendar_event[data-event-id="${eventId}"]`);
+    await expect(entry('2026-10-24')).toHaveCount(1);
+    await expect(entry('2026-10-25')).toHaveCount(0);
   });
 
   test('an apostrophe in the title and description survives the round trip', async ({ page }) => {

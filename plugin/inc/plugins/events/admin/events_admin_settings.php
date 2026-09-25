@@ -133,15 +133,11 @@ function events_admin_settings()
                 'events_timezone' => $timezone,
                 'events_event_forum' => $mybb->get_input('event_forum'),
                 'events_regions' => $region_plan['list'],
-                // One dropdown per region, folded back into the single Region=fid setting.
-                // The dropdowns were rendered under the names the regions had before this
-                // save, so they are remapped onto the names the regions now have - without
-                // that, renaming a region silently unroutes its announcements.
+                // One dropdown per region, folded back into the single Region=fid setting
+                // under the names the regions now have - without that, renaming a region
+                // silently unroutes its announcements.
                 'events_event_forums' => events_build_region_forums_setting(
-                    events_admin_remap_region_forums(
-                        (array)$mybb->get_input('event_forums', MyBB::INPUT_ARRAY),
-                        $region_plan['renames']
-                    )
+                    events_admin_region_forums_from_rows($region_rows, $region_plan['renames'])
                 )
             );
 
@@ -308,20 +304,7 @@ function events_admin_settings()
     // Which forum a region posts to is a property of that region, so it belongs on the
     // region rather than in a parallel list of "<Region> Event Forum" rows that the two
     // would have to be read side by side to make sense of.
-    $region_forums = events_region_forums();
-    $posted_region_forums = (array)$mybb->get_input('event_forums', MyBB::INPUT_ARRAY);
-
-    $selected_region_forums = array();
-    foreach($region_rows as $row)
-    {
-        $region = $row['original'];
-
-        $selected_region_forums[$region] = $mybb->request_method == "post"
-            ? (isset($posted_region_forums[$region]) ? $posted_region_forums[$region] : '')
-            : (isset($region_forums[$region]) ? $region_forums[$region] : '');
-    }
-
-    events_admin_output_region_rows($form, $region_rows, $region_counts, $forum_choices, $selected_region_forums);
+    events_admin_output_region_rows($form, $region_rows, $region_counts, $forum_choices);
 
     $buttons = array($form->generate_submit_button("Save Settings"));
     $form->output_submit_wrapper($buttons);

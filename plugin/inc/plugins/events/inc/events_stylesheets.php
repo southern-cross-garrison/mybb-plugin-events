@@ -73,8 +73,20 @@ function events_install_stylesheet()
         $db->insert_query("themestylesheets", $row);
     }
 
+    // A theme that has customised the sheet has a row of its own, which MyBB serves in
+    // place of the master's - and that row carries its own copy of attachedto, taken when
+    // it was made. Left alone, a page added to the list above reached every theme but
+    // those, and on them rendered unstyled. Only the page list is brought up to date: the
+    // CSS in that row is the theme's, and overwriting it would undo the customisation.
+    $db->update_query(
+        "themestylesheets",
+        array("attachedto" => $db->escape_string(EVENTS_STYLESHEET_ATTACHEDTO)),
+        "name = '" . $db->escape_string(EVENTS_STYLESHEET) . "' AND tid != " . EVENTS_MASTER_THEME
+    );
+
     // Write the flat cache file MyBB serves in preference to css.php, then rebuild the
-    // per-theme stylesheet lists. That is what adds the sheet to each theme's display
+    // per-theme stylesheet lists - every theme's, since the call walks the master's
+    // children, which is what puts the copies' new attachedto into effect. That is what adds the sheet to each theme's display
     // order - a stylesheet missing from disporder is silently never output.
     cache_stylesheet(EVENTS_MASTER_THEME, EVENTS_STYLESHEET, $css);
     update_theme_stylesheet_list(EVENTS_MASTER_THEME, false, true);

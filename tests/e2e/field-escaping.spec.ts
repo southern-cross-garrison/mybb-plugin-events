@@ -289,19 +289,21 @@ test.describe('region, address and costume values', () => {
     await expect(page.locator('td', { hasText: COSTUME }).first()).toHaveText(COSTUME);
     await expectInert(page, 'the Admin CP RSVP list');
 
-    // The settings page's region list: the rename box, the forum the map gives it (keyed
-    // by the name, in a select whose own name carries it), and the X that deletes it.
+    // The settings page's region list: the rename box, the forum the map gives it (on the
+    // same row, under the same index), and the X that deletes it.
     await gotoEventsAdmin(page, '&action=settings');
     expect(await countWithAttribute(page, 'input[name^="region_original["]', 'value', REGION)).toBe(1);
     expect(await page.locator('input[name^="region_name["]').evaluateAll((nodes, expected) => nodes.filter((node) => (node as HTMLInputElement).value === expected).length, REGION)).toBe(1);
-    const forumSelect = page.locator('select[name^="event_forums["]');
-    expect(
-      await forumSelect.evaluateAll(
-        (nodes, [name, fid]) => nodes.filter((node) => node.getAttribute('name') === name && (node as HTMLSelectElement).value === fid).length,
-        [`event_forums[${REGION}]`, String(FORUMS.events_hunter)],
-      ),
-      "the region's forum select should be named for it and show the forum the map gives it",
-    ).toBe(1);
+    const rowIndex = await page
+      .locator('input[name^="region_original["]')
+      .evaluateAll((nodes, expected) => {
+        const node = nodes.find((n) => (n as HTMLInputElement).value === expected);
+        return node?.getAttribute('name')?.match(/\[(\d+)\]/)?.[1];
+      }, REGION);
+    await expect(
+      page.locator(`select[name="event_forums[${rowIndex}]"]`),
+      "the region's forum select should sit on its row and show the forum the map gives it",
+    ).toHaveValue(String(FORUMS.events_hunter));
     expect(await countWithAttribute(page, 'a.events_region_delete', 'data-region', REGION)).toBe(1);
     expect(await countWithAttribute(page, 'a.events_region_delete', 'aria-label', `Delete ${REGION}`)).toBe(1);
     await expectInert(page, 'the Admin CP settings page');

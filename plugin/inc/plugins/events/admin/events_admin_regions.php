@@ -354,7 +354,12 @@ function events_admin_delete_region($region, $move_to, array &$errors, &$thread_
  * Position would be enough right up until two admins had the settings page open at once,
  * at which point the second save would rename regions it was never shown.
  *
- * @return array of array('original' => string, 'name' => string)
+ * The forum comes back under the row's index, the same as its name box, and never under
+ * the region's name: PHP ends an array key at the first "]", so a dropdown called
+ * event_forums[North]Coast] arrives as event_forums[North] and the region loses its
+ * forum to a name the board does not have.
+ *
+ * @return array of array('original' => string, 'name' => string, 'forum' => string)
  */
 function events_admin_region_rows()
 {
@@ -364,9 +369,15 @@ function events_admin_region_rows()
 
     if($mybb->request_method != "post")
     {
+        $forums = events_region_forums();
+
         foreach(events_regions() as $region)
         {
-            $rows[] = array('original' => $region, 'name' => $region);
+            $rows[] = array(
+                'original' => $region,
+                'name'     => $region,
+                'forum'    => isset($forums[$region]) ? (string)$forums[$region] : '',
+            );
         }
 
         return $rows;
@@ -374,12 +385,14 @@ function events_admin_region_rows()
 
     $originals = (array)$mybb->get_input('region_original', MyBB::INPUT_ARRAY);
     $names     = (array)$mybb->get_input('region_name', MyBB::INPUT_ARRAY);
+    $forums    = (array)$mybb->get_input('event_forums', MyBB::INPUT_ARRAY);
 
     foreach($originals as $index => $original)
     {
         $rows[] = array(
             'original' => trim((string)$original),
             'name'     => isset($names[$index]) ? trim((string)$names[$index]) : '',
+            'forum'    => isset($forums[$index]) ? trim((string)$forums[$index]) : '',
         );
     }
 
@@ -455,30 +468,25 @@ function events_admin_plan_regions(array $rows, array &$errors)
 }
 
 /**
- * Carry the per-region announcement forums across a set of renames.
+ * The per-region announcement forums the submitted rows ask for, under the names the
+ * regions now have.
  *
- * The dropdowns on the settings form are keyed by the names the regions had when it was
- * rendered, so a renamed region's forum has to follow it to its new name or the board
- * silently loses the routing it just had.
+ * Each dropdown sits on the row of the region it belongs to, so a renamed region's forum
+ * follows it to its new name rather than the board silently losing the routing it just
+ * had.
  *
- * @param array $posted  event_forums[] as submitted, region => forum id
+ * @param array $rows    From events_admin_region_rows()
  * @param array $renames original => final name
  * @return array region => forum id
  */
-function events_admin_remap_region_forums(array $posted, array $renames)
+function events_admin_region_forums_from_rows(array $rows, array $renames)
 {
     $mapped = array();
 
-    foreach($posted as $region => $forum_id)
+    foreach($rows as $row)
     {
-        $region = trim((string)$region);
-
-        if(isset($renames[$region]))
-        {
-            $region = $renames[$region];
-        }
-
-        $mapped[$region] = $forum_id;
+        $region = isset($renames[$row['original']]) ? $renames[$row['original']] : $row['original'];
+        $mapped[$region] = $row['forum'];
     }
 
     return $mapped;
@@ -691,9 +699,8 @@ function events_admin_output_region_delete_page($region)
  * @param array $rows          From events_admin_region_rows()
  * @param array $counts        From events_admin_region_event_counts()
  * @param array $forum_choices forum id => name, with '' => 'None' at the front
- * @param array $forums        region => the forum id its row should show
  */
-function events_admin_output_region_rows($form, array $rows, array $counts, array $forum_choices, array $forums)
+function events_admin_output_region_rows($form, array $rows, array $counts, array $forum_choices)
 {
     $container = new FormContainer("Regions");
 
@@ -708,11 +715,10 @@ function events_admin_output_region_rows($form, array $rows, array $counts, arra
             . ' title="Delete ' . htmlspecialchars_uni($original) . '"'
             . ' aria-label="Delete ' . htmlspecialchars_uni($original) . '">&times;</a>';
 
-        // Keyed by the name the region has now. A region renamed in the box beside it
-        // is remapped onto its new name when the form is saved.
-        $forum = $form->generate_select_box("event_forums[" . htmlspecialchars_uni($original) . "]",
-            $forum_choices, isset($forums[$original]) ? $forums[$original] : '',
-            array("id" => "region_forum_" . $index));
+        // Keyed by the row, like the name box beside it, and not by the region's name:
+        // see events_admin_region_rows().
+        $forum = $form->generate_select_box("event_forums[" . $index . "]",
+            $forum_choices, $row['forum'], array("id" => "region_forum_" . $index));
 
         $content = '<span class="events_region_row">'
             . $form->generate_hidden_field("region_original[" . $index . "]", $original)

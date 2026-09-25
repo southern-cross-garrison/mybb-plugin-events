@@ -136,7 +136,12 @@ baseline picks the change up.
   the suite looks flaky and no single test looks broken. `tests/helpers/suite-lock.ts`
   holds a PID lock: `playwright.config.ts` checks it (before Playwright empties
   `outputDir`, which would otherwise take the running suite's traces with it) and global
-  setup claims it. A lock left by a dead process is taken over automatically.
+  setup claims it. A lock left by a dead process is taken over automatically. The claim is
+  atomic (the file is written whole and hard-linked into place, which fails if the name is
+  taken): it used to read and then write, and sessions queued on the same pid all start the
+  moment it exits, so two of them read "free" in the same second and restored the database
+  at once. The config only checks, never claims - an editor's test explorer loads it to
+  list tests and then idles, and a claim there would hold the suite while the editor is open.
 
 - Never delete `.devenv/suite.lock` to get a run moving. The lock takes itself over when the
   process that wrote it is gone - `assertNoRunInFlight()` checks `isAlive(pid)` before it

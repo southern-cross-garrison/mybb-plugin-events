@@ -150,7 +150,9 @@ test.describe('admin event management', () => {
       await loginToAdminCp(page);
       await gotoEventsAdmin(page, '&action=add');
 
-      await expect(page.locator('#gec_user_id option')).toHaveText(['admin', 'gec', 'trooper2']);
+      // Led by a blank option, which is what an event whose coordinator has been deleted
+      // falls back to instead of whoever sorts first (member-deletion.spec.ts).
+      await expect(page.locator('#gec_user_id option')).toHaveText(['Choose a coordinator', 'admin', 'gec', 'trooper2']);
     } finally {
       for (const undo of restore) await undo();
     }
