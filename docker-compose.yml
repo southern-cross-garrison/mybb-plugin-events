@@ -3,6 +3,10 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
+      args:
+        PHP_VERSION: ${PHP_VERSION:-7.4}
+    # Tagged per version so switching back and forth reuses each build.
+    image: mybb-events-web:php${PHP_VERSION:-7.4}
     container_name: mybb-events-web
     ports:
       - "${WEB_PORT:-8080}:80"

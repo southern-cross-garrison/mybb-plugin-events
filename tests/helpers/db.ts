@@ -525,8 +525,14 @@ export async function getPrivateMessages(username: string, subjectLike: string):
   );
 }
 
+/**
+ * Empty every mailbox, counters included. MyBB trusts `unreadpms`: left above zero, the
+ * next page shows a new-PM notice for a message that no longer exists, which is a logged
+ * warning on PHP 8.
+ */
 export async function deletePrivateMessages(): Promise<void> {
   await execute(`DELETE FROM ${T('privatemessages')}`, []);
+  await execute(`UPDATE ${T('users')} SET totalpms = 0, unreadpms = 0`, []);
 }
 
 export async function findThreadBySubject(subject: string): Promise<RowDataPacket | null> {

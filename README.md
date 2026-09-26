@@ -55,6 +55,20 @@ docker compose exec -T web php /dev/stdin < scripts/provision.php
 If the environment gets into a strange state, `./scripts/bootstrap.sh --fresh` rebuilds it
 from nothing.
 
+## PHP versions
+
+The plugin supports PHP 7.4 (what the garrison's host runs) through the latest 8.x. The web
+container runs 7.4 unless `PHP_VERSION` says otherwise, in `.env` or on the command line:
+
+```bash
+PHP_VERSION=8.5 ./scripts/bootstrap.sh
+npx playwright test
+```
+
+Each version builds its own image (`mybb-events-web:php<version>`), so switching back is
+quick. A plain `./scripts/bootstrap.sh` goes back to whatever `.env` says, so put the
+version there if you mean to stay on it.
+
 ## Demo data
 
 The provisioned board has users and settings but no events, which is what the suite wants
@@ -228,8 +242,10 @@ All of them use the password `testpass123`.
 
 ## Continuous integration
 
-`.github/workflows/e2e.yml` runs the same two commands on every push and pull request, and
-uploads the Playwright report, traces and container logs when something fails.
+`.github/workflows/e2e.yml` runs the same two commands on every push and pull request,
+once on PHP 7.4 and once on 8.5, and uploads each one's Playwright report, traces and
+container logs when something fails. Before the suite it lints every PHP file in `plugin/`
+and `scripts/`, which is what catches PHP 8-only syntax in a file no test loads.
 
 ### The `THEME_TOKEN` secret
 

@@ -8,9 +8,20 @@ on:
 
 jobs:
   e2e:
-    name: Playwright end-to-end
+    name: Playwright end-to-end (PHP ${{ matrix.php }})
     runs-on: ubuntu-latest
     timeout-minutes: 25
+
+    # The garrison's host runs 7.4 and the plugin has to keep working when it upgrades, so
+    # both ends of the supported range run. Neither cancels the other: a failure on one
+    # version is only useful to read alongside the other's result.
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['7.4', '8.5']
+
+    env:
+      PHP_VERSION: ${{ matrix.php }}
 
     steps:
       - uses: actions/checkout@v7
@@ -57,6 +68,13 @@ jobs:
       - name: Bootstrap the test forum
         run: ./scripts/bootstrap.sh --fresh
 
+      # Every file, including ones no test loads: on 7.4 this is what catches syntax that
+      # only PHP 8 accepts.
+      - name: Lint the plugin
+        run: |
+          docker run --rm --entrypoint sh -v "$PWD:/src" -w /src "mybb-events-web:php${PHP_VERSION}" \
+            -c 'find plugin scripts -name "*.php" -print0 | xargs -0 -n1 php -d display_errors=stderr -l >/dev/null'
+
       - name: Run the suite
         run: npx playwright test
 
@@ -71,7 +89,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-php${{ matrix.php }}
           # Everything below lives under .devenv/, and the action ignores files inside
           # dot-directories unless this is set - so without it a failing run uploads an
           # empty artifact and takes its own traces and container logs with it.

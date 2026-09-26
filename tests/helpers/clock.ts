@@ -9,7 +9,7 @@ import { BASE_URL, FAKETIME_FILE, TEST_NOW } from './config';
  * a bind-mounted file, so writing that file moves PHP's idea of "now" for both Apache
  * requests and CLI runs - without touching the host clock or the database.
  *
- * The control file always holds a *relative* offset ("+1209600s"). libfaketime resolves
+ * The control file always holds a *relative* offset in seconds ("+1209600"). libfaketime resolves
  * an absolute "@" spec against each process's start time, which means long-lived Apache
  * workers drift away from the requested instant; an offset is applied to the real clock
  * on every call and therefore stays put.
@@ -64,7 +64,9 @@ export async function setClock(when: string): Promise<void> {
   // Round up so the container clock is never left a fraction of a second *before* the
   // requested instant, which would make boundary assertions flap.
   const offset = Math.ceil(target - Date.now() / 1000);
-  write(`${offset >= 0 ? '+' : '-'}${Math.abs(offset)}s`);
+  // No unit: seconds are the default, and libfaketime 0.9.13 kills the process over an
+  // "s" suffix that older versions let pass.
+  write(`${offset >= 0 ? '+' : '-'}${Math.abs(offset)}`);
 
   await waitForClock(
     (observed) => Math.abs(toEpochSeconds(observed) - target) <= 120,

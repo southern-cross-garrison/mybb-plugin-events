@@ -599,6 +599,13 @@ if($rsvp_step === 'attendance')
                      . ($event_when === '' ? '' : ' on ' . $event_when) . '.</p>';
     }
 
+    // And where, for the same reason.
+    $address_link = events_address_link($event['address'], 'signup_intro_address_link');
+    if($address_link !== '')
+    {
+        $rsvp_intro .= '<p class="signup_intro_address"><strong>Address:</strong> ' . $address_link . '</p>';
+    }
+
     // The leading question, and for all but a handful of signups the only one. A div with
     // role="radiogroup" rather than a fieldset: a <legend> is lifted out of the fieldset's
     // box by the browser and themes restyle it freely, so the layout would be at the mercy

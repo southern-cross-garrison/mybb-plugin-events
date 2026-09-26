@@ -1875,6 +1875,13 @@ function events_send_waitlist_pms($event_id, array $moves, $from_uid = null, $sk
         $from_uid = (int)$event['gec_user_id'];
     }
 
+    // A sender who has since been deleted sends as the board (uid 0). MyBB lands there
+    // too, but only after reading fields off a user it could not find.
+    if($from_uid && !get_user($from_uid))
+    {
+        $from_uid = 0;
+    }
+
     $day_labels = array();
     foreach(events_get_event_days($event_id) as $day)
     {

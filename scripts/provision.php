@@ -17,6 +17,10 @@ require_once MYBB_ROOT . 'inc/init.php';
 
 // Surface the failing query when something goes wrong during provisioning.
 $mybb->dev_mode = 1;
+// Loaded as global.php does. UserDataHandler's timezone check reads the timezone names
+// from it, and on PHP 8 each one missing is a logged warning rather than a silent notice.
+$lang->set_language($mybb->settings['bblanguage']);
+$lang->load('global');
 require_once MYBB_ROOT . 'inc/functions_user.php';
 require_once MYBB_ROOT . 'inc/datahandlers/user.php';
 

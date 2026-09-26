@@ -46,6 +46,25 @@ test.describe('signup wizard', () => {
     await expect(page.locator('#signup_role_wrangler')).not.toBeChecked();
   });
 
+  test('links the event address to Google Maps on the attendance step', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Mapped Troop', address: '1 Macquarie St, Sydney NSW' });
+    const bareEventId = await createEvent({ title: 'Unmapped Troop' });
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+
+    const link = page.locator('#rsvp_page .signup_intro_address a');
+    await expect(link).toHaveText('1 Macquarie St, Sydney NSW');
+    await expect(link).toHaveAttribute(
+      'href',
+      'https://www.google.com/maps/search/?api=1&query=1%20Macquarie%20St%2C%20Sydney%20NSW',
+    );
+
+    await page.goto(`/rsvp.php?id=${bareEventId}`);
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'attendance');
+    await expect(page.locator('#rsvp_page .signup_intro_address')).toHaveCount(0);
+  });
+
   test('carries every selected costume through to the confirmation and the database', async ({ page }) => {
     const eventId = await createEvent({ title: 'Multi Costume Troop' });
 

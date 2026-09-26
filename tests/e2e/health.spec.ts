@@ -1,33 +1,15 @@
 import type { Page } from '@playwright/test';
 import { test, expect } from '../helpers/fixtures';
-import { runPhp } from '../helpers/container';
+import { clearErrorLogs, readErrorLogs } from '../helpers/error-log';
 import { followAdminActionLink, gotoEventsAdmin, loginAs, loginToAdminCp } from '../helpers/auth';
 import { createEvent, createRsvp, getEventDays, fixtures } from '../helpers/db';
 import { relativeToTestNow } from '../helpers/clock';
 
 const TK = fixtures().costumeOptions[0];
 
-/** Clear both logs, so what is read back afterwards was written by this test. */
-async function clearLogs(): Promise<void> {
-  await runPhp(`
-@unlink('/var/www/html/cache/mybb_errors.log');
-@unlink('/var/log/php_errors.log');
-echo "cleared";
-`);
-}
-
 /** The lines of either log that come from the plugin. */
 async function pluginLogLines(): Promise<string> {
-  const log = await runPhp(`
-foreach(array('/var/www/html/cache/mybb_errors.log', '/var/log/php_errors.log') as $file)
-{
-    if(file_exists($file)) { echo file_get_contents($file); }
-}
-echo "END_OF_LOG";
-`);
-
-  return log
-    .replace('END_OF_LOG', '')
+  return (await readErrorLogs())
     .split('\n')
     .filter((line) => /events|event_plugin|rsvp|troop/i.test(line))
     .join('\n');
@@ -46,7 +28,7 @@ async function expectRenders(page: Page, url: string): Promise<void> {
  */
 test.describe('runtime health', () => {
   test('every plugin page renders without a PHP warning or SQL error', async ({ page }) => {
-    await clearLogs();
+    await clearErrorLogs();
 
     const eventId = await createEvent({
       title: 'Health Check Troop',
@@ -91,7 +73,7 @@ test.describe('runtime health', () => {
    * (followAdminActionLink), and land on the list they redirect to.
    */
   test('the Admin CP, the troop report and the calendar subscription render without a PHP warning or SQL error', async ({ page }) => {
-    await clearLogs();
+    await clearErrorLogs();
 
     const upcoming = await createEvent({
       title: 'Health Check Admin Troop',

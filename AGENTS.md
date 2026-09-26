@@ -50,6 +50,23 @@ baseline picks the change up.
   records the run's *content* as well: the last test's threads, posts and PMs are still on
   the board when the run ends, so a snapshot taken after a run bakes them into the
   baseline that every later run starts from. Restoring first is what clears them.
+- The plugin has to run on PHP 7.4 (the garrison's host) and the latest 8.x, and CI runs
+  the suite on both (`PHP_VERSION`, see README). Write for 7.4 - no `str_contains()`,
+  `match`, `?->` or other 8.x additions - and for 8's strictness: an undefined index or
+  property that 7.4 reports as a notice MyBB ignores is a logged warning on 8, which fails
+  `health.spec.ts`. That includes MyBB's own code tripping over what the plugin hands it:
+  a PM whose `fromid` names a deleted member, or one sent from the reminder task, where
+  `task.php` loads no user at all and `$mybb->user['uid']` does not exist.
+- The error-log assertions (`tests/helpers/error-log.ts`) ignore a short, exact list of
+  warnings the garrison theme's templates raise on PHP 8 - variables and keys its
+  templates read that MyBB never sets. Add to that list only for a warning raised inside
+  an eval'd *theme* template; one from anywhere else is a real failure.
+- libfaketime is built from a pinned release in `docker/web.Dockerfile`, not installed
+  from Debian. PHP on the newer images reads file times through `stat64()`, which Debian's
+  0.9.10 does not intercept, so every file written under a moved clock looked older than
+  `time()` and MyBB served a theme's cached stylesheet through `css.php` instead. 0.9.13
+  also refuses - by killing the process - an offset with an `s` suffix, which older
+  versions ignored, so `tests/helpers/clock.ts` writes a bare number of seconds.
 - Everything runs in Docker. Log and file paths in debugging code must be container paths
   (`/var/www/html/...`); `test-forum/` on the host is the same directory.
 - MyBB's `insert_query()`/`update_query()` quote values but do **not** escape them. Every

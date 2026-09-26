@@ -3,6 +3,10 @@ import { test, expect } from '../helpers/fixtures';
 import { loginAs, loginToAdminCp, gotoEventsAdmin } from '../helpers/auth';
 import { relativeToTestNow } from '../helpers/clock';
 import { runPhp, runScheduledTask } from '../helpers/container';
+// Read unfiltered, not narrowed to the plugin's own files the way health.spec.ts narrows
+// it: a sender who no longer exists warns from inside MyBB's PMDataHandler, which is still
+// the plugin's doing when the plugin passed that uid.
+import { clearErrorLogs, readErrorLogs } from '../helpers/error-log';
 import {
   countPrivateMessages,
   createEvent,
@@ -149,34 +153,6 @@ async function deleteMemberThroughAdminCp(page: Page, userId: number): Promise<v
   const row = await queryOne<any>(`SELECT uid FROM ${T('users')} WHERE uid = ?`, [userId]);
   expect(row, `uid ${userId} should be gone from the users table`).toBeNull();
   throwaways = throwaways.filter((id) => id !== userId);
-}
-
-/**
- * PHP warnings and MyBB's own error log are written, not shown, so a page can render
- * "fine" over a stream of "array offset on null" from a uid that names nobody.
- */
-async function clearErrorLogs(): Promise<void> {
-  await runPhp(`
-@unlink('/var/www/html/cache/mybb_errors.log');
-@unlink('/var/log/php_errors.log');
-echo "cleared";
-`);
-}
-
-/**
- * Everything logged since clearErrorLogs(). Not filtered to the plugin's own files the
- * way health.spec.ts filters: a sender who no longer exists warns from inside MyBB's
- * PMDataHandler, which is still the plugin's doing when the plugin passed that uid.
- */
-async function readErrorLogs(): Promise<string> {
-  const log = await runPhp(`
-foreach(array('/var/www/html/cache/mybb_errors.log', '/var/log/php_errors.log') as $file)
-{
-    if(file_exists($file)) { echo file_get_contents($file); }
-}
-echo "END_OF_LOG";
-`);
-  return log.replace('END_OF_LOG', '').trim();
 }
 
 async function expectPageRenders(page: Page, url: string, absentNames: string[] = []): Promise<void> {

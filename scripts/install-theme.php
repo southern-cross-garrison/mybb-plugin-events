@@ -25,7 +25,9 @@ $mybb->dev_mode = 1;
 
 // import_theme_xml() and its helpers live in the ACP's function library. They are plain
 // function definitions - including them does not pull in any admin session handling.
-require_once MYBB_ROOT . 'inc/class_xml.php';
+// They parse through create_xml_parser(), which loads the parser for the running PHP
+// itself; requiring inc/class_xml.php here is a fatal error on PHP 8, which already has a
+// class named XMLParser.
 require_once MYBB_ROOT . 'admin/inc/functions.php';
 require_once MYBB_ROOT . 'admin/inc/functions_themes.php';
 

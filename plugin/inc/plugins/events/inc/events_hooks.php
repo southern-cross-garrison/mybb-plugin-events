@@ -1495,6 +1495,8 @@ function events_send_reminders(&$failures = array())
             'fromid'  => 0,
             'toid'    => $user_ids,
             'ipaddress' => my_inet_pton('127.0.0.1'),
+            // The board has no Sent Items to save a copy into.
+            'options' => array('savecopy' => 0),
         ));
 
         // Nothing records a refused PM but this: last_reminder_sent is left alone, so the
