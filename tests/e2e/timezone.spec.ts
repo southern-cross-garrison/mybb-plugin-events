@@ -124,9 +124,9 @@ test.describe(`events in ${ZONE}`, () => {
     await loginAs(page, 'trooper1');
     await page.goto(`/event.php?id=${eventId}`);
 
-    // dateformat/timeformat are pinned to Y-m-d H:i by provisioning.
-    await expect(page.locator('#event_start')).toHaveText('2026-10-05 18:00');
-    await expect(page.locator('#event_end')).toHaveText('2026-10-05 21:30');
+    // timeformat is pinned to H:i (and dateformat to Y-m-d) by provisioning.
+    await expect(page.locator('#event_start')).toHaveText('Monday, Oct 5 at 18:00');
+    await expect(page.locator('#event_end')).toHaveText('Monday, Oct 5 at 21:30');
     await expect(page.locator('#event_cutoff')).toHaveText('2026-10-04 12:00');
   });
 

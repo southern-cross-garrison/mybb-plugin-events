@@ -66,8 +66,8 @@ function events_render_event_card(array $event, $thread_id = 0)
     // the listing colours it.
     $event_status_class = events_needs_troop_report($event) ? 'event_status_needs_report' : '';
     $event_region = htmlspecialchars_uni($event['region']);
-    $event_start_date = events_format_date($event['start_date']);
-    $event_end_date = events_format_date($event['end_date']);
+    $event_start_date = events_format_long_date($event['start_date']);
+    $event_end_date = events_format_long_date($event['end_date']);
     $event_description = events_parse_description($event['description']);
     $rsvp_count = events_rsvp_count($event_id, 'trooper');
     $wrangler_count = events_rsvp_count($event_id, 'wrangler');

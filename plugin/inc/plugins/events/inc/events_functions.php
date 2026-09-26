@@ -2504,6 +2504,34 @@ function events_format_date_day($timestamp)
 }
 
 /**
+ * "Friday, Oct 2 at 06:00 PM" - a stored datetime written out in full for the event card,
+ * with the year added as events_format_date_day() adds it and the time in the board's
+ * own time format.
+ *
+ * @param string $date
+ * @return string
+ */
+function events_format_long_date($date)
+{
+    global $mybb;
+
+    if(empty($date) || $date === '0000-00-00 00:00:00')
+    {
+        return '';
+    }
+
+    $timestamp = events_strtotime($date);
+
+    if($timestamp === false)
+    {
+        return '';
+    }
+
+    return events_date('l', $timestamp) . ', ' . events_format_date_day($timestamp)
+        . ' at ' . events_date($mybb->settings['timeformat'], $timestamp);
+}
+
+/**
  * "Oct 20 at 10am" - a date written to sit inside a sentence.
  *
  * Joined with "at" and set in lower case, where events_format_list_date() writes the
