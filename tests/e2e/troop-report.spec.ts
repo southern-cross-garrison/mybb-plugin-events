@@ -93,9 +93,41 @@ test.describe("troop reports", () => {
     );
   });
 
-  test("draft segments attendees by club membership and lists their costumes", async ({
-    page,
-  }) => {
+  test("draft follows the garrison's report layout", async ({ page }) => {
+    const eventId = await createEvent({
+      title: "Laid Out Troop",
+      address: "Gosford Japanese Gardens",
+      start: "2026-10-04 14:00:00",
+      end: "2026-10-04 18:00:00",
+      signupCutoff: "2026-10-03 12:00:00",
+    });
+    await createRsvp(eventId, "trooper1", { costumes: [TK] });
+    await setClock("2026-10-05 09:00:00");
+
+    await loginAs(page, "trooper1");
+    await page.goto(`/troop_report.php?id=${eventId}`);
+
+    const draft = await page.locator("#troop_report_content").inputValue();
+
+    const headings = [
+      "[b]Troop Report[/b]",
+      "[b]Location:[/b] Gosford Japanese Gardens",
+      "[b]Weather:[/b]",
+      "[b]Date/ Time:[/b] 4th of October from 2pm",
+      "[b]Garrison Troopers:[/b]\nAsh - trooper1 - TK-20001",
+      "[b]Mission Report:[/b]",
+      "[b]Mission Status:[/b]",
+      "[b]Photos by:[/b]\nIf permission is not granted, say so... (for use by PR team)",
+    ];
+    let last = -1;
+    for (const heading of headings) {
+      const index = draft.indexOf(heading);
+      expect(index, heading).toBeGreaterThan(last);
+      last = index;
+    }
+  });
+
+  test("draft segments troopers by club membership", async ({ page }) => {
     const eventId = await finishedEvent("Segmented Troop");
     // trooper1 is a Garrison member, trooper2 is in the 501st group, newbie is neither.
     await createRsvp(eventId, "trooper1", { costumes: [TK] });
@@ -107,22 +139,20 @@ test.describe("troop reports", () => {
 
     const draft = await page.locator("#troop_report_content").inputValue();
 
-    expect(draft).toContain("[b]Event:[/b] Segmented Troop");
-    expect(draft).toContain("[b]Garrison Members:[/b]");
-    expect(draft).toContain("[b]Other 501st Members:[/b]");
-    expect(draft).toContain("[b]Others:[/b]");
-    expect(draft).toContain("trooper1 (TK-20001)");
-    expect(draft).toContain(TK);
-    expect(draft).toContain("[b]Total attendees:[/b] 3");
-
-    // Ordering: each attendee must appear under their own heading.
-    const garrisonIndex = draft.indexOf("Garrison Members");
-    const legionIndex = draft.indexOf("Other 501st Members");
-    const otherIndex = draft.indexOf("Others:");
-    expect(draft.indexOf("trooper1")).toBeGreaterThan(garrisonIndex);
-    expect(draft.indexOf("trooper1")).toBeLessThan(legionIndex);
-    expect(draft.indexOf("trooper2")).toBeGreaterThan(legionIndex);
-    expect(draft.indexOf("newbie")).toBeGreaterThan(otherIndex);
+    // Each attendee must appear under their own heading. newbie has no preferred name or
+    // Legion ID, so the line is the username alone.
+    const garrisonIndex = draft.indexOf("[b]Garrison Troopers:[/b]");
+    const legionIndex = draft.indexOf("[b]Other 501st Troopers:[/b]");
+    const otherIndex = draft.indexOf("[b]Other Troopers:[/b]");
+    const trooper1 = draft.indexOf("Ash - trooper1 - TK-20001\n");
+    const trooper2 = draft.indexOf("Bex - trooper2 - TK-20002\n");
+    const newbie = draft.indexOf("\nnewbie\n");
+    expect(garrisonIndex).toBeGreaterThan(-1);
+    expect(trooper1).toBeGreaterThan(garrisonIndex);
+    expect(legionIndex).toBeGreaterThan(trooper1);
+    expect(trooper2).toBeGreaterThan(legionIndex);
+    expect(otherIndex).toBeGreaterThan(trooper2);
+    expect(newbie).toBeGreaterThan(otherIndex);
   });
 
   test("leaves out anybody who was only on the waitlist", async ({ page }) => {
@@ -134,9 +164,8 @@ test.describe("troop reports", () => {
     await page.goto(`/troop_report.php?id=${eventId}`);
 
     const draft = await page.locator("#troop_report_content").inputValue();
-    expect(draft).toContain("trooper1 (TK-20001)");
+    expect(draft).toContain("Ash - trooper1 - TK-20001");
     expect(draft).not.toContain("trooper2");
-    expect(draft).toContain("[b]Total attendees:[/b] 1");
 
     // Waiting for a place is not having attended, so there is no report to write either.
     await loginAs(page, "trooper2");
@@ -156,7 +185,7 @@ test.describe("troop reports", () => {
     await expectEditorAttached(page, "troop_report_content");
   });
 
-  test("rosters the attendees as a BBCode list, all the way to the thread", async ({
+  test("rosters the attendees one per line, all the way to the thread", async ({
     page,
   }) => {
     const eventId = await finishedEvent("Listed Troop");
@@ -166,20 +195,14 @@ test.describe("troop reports", () => {
     await loginAs(page, "trooper1");
     await page.goto(`/troop_report.php?id=${eventId}`);
 
-    const draft = await page.locator("#troop_report_content").inputValue();
-
-    expect(draft).toContain("[list]");
-    expect(draft).toContain("[/list]");
-    expect(draft).toContain("[*]trooper1 (TK-20001)");
-    expect(draft).not.toContain("- trooper1 (TK-20001)");
-
     // Posted unchanged - which also takes the draft back out through the editor - the
-    // list tags have to arrive as a list rather than as visible markup.
+    // headings have to arrive bold and each attendee on a line of their own.
     await page.locator("#troop_report_submit").click();
 
     const post = page.locator(".post_body").first();
-    await expect(post.locator("ul li").first()).toContainText("trooper1 (TK-20001)");
-    await expect(post).not.toContainText("[*]");
+    await expect(post.locator(".mycode_b", { hasText: "Mission Status:" })).toHaveCount(1);
+    await expect(post).not.toContainText("[b]");
+    expect(await post.innerText()).toMatch(/Ash - trooper1 - TK-20001\s*\n/);
   });
 
   test("lists wranglers in their own section, apart from the membership buckets", async ({
@@ -196,19 +219,12 @@ test.describe("troop reports", () => {
     const draft = await page.locator("#troop_report_content").inputValue();
 
     expect(draft).toContain("[b]Wranglers:[/b]");
-    expect(draft).toContain("[*]wrangler");
+    expect(draft).toContain("[b]Wranglers:[/b]\nDev - wrangler\n");
 
     // Wranglers sit after the membership buckets, not inside them.
-    expect(draft.indexOf("wrangler\n")).toBeGreaterThan(
-      draft.indexOf("[b]Wranglers:[/b]"),
-    );
     expect(draft.indexOf("[b]Wranglers:[/b]")).toBeGreaterThan(
-      draft.indexOf("[b]Others:[/b]"),
+      draft.indexOf("[b]Other 501st Troopers:[/b]"),
     );
-
-    // The headline attendance figure stays the costumed count.
-    expect(draft).toContain("[b]Total attendees:[/b] 2");
-    expect(draft).toContain("[b]Total wranglers:[/b] 1");
   });
 
   test("omits the wrangler section entirely when nobody wrangled", async ({

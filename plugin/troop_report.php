@@ -205,10 +205,14 @@ $garrison_group = (int)events_get_setting('garrison_members_group');
 $legion_group = (int)events_get_setting('501st_members_group');
 
 $buckets = array(
-    'garrison' => array('title' => 'Garrison Members', 'attendees' => array()),
-    'legion'   => array('title' => 'Other 501st Members', 'attendees' => array()),
-    'other'    => array('title' => 'Others', 'attendees' => array()),
+    'garrison' => array('title' => 'Garrison Troopers', 'attendees' => array()),
+    'legion'   => array('title' => 'Other 501st Troopers', 'attendees' => array()),
+    'other'    => array('title' => 'Other Troopers', 'attendees' => array()),
 );
+
+// Roll-call order: each line leads with the name the member goes by.
+usort($troopers, 'events_compare_by_preferred_name');
+usort($wranglers, 'events_compare_by_preferred_name');
 
 foreach($troopers as $attendee)
 {
@@ -228,9 +232,12 @@ foreach($troopers as $attendee)
     }
 }
 
-$draft_content = "[b]Event:[/b] " . events_escape_bbcode($event['title']) . "\n";
-$draft_content .= "[b]Date:[/b] " . events_format_date($event['start_date']) . " - " . events_format_date($event['end_date']) . "\n";
-$draft_content .= "[b]Region:[/b] " . events_escape_bbcode($event['region']) . "\n\n";
+$location = trim((string)$event['address']) !== '' ? $event['address'] : $event['region'];
+
+$draft_content = "[b]Troop Report[/b]\n\n";
+$draft_content .= "[b]Location:[/b] " . events_escape_bbcode($location) . "\n";
+$draft_content .= "[b]Weather:[/b] \n";
+$draft_content .= "[b]Date/ Time:[/b] " . events_troop_report_when($event) . "\n\n";
 
 foreach($buckets as $bucket)
 {
@@ -239,42 +246,88 @@ foreach($buckets as $bucket)
         continue;
     }
 
-    // A real [list] rather than hyphens: the report is BBCode posted into a forum, so the
-    // roster should come out as a list in the thread - and in the editor, which renders
-    // what it is given rather than showing the markup.
-    $draft_content .= "[b]" . $bucket['title'] . ":[/b]\n[list]\n";
+    $draft_content .= "[b]" . $bucket['title'] . ":[/b]\n";
     foreach($bucket['attendees'] as $attendee)
     {
-        $line = "[*]" . events_escape_bbcode($attendee['username']);
-        if($attendee['tk_id'] !== '')
-        {
-            $line .= " (" . events_escape_bbcode($attendee['tk_id']) . ")";
-        }
-        if(!empty($attendee['costumes']))
-        {
-            $line .= " - " . events_escape_bbcode(implode(', ', $attendee['costumes']));
-        }
-        $draft_content .= $line . "\n";
+        $draft_content .= events_troop_report_roster_line($attendee) . "\n";
     }
-    $draft_content .= "[/list]\n\n";
+    $draft_content .= "\n";
 }
 
 // Wranglers are not costumed and hold no Legion ID, so they get their own section
 // rather than being folded into the membership buckets above.
 if(!empty($wranglers))
 {
-    $draft_content .= "[b]Wranglers:[/b]\n[list]\n";
+    $draft_content .= "[b]Wranglers:[/b]\n";
     foreach($wranglers as $wrangler)
     {
-        $draft_content .= "[*]" . events_escape_bbcode($wrangler['username']) . "\n";
+        $draft_content .= events_troop_report_roster_line($wrangler, false) . "\n";
     }
-    $draft_content .= "[/list]\n\n";
+    $draft_content .= "\n";
 }
 
-$draft_content .= "[b]Total attendees:[/b] " . count($troopers) . "\n";
-if(!empty($wranglers))
+$draft_content .= "[b]Mission Report:[/b]\n\n\n\n";
+$draft_content .= "[b]Mission Status:[/b] \n\n";
+$draft_content .= "[b]Photos by:[/b]\nIf permission is not granted, say so... (for use by PR team)\n";
+
+/**
+ * "Paul - roguemm - TK-25775": the name a member goes by, their username and their Legion
+ * ID, leaving out whichever of the first and last they have not filled in.
+ *
+ * @param array $attendee from events_get_attendees()
+ * @param bool $with_id
+ * @return string BBCode
+ */
+function events_troop_report_roster_line(array $attendee, $with_id = true)
 {
-    $draft_content .= "[b]Total wranglers:[/b] " . count($wranglers) . "\n";
+    $parts = array();
+
+    if(trim($attendee['preferred_name']) !== '')
+    {
+        $parts[] = trim($attendee['preferred_name']);
+    }
+
+    $parts[] = $attendee['username'];
+
+    if($with_id && trim($attendee['tk_id']) !== '')
+    {
+        $parts[] = trim($attendee['tk_id']);
+    }
+
+    return events_escape_bbcode(implode(' - ', $parts));
+}
+
+/**
+ * "4th of October from 2pm" - when the event ran, written the way a report says it. An
+ * event that ran past its first day adds the day it ended ("to 5th of October"), and the
+ * year is written only when it is not the current one.
+ *
+ * @param array $event
+ * @return string
+ */
+function events_troop_report_when(array $event)
+{
+    $start = events_strtotime($event['start_date']);
+    $end = events_strtotime($event['end_date']);
+
+    $day = function($timestamp)
+    {
+        $text = events_date('jS \o\f F', $timestamp);
+        if(events_date('Y', $timestamp) !== events_date('Y', TIME_NOW))
+        {
+            $text .= ' ' . events_date('Y', $timestamp);
+        }
+        return $text;
+    };
+
+    $when = $day($start) . ' from ' . events_date((int)events_date('i', $start) === 0 ? 'ga' : 'g:ia', $start);
+
+    if($end !== false && events_date('Y-m-d', $end) !== events_date('Y-m-d', $start))
+    {
+        $when .= ' to ' . $day($end);
+    }
+
+    return $when;
 }
 
 // Deliberately not htmlspecialchars_uni(): that preserves &#91;, which the browser would

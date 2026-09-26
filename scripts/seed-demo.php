@@ -740,10 +740,31 @@ $id = demo_event(array(
     'title'       => 'Westfield Parramatta Charity Walk',
     'region'      => 'Sydney',
     'address'     => '159-175 Church St, Parramatta NSW 2150',
-    'description' => "A gentle shopping centre walk raising money for the children's ward.\n\n"
-                   . "[b]Bring:[/b]\n[list][*]Full kit, helmets on inside the centre[*]Water - the atrium gets warm"
-                   . "[*]Civvies for the debrief afterwards[/list]\n\n"
-                   . "Handlers will meet us at the loading dock. Parking is validated.",
+    'description' => <<<'TXT'
+A slow lap of all four levels of Westfield Parramatta, collecting for the Sydney Children's Hospitals Foundation. The centre has given us the run of the malls for the morning and the foundation's volunteers will walk with us carrying the buckets - we stop for photos, they do the asking.
+
+[b]Schedule[/b]
+[list]
+[*]09:15 - Arrive at the loading dock off Marsden St and kit up in the staff room
+[*]10:00 - Walk steps off from the Church St entrance
+[*]12:00 - Twenty minute break back in the staff room
+[*]13:30 - Final lap and group photo in the Level 3 dining precinct
+[*]14:00 - Finish and de-kit
+[/list]
+
+[b]Bring[/b]
+[list]
+[*]Full kit - helmets stay on inside the centre
+[*]Water; the atrium gets warm by midday
+[*]Civvies for the debrief at the food court afterwards
+[/list]
+
+[b]Parking[/b]
+Park on Level 5 of the Marsden St car park and give your plate to the coordinator on arrival - the centre validates it for the day.
+
+Handlers will meet us at the loading dock. The route is flat, with lifts between levels, so it suits anybody still breaking in new boots.
+TXT
+    ,
     'start_date'  => demo_at(21, '10:00:00'),
     'end_date'    => demo_at(21, '14:00:00'),
     'days'        => demo_days(21, 21, '10:00:00', '14:00:00'),
@@ -754,12 +775,32 @@ note('nobody signed up yet', $id);
 //    people have picked different days - which is what the attendance sheet's day filter
 //    and the per-day counts exist for.
 $id = demo_event(array(
-    'title'       => 'Sydney Royal Easter Show - Weekend Deployment',
+    'title'       => 'Supanova Sydney',
     'region'      => 'Sydney',
     'address'     => 'Sydney Showground, 1 Showground Rd, Sydney Olympic Park NSW 2127',
-    'description' => "Our largest deployment of the year. Three days, rotating shifts, full garrison turnout.\n\n"
-                   . "[b]Shift pattern:[/b] two hours on, one hour off. The cooling room is behind the main stage.\n\n"
-                   . "Pick only the days you can actually make - the roster is built from what you select here.",
+    'description' => <<<'TXT'
+Our largest deployment of the year: three days on the Supanova floor in the Dome and Exhibition Halls, with a garrison booth, a photo backdrop and a charity collection for the Starlight Children's Foundation running all weekend.
+
+[b]What we are doing[/b]
+[list]
+[*]Garrison booth in Hall 4 - photos with the public for a gold coin donation to Starlight
+[*]Two floor patrols each hour, in groups of at least three plus a handler
+[*]The Saturday 2pm costume parade on the main stage
+[*]Sunday afternoon kids' "trooper training" session beside the booth
+[/list]
+
+[b]Shift pattern[/b]
+Two hours on, one hour off. The cooling room is behind the main stage, with water, fans and somewhere to sit down out of your armour. The roster for each day goes up on the booth wall at 08:30.
+
+[b]Arrival and passes[/b]
+Exhibitor wristbands are collected from the Gate 3 loading dock between 07:30 and 08:30. Your name has to be on the list the organisers receive, which is built from this signup - if you are not signed up for a day, there is no wristband for you that day.
+
+[b]Parking[/b]
+The P1 car park beside the Dome. The garrison's parking passes are handed out with the wristbands.
+
+Pick only the days you can actually make - the roster is built from what you select here.
+TXT
+    ,
     'start_date'  => demo_at(35, '09:00:00'),
     'end_date'    => demo_at(37, '17:00:00'),
     'days'        => demo_days(35, 37, '09:00:00', '17:00:00'),
@@ -793,8 +834,25 @@ $id = demo_event(array(
     'title'         => "Children's Hospital Ward Visit",
     'region'        => 'Sydney',
     'address'       => 'Cnr Hainsworth St & Hawkesbury Rd, Westmead NSW 2145',
-    'description'   => "Ward visit for the long-stay kids. [b]A current WWCC is required[/b] - the hospital checks.\n\n"
-                     . "Quiet voices, no blasters drawn indoors, and follow the play therapist's lead.",
+    'description'   => <<<'TXT'
+An afternoon visit to the long-stay wards at the Children's Hospital at Westmead, arranged with the hospital's Starlight Express Room. We visit the Express Room first, then go ward to ward in small groups with a play therapist.
+
+[b]A current WWCC is required[/b] - the hospital checks every name before the day, and anybody without one on their profile will not be let past reception.
+
+[b]On the wards[/b]
+[list]
+[*]Quiet voices and no blasters drawn indoors
+[*]Follow the play therapist's lead - some kids want a high five, some want to be left alone
+[*]Hand sanitiser on the way into every room, gloves and all
+[*]No photos of patients unless a parent asks you to take one on their phone
+[/list]
+
+[b]Arrival[/b]
+Meet at the main entrance on Hawkesbury Rd at 12:30. The hospital has given us a meeting room on Level 1 to kit up in. Park in the multi-storey car park; the Starlight team will hand out exit passes.
+
+Please do not sign up if you have been unwell in the last 48 hours. The hospital would rather we were one short than bring anything onto the wards.
+TXT
+    ,
     'start_date'    => demo_at(14, '13:00:00'),
     'end_date'      => demo_at(14, '16:00:00'),
     'requires_wwcc' => 1,
@@ -813,8 +871,31 @@ $id = demo_event(array(
     'title'       => 'Hunter Valley Toy Run',
     'region'      => 'Hunter',
     'address'     => 'Maitland Park, Maitland NSW 2320',
-    'description' => "Riding with the Hunter clubs to deliver toys to the local hospitals.\n\n"
-                   . "Meet at the park at 08:30 for a 09:00 departure. Bring an unwrapped toy.",
+    'description' => <<<'TXT'
+Riding with the Hunter motorcycle clubs on their annual toy run, which delivers donated toys to the children's wards at John Hunter and Maitland hospitals and to the Salvation Army's Christmas appeal.
+
+[b]How it works[/b]
+We travel in the support vehicles at the back of the convoy rather than on bikes. At each stop we get out, carry the toys in with the riders and spend twenty minutes on photos before moving on.
+
+[b]Schedule[/b]
+[list]
+[*]08:30 - Meet at the Maitland Park rotunda, kit up in the scout hall
+[*]09:00 - Convoy departs
+[*]10:30 - Maitland Hospital
+[*]12:30 - Lunch at the Kurri Kurri clubhouse (supplied by the clubs)
+[*]14:00 - John Hunter Hospital, then back to Maitland Park
+[/list]
+
+[b]Bring[/b]
+[list]
+[*]An unwrapped toy for the collection
+[*]Sunscreen and water - there is a lot of standing about in the sun between stops
+[*]A change of clothes; we travel between stops out of armour
+[/list]
+
+The clubs have asked for a final headcount the Wednesday before, so please sign up by then.
+TXT
+    ,
     'start_date'  => demo_at(28, '08:30:00'),
     'end_date'    => demo_at(28, '15:00:00'),
     'days'        => demo_days(28, 28, '08:30:00', '15:00:00'),
@@ -828,11 +909,28 @@ note('Hunter region - own announcement forum', $id);
 
 // 5. Two days, with signups still open but closing well before the event.
 $id = demo_event(array(
-    'title'         => 'Canberra Supanova',
+    'title'         => 'Canberra Comic Con',
     'region'        => 'Canberra',
     'address'       => 'Exhibition Park, 1 Flemington Rd, Mitchell ACT 2911',
-    'description'   => "Two days on the convention floor with the interstate garrisons.\n\n"
-                     . "[b]Numbers close early[/b] - the venue needs the crew list a fortnight out.",
+    'description'   => <<<'TXT'
+Two days on the convention floor at Exhibition Park, sharing a booth with the interstate garrisons and the Rebel Legion. The con is donating a share of its photo-op takings to Canberra Hospital Foundation, and our booth photos go into the same pot.
+
+[b]Numbers close early[/b] - the venue needs the crew list a fortnight out to print passes, and nobody can be added after that.
+
+[b]What we are doing[/b]
+[list]
+[*]Shared booth in the main pavilion, photos with the public all day
+[*]A combined 501st/Rebel Legion walk through the hall at 11:00 and 15:00 each day
+[*]The Saturday evening cosplay competition - we are guests on the judging panel
+[/list]
+
+[b]Travel and accommodation[/b]
+It is a three hour drive from Sydney. Car pools are organised in the thread below; the garrison has a group rate at the motel across Flemington Rd - mention the 501st when you book.
+
+[b]Arrival[/b]
+Crew passes are collected from the Coorong Pavilion office from 08:00. Park in the exhibitor car park behind the pavilion.
+TXT
+    ,
     'start_date'    => demo_at(60, '09:00:00'),
     'end_date'      => demo_at(61, '18:00:00'),
     'signup_cutoff' => demo_at(50, '23:59:00'),
@@ -847,10 +945,29 @@ note('cutoff still open, closes before the event', $id);
 
 // 6. Cutoff already passed: signups are locked, but the roster that made it in is intact.
 $id = demo_event(array(
-    'title'         => 'Blacktown Library Reading Day',
+    'title'         => 'Blacktown Relay For Life',
     'region'        => 'Sydney',
-    'address'       => '3 Flushcombe Rd, Blacktown NSW 2148',
-    'description'   => "Reading picture books to the under-fives. Signups have closed - the library has the list.",
+    'address'       => 'Blacktown International Sportspark, Eastern Rd, Rooty Hill NSW 2766',
+    'description'   => <<<'TXT'
+Joining the opening of Cancer Council's Relay For Life at Blacktown. We lead the Survivors' and Carers' Lap after the opening ceremony, then walk the first hour of the relay with the teams before handing over to the garrison's own relay team, who carry on through the night.
+
+[b]Signups have closed[/b] - Cancer Council needed the names for the opening ceremony run sheet.
+
+[b]Schedule[/b]
+[list]
+[*]09:15 - Meet at the athletics centre change rooms
+[*]10:00 - Opening ceremony
+[*]10:20 - Survivors' and Carers' Lap - walk at their pace, not ours
+[*]10:45 - Relay laps and photos at the team tents
+[*]12:00 - Finish
+[/list]
+
+[b]Donations[/b]
+The garrison's relay team page is linked in the thread below. Anything raised on the day goes to cancer research, prevention and support services.
+
+Parking is free in the Eastern Rd car park. The track is fully exposed, so bring water and sunscreen for your handler.
+TXT
+    ,
     'start_date'    => demo_at(10, '10:00:00'),
     'end_date'      => demo_at(10, '12:00:00'),
     'signup_cutoff' => demo_at(-1, '17:00:00'),
@@ -866,11 +983,30 @@ note('signups locked - cutoff has passed', $id);
 // 7. Exclusions: three members cannot see this event, its pages, its feed or its
 //    announcement thread.
 $id = demo_event(array(
-    'title'       => 'Private Function - Corporate Gala',
+    'title'       => 'Starlight Foundation Charity Gala',
     'region'      => 'Other',
     'address'     => 'Doltone House, 48 Pirrama Rd, Pyrmont NSW 2009',
-    'description' => "Invitation-only evening function. Numbers are fixed by the client, so this one is"
-                   . " not open to the whole garrison.\n\n[b]Black tie for the handlers.[/b]",
+    'description' => <<<'TXT'
+The Starlight Children's Foundation's annual fundraising gala. We line the arrival walk, stand in for photos at the step-and-repeat, and escort the auction's headline lot - a signed helmet donated by the garrison - onto the stage.
+
+[b]This one is invitation-only.[/b] Numbers are fixed by the foundation and security has the guest list, so it is not open to the whole garrison. If you can see this event you are on the list.
+
+[b]Schedule[/b]
+[list]
+[*]17:15 - Arrive at the Pirrama Rd service entrance and kit up in the green room
+[*]18:00 - Guest arrivals
+[*]19:30 - Auction; the helmet lot is around 20:15
+[*]20:45 - Photos with the table sponsors
+[*]21:30 - Released; stay for dinner in the green room if you like
+[/list]
+
+[b]Handlers[/b]
+Black tie. The venue will not admit handlers in anything less.
+
+[b]Parking[/b]
+The foundation has reserved spaces in the Star car park on Pirrama Rd. Your coordinator will PM the code.
+TXT
+    ,
     'start_date'  => demo_at(18, '18:00:00'),
     'end_date'    => demo_at(18, '23:00:00'),
     'exclusions'  => 'excluded,MarcusHale,PiaSolano',
@@ -884,12 +1020,26 @@ note('3 members excluded (region "Other" - default forum)', $id);
 
 // 8. Pending: coordinators only, and deliberately unannounced.
 $id = demo_event(array(
-    'title'       => 'Garrison Planning Meeting (draft)',
+    'title'       => 'SMASH! Sydney Anime Convention (draft)',
     'region'      => 'Sydney',
     'status'      => 'pending',
     'address'     => 'To be confirmed',
-    'description' => "Draft - still chasing the venue and a date that suits the committee.\n\n"
-                   . "Members cannot see this one until it goes live.",
+    'description' => <<<'TXT'
+Draft - the organisers have invited us back, but the hall and the date are not confirmed yet.
+
+[b]Still to settle[/b]
+[list]
+[*]Which hall - they are choosing between two venues
+[*]Whether we get a booth or only floor walks
+[*]Whether their charity partner will take a garrison collection at the booth
+[/list]
+
+[b]Plan if it goes ahead[/b]
+One evening session on the Saturday: floor walks in pairs, the cosplay parade at 20:00, and photos at the booth. Anime crossover costumes are welcome if the organisers agree.
+
+Members cannot see this one until it goes live.
+TXT
+    ,
     'start_date'  => demo_at(45, '19:00:00'),
     'end_date'    => demo_at(45, '21:00:00'),
     'days'        => demo_days(45, 45, '19:00:00', '21:00:00'),
@@ -898,10 +1048,29 @@ note('pending - coordinators only, no announcement', $id);
 
 // 9. Over, trooped, and the troop report still owing.
 $id = demo_event(array(
-    'title'       => 'Movie Premiere Red Carpet Escort',
+    'title'       => 'Make-A-Wish Charity Screening',
     'region'      => 'Sydney',
     'address'     => 'Event Cinemas, 505-525 George St, Sydney NSW 2000',
-    'description' => "Red carpet line-up and photos with the crowd before the doors opened.",
+    'description' => <<<'TXT'
+A fundraising screening of the Star Wars saga for Make-A-Wish Australia, with every ticket sold going towards granting wishes. Before the film we line the red carpet in the George St foyer, pose for photos with ticket holders and the wish kids and their families, and escort the evening's wish kid into the cinema.
+
+[b]Schedule[/b]
+[list]
+[*]16:30 - Meet at the Bathurst St staff entrance, kit up in the function room
+[*]17:00 - Red carpet opens
+[*]18:45 - Escort into Cinema 1 and a short welcome on stage
+[*]19:00 - Film starts - you are free to de-kit and stay
+[/list]
+
+[b]Bring[/b]
+[list]
+[*]Full kit, with a spare set of gloves - the foyer lights show every mark
+[*]Something warm for afterwards; the cinema is cold
+[/list]
+
+Anybody staying for the film has a ticket held under their name at the box office, courtesy of Make-A-Wish.
+TXT
+    ,
     'start_date'  => demo_at(-7, '17:00:00'),
     'end_date'    => demo_at(-7, '22:00:00'),
     'days'        => demo_days(-7, -7, '17:00:00', '22:00:00'),
@@ -929,10 +1098,33 @@ note('finished - troop report owing, admin rostered to write it', $id);
 
 // 10. The full cycle: over, trooped, reported.
 $id = demo_event(array(
-    'title'       => 'Anzac Day March',
+    'title'       => 'Centennial Park Charity Fun Run',
     'region'      => 'Sydney',
-    'address'     => 'Martin Place, Sydney NSW 2000',
-    'description' => "Marching with the veterans' associations, as we do every year.",
+    'address'     => 'Centennial Park, Grand Dr, Centennial Park NSW 2021',
+    'description' => <<<'TXT'
+A 5km fun run around Grand Drive raising money for Ronald McDonald House Charities, which houses families from the country while their children are in Sydney hospitals. We do not run it in armour - we hold the start line, cheer on the course and hand out medals at the finish.
+
+[b]Where we stand[/b]
+[list]
+[*]Start line - photos with runners in the start chute, then the countdown from the stage
+[*]Halfway point at the Busby's Pond turn - the cheer squad
+[*]Finish line - medals and the photo backdrop
+[/list]
+
+[b]Schedule[/b]
+[list]
+[*]07:15 - Meet at the Paddington Gates, kit up in the marquee behind the stage
+[*]08:00 - Start
+[*]08:15 - Split into start, halfway and finish groups
+[*]10:30 - Presentations, then photos until the crowd thins out
+[/list]
+
+[b]Bring[/b]
+Water, sunscreen and a hat for your handler. There is almost no shade at the finish.
+
+Want to actually run it? Register under the garrison's team name and the fee goes to the charity too.
+TXT
+    ,
     'start_date'  => demo_at(-30, '08:00:00'),
     'end_date'    => demo_at(-30, '13:00:00'),
     'days'        => demo_days(-30, -30, '08:00:00', '13:00:00'),
@@ -944,20 +1136,33 @@ foreach(array('AlexVoss', 'BriannaKade', 'DanaOkoye', 'FreyaLind', 'HanaMorrow',
 }
 demo_signup($id, 'wrangler', array('roles' => array('wrangler')));
 demo_troop_report(events_get_event($id), 'AlexVoss',
-    "Ten of us marched with the veterans' associations this year, plus one wrangler keeping the water up to us.\n\n"
+    "Ten of us turned out for the fun run, plus one wrangler keeping the water coming.\n\n"
   . "[b]Attendance:[/b] 10 troopers, 1 wrangler\n"
-  . "[b]Charity:[/b] N/A - community event\n\n"
-  . "The crowd along Martin Place was three deep by 09:00. No kit failures, no heat casualties, and the"
-  . " RSL have already asked whether we will be back next year. Photos are with the media team.");
+  . "[b]Charity:[/b] Ronald McDonald House Charities\n\n"
+  . "Around 1,200 runners this year. We split three ways as planned - start line, Busby's Pond and the"
+  . " finish - and the medal table at the finish was the busiest photo spot of the morning. No kit"
+  . " failures and no heat casualties. The organisers told us the run raised a record amount and have"
+  . " already asked us back next year. Photos are with the media team.");
 note('finished - troop report posted', $id);
 
 // 11. Archived: hidden from the listing until the filter asks for it.
 $id = demo_event(array(
-    'title'       => 'Comic-Gong 2024',
+    'title'       => 'Comic-Gong',
     'region'      => 'Sydney',
     'status'      => 'archived',
     'address'     => 'WIN Entertainment Centre, Wollongong NSW 2500',
-    'description' => "Last year's Wollongong convention. Kept for the record.",
+    'description' => <<<'TXT'
+Two days at Wollongong's pop culture convention, with a photo booth collecting for the Illawarra Children's Hospital appeal and a guest spot in the Sunday cosplay parade.
+
+[b]Arrival[/b]
+Crew entry is through the Crown St loading dock from 08:00. Parking is in the WIN Stadium car park next door.
+
+[b]Getting there[/b]
+The train from Central takes about ninety minutes and stops a short walk from the venue. Car pools are organised in the thread below.
+
+Kept for the record now the weekend is over.
+TXT
+    ,
     'start_date'  => demo_at(-120, '09:00:00'),
     'end_date'    => demo_at(-119, '17:00:00'),
     'days'        => demo_days(-120, -119, '09:00:00', '17:00:00'),
@@ -971,10 +1176,24 @@ note('archived - hidden unless the filter asks', $id);
 // 12. Happening right now: the listing and calendar both mark it, and signups are still
 //     open because the event has not ended.
 $id = demo_event(array(
-    'title'       => 'Garrison Recruitment Stand',
+    'title'       => "Kids' Cancer Project Collection Day",
     'region'      => 'Sydney',
-    'address'     => 'Darling Harbour, Sydney NSW 2000',
-    'description' => "Recruitment stand by the waterfront - in progress today.",
+    'address'     => 'Tumbalong Park, Darling Harbour, Sydney NSW 2000',
+    'description' => <<<'TXT'
+A full day on the Darling Harbour boardwalk collecting for The Kids' Cancer Project, which funds research into childhood cancer. We pose for photos, the charity's volunteers carry the buckets, and the passing school holiday crowd does the rest.
+
+[b]Shifts[/b]
+Come for as much of the day as you can. It runs in three-hour blocks - 09:00, 12:00, 15:00 and 18:00 - and the evening block covers the fireworks crowd, which is when the buckets fill fastest.
+
+[b]Base[/b]
+The charity's marquee on the Tumbalong Park lawn, with a screened-off area to kit up and cool down in. Water and snacks provided.
+
+[b]Getting there[/b]
+Light rail to Exhibition Centre, or park in the Harbourside car park and ask the coordinator for a validation sticker.
+
+It is in progress now - if you can come down for a block this afternoon, sign up and let the coordinator know you are on your way.
+TXT
+    ,
     'start_date'  => demo_at(0, '09:00:00'),
     'end_date'    => demo_at(0, '21:00:00'),
     'days'        => demo_days(0, 0, '09:00:00', '21:00:00'),
@@ -988,10 +1207,26 @@ note('happening today', $id);
 
 // 13. Tomorrow, so the listing has something imminent above the fold.
 $id = demo_event(array(
-    'title'       => 'Macquarie Centre Mall Appearance',
+    'title'       => 'Macquarie Centre Legacy Badge Day',
     'region'      => 'Sydney',
     'address'     => 'Cnr Herring & Waterloo Rds, North Ryde NSW 2113',
-    'description' => "Short mall appearance - meet at the food court entrance at 10:30.",
+    'description' => <<<'TXT'
+Standing with the Legacy badge sellers at Macquarie Centre for Legacy Badge Day. Legacy supports the families of veterans who died or were injured in service, and a trooper beside the table reliably doubles the number of people who stop.
+
+[b]Arrival[/b]
+Meet at the food court entrance on Level 3 at 10:30. Centre management will walk us to a storeroom to kit up in.
+
+[b]On the day[/b]
+[list]
+[*]Two stations - the Level 1 entrance by the ice rink, and the Level 3 food court
+[*]Swap stations at 13:00
+[*]Short breaks back in the storeroom whenever you need one
+[/list]
+
+[b]Parking[/b]
+Any of the centre's car parks - the first three hours are free, and the centre will validate the rest.
+TXT
+    ,
     'start_date'  => demo_at(1, '11:00:00'),
     'end_date'    => demo_at(1, '15:00:00'),
     'days'        => demo_days(1, 1, '11:00:00', '15:00:00'),
@@ -1004,11 +1239,27 @@ note('tomorrow', $id);
 
 // 14. Wranglers only: no troopers at all, which is the other end of the role split.
 $id = demo_event(array(
-    'title'       => 'Costume Build Workshop',
+    'title'       => 'Toy Drive Wrapping Day',
     'region'      => 'Sydney',
     'address'     => 'Unit 4, 12 Carrington Rd, Marrickville NSW 2204',
-    'description' => "Armour trimming and strapping session. [b]No kit required[/b] - this one is for helpers"
-                   . " and anybody still building.\n\nTools provided. Bring your own strapping if you have it.",
+    'description' => <<<'TXT'
+Sorting, wrapping and labelling everything donated to the garrison's Christmas toy drive, ready for the Salvation Army to collect. Last year it came to over four hundred gifts and took two full days, so every pair of hands makes a difference.
+
+[b]No kit required[/b] - this one is for handlers, helpers, family and anybody still building their armour.
+
+[b]What happens[/b]
+[list]
+[*]Morning - sort the donations by age group and check nothing is broken or missing batteries
+[*]Lunch - pizza, on the garrison
+[*]Afternoon - wrap, label by age and gender, and box up for the Salvos' truck at 16:00
+[/list]
+
+[b]Bring[/b]
+Scissors and sticky tape if you have them. Wrapping paper and tags are provided, courtesy of the donations.
+
+The workshop has street parking out front and is a ten minute walk from Sydenham station.
+TXT
+    ,
     'start_date'  => demo_at(25, '10:00:00'),
     'end_date'    => demo_at(25, '16:00:00'),
     'days'        => demo_days(25, 25, '10:00:00', '16:00:00'),
@@ -1023,13 +1274,32 @@ note('wranglers only, no troopers', $id);
 //     this one is open for signups now, where the ward visit is close enough to its date
 //     that it reads as already settled.
 $id = demo_event(array(
-    'title'         => 'Riverstone Public School Book Week Parade',
+    'title'         => 'Camp Quality Family Fun Day',
     'region'        => 'Sydney',
-    'address'       => 'Elizabeth St, Riverstone NSW 2765',
-    'description'   => "Marching in the Book Week parade and posing for photos with the classes afterwards.\n\n"
-                     . "[b]A current WWCC is required[/b] - the school collects numbers before the day.\n\n"
-                     . "Assembly is on the oval, so expect grass and a bit of dust. Helmets off for the"
-                     . " classroom visits at the end.",
+    'address'       => 'Bella Vista Farm Park, Norwest Blvd, Baulkham Hills NSW 2153',
+    'description'   => <<<'TXT'
+Camp Quality's family day for children living with cancer and their brothers and sisters: a morning of rides, face painting and a sausage sizzle, and this year a visit from the Empire. We parade in at the start, then spend the morning on photos and games with the kids.
+
+[b]A current WWCC is required[/b] - Camp Quality collects numbers from everybody attending before the day.
+
+[b]Schedule[/b]
+[list]
+[*]08:30 - Meet at the woolshed, kit up behind the stage
+[*]09:00 - March in with the Camp Quality mascots
+[*]09:30 - Photos, trooper training and a tug-of-war the kids are allowed to win
+[*]12:30 - Finish
+[/list]
+
+[b]Please note[/b]
+[list]
+[*]Some of the children are immunosuppressed - do not come if you are unwell
+[*]Helmets off if a child is frightened; a face usually settles them
+[*]No photos of the families on personal phones - Camp Quality's photographer covers the day
+[/list]
+
+The park is on grass and gravel, so expect some dust on your boots.
+TXT
+    ,
     'start_date'    => demo_at(20, '09:00:00'),
     'end_date'      => demo_at(20, '12:30:00'),
     'requires_wwcc' => 1,
@@ -1042,16 +1312,32 @@ foreach(array('CarloRen', 'EliTanaka', 'JadeNkemdi') as $username)
 demo_signup($id, 'RaySutton', array('roles' => array('wrangler')));
 note('WWCC required, signups open now', $id);
 
-// 16. The Easter Show's shape at a tenth of the size: multi-day, mixed day selection, a
-//     wrangler - but a roster small enough that the attendance sheet and the per-day
-//     counts can be read at a glance rather than scrolled through.
+// 16. Supanova's shape at a tenth of the size: multi-day, mixed day selection, a wrangler -
+//     but a roster small enough that the attendance sheet and the per-day counts can be
+//     read at a glance rather than scrolled through.
 $id = demo_event(array(
     'title'       => 'Penrith Pop Culture Fair',
     'region'      => 'Sydney',
     'address'     => 'Penrith Panthers, 123 Mulgoa Rd, Penrith NSW 2750',
-    'description' => "A two day suburban con - one hall, one photo backdrop, and a much quieter weekend than"
-                   . " the Show.\n\n[b]Shift pattern:[/b] two hours on, one hour off, same as always.\n\n"
-                   . "Pick only the days you can actually make - the roster is built from what you select here.",
+    'description' => <<<'TXT'
+A two day suburban con - one hall, one photo backdrop, and a much quieter weekend than Supanova. The organisers are giving the gate takings from the first hour of each day to the Nepean Hospital children's ward, and we are the photo opportunity they are advertising it with.
+
+[b]What we are doing[/b]
+[list]
+[*]Photo backdrop by the entrance, gold coin donation per photo
+[*]One walk through the traders' hall each hour
+[*]Judging the kids' costume competition at 14:00 on the Sunday
+[/list]
+
+[b]Shift pattern[/b]
+Two hours on, one hour off, same as always. The Panthers have given us a function room upstairs to change and cool down in.
+
+[b]Parking[/b]
+Free in the Panthers car park. Use the rear entrance off Ransley St to reach the function room lift.
+
+Pick only the days you can actually make - the roster is built from what you select here.
+TXT
+    ,
     'start_date'  => demo_at(42, '10:00:00'),
     'end_date'    => demo_at(43, '16:00:00'),
     'days'        => demo_days(42, 43, '10:00:00', '16:00:00'),
@@ -1070,12 +1356,25 @@ note('6 troopers + 1 wrangler, mixed days', $id);
 //     is taken as well, so anybody signing up in either role joins the back of a queue.
 //     trooper1 and trooper2 are deliberately left off, so either can sign in and see it.
 $id = demo_event(array(
-    'title'         => 'Castle Hill Showground Fun Day',
+    'title'         => 'Castle Hill Rotary Charity Fair',
     'region'        => 'Sydney',
     'address'       => 'Castle Hill Showground, Doran Dr, Castle Hill NSW 2154',
-    'description'   => "A small community fair. [b]The organisers can only fit four of us[/b] in the photo tent,"
-                     . " plus one handler.\n\nIf you are on the waitlist and a place opens up, you will be"
-                     . " moved up automatically and sent a PM.",
+    'description'   => <<<'TXT'
+The Castle Hill Rotary Club's spring fair, with rides, market stalls and a dog show, and everything raised going to the Rotary club's local youth and mental health projects. We have a photo tent next to the main arena.
+
+[b]The organisers can only fit four of us[/b] in the photo tent, plus one handler. If you are on the waitlist and a place opens up, you will be moved up automatically and sent a PM.
+
+[b]Schedule[/b]
+[list]
+[*]09:30 - Meet at the pavilion behind the photo tent, kit up
+[*]10:00 - Photo tent opens, gold coin donation per photo
+[*]12:00 - A lap of the main arena before the dog show
+[*]14:00 - Finish
+[/list]
+
+Parking is free inside the showground - tell the gate you are with the photo tent and they will wave you through to the pavilion.
+TXT
+    ,
     'start_date'    => demo_at(12, '10:00:00'),
     'end_date'      => demo_at(12, '14:00:00'),
     'days'          => demo_days(12, 12, '10:00:00', '14:00:00'),
@@ -1093,11 +1392,28 @@ note('full - 4/4 troopers + 1 waitlisted, 1/1 wranglers', $id);
 //     waitlisted - which is how the waitlist is shown happening rather than already there.
 //     Sign in as trooper1 to take the last place, then as trooper2 to be waitlisted behind them.
 $id = demo_event(array(
-    'title'        => 'Hornsby Library Star Wars Day',
+    'title'        => 'Hornsby Brick Show',
     'region'       => 'Sydney',
-    'address'      => '28-44 George St, Hornsby NSW 2077',
-    'description'  => "Photos and a story session in the children's section. The library has room for"
-                    . " [b]four troopers[/b] - once those places are taken, further signups go on the waitlist.",
+    'address'      => 'Hornsby RSL, 4 High St, Hornsby NSW 2077',
+    'description'  => <<<'TXT'
+A weekend LEGO fan exhibition, with club layouts, a kids' build zone and, this year, a full-size Death Star trench run built by the local LUG. We are guests of the show on the Saturday morning, posing with the Star Wars displays and the builders.
+
+The hall has room for [b]four troopers[/b] - once those places are taken, further signups go on the waitlist.
+
+[b]Schedule[/b]
+[list]
+[*]09:30 - Meet at the RSL's function room entrance, kit up in the committee room
+[*]10:00 - Doors open - photos at the trench run and the Star Wars layouts
+[*]11:30 - Judging the kids' build challenge
+[*]13:00 - Finish
+[/list]
+
+[b]Please note[/b]
+The displays are fragile and the aisles are narrow. Keep blasters holstered and mind your backpacks and belts near the tables.
+
+Parking is available under the RSL, or it is a five minute walk from Hornsby station.
+TXT
+    ,
     'start_date'   => demo_at(16, '10:00:00'),
     'end_date'     => demo_at(16, '13:00:00'),
     'days'         => demo_days(16, 16, '10:00:00', '13:00:00'),

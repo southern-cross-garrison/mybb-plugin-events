@@ -332,7 +332,7 @@ of the same flow.
 4. **Attendance**: choose how each day is being attended - trooping, wrangling, or not at
    all. Every day starts on trooping, so the common case is one click past this step. A
    single-day event (one with no configured days) asks for one answer instead of one per
-   day, and names when it is - "You are signing up to Anzac Day March - Oct 20 at 9am" -
+   day, and names when it is - "You are signing up to Hunter Valley Toy Run - Oct 20 at 9am" -
    because a member arriving from a reminder or a link is usually answering "can I make
    that?". The step does not explain what a trooper or a wrangler is; members know.
 5. Complete any missing prerequisites (saved back to the user's profile)
@@ -535,8 +535,8 @@ Outlook more often - and keeps its copy in step with it, which is how a day the 
 drops, or an event they withdraw from, leaves their calendar. A downloaded `.ics` can only
 ever add. The feed covers every event they are signed up for that ended within the past
 year or has yet to happen, with the same entries and UIDs the one-event download produces.
-Each entry's title leads with the role the member holds that day - "Trooping: Sydney Royal
-Easter Show", or "Trooping and Wrangling: ..." for a day held in both - so the calendar grid
+Each entry's title leads with the role the member holds that day - "Trooping: Supanova
+Sydney", or "Trooping and Wrangling: ..." for a day held in both - so the calendar grid
 says what the day is without the entry being opened. A one-event download for an event the
 member has not signed up for keeps the bare title.
 An event with an address also gets a Google Maps search link in its description, which

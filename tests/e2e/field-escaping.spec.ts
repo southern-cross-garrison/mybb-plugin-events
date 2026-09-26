@@ -263,8 +263,7 @@ test.describe('region, address and costume values', () => {
     await loginAs(page, 'trooper1');
     await page.goto(`/troop_report.php?id=${finished}`);
     const draft = await page.locator('#troop_report_content').inputValue();
-    expect(draft).toContain(`[b]Region:[/b] ${REGION}`);
-    expect(draft).toContain(COSTUME);
+    expect(draft).toContain(`[b]Location:[/b] ${ADDRESS}`);
     await expectInert(page, 'troop_report.php');
   });
 
