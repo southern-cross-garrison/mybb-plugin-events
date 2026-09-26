@@ -207,7 +207,16 @@ foreach($events as $event)
     }
     elseif($lock_reason === null)
     {
-        $you = '<a class="event_btn event_signup_link" href="rsvp.php?id=' . (int)$event['id'] . '">Sign Up</a>';
+        // The same rule as the event card's button (events_render_event_card()): one full
+        // role is enough for the button to say it joins a waitlist.
+        if(!empty(events_full_roles($event)))
+        {
+            $you = '<a class="event_btn event_signup_link" href="rsvp.php?id=' . (int)$event['id'] . '" data-waitlist="1">Join Waitlist</a>';
+        }
+        else
+        {
+            $you = '<a class="event_btn event_signup_link" href="rsvp.php?id=' . (int)$event['id'] . '">Sign Up</a>';
+        }
     }
     else
     {

@@ -114,6 +114,12 @@ test.describe('signing up to a full event', () => {
     await expect(page.locator('#event_signup')).toHaveText('Join Waitlist');
     await expect(page.locator('#event_signup')).toHaveAttribute('data-waitlist', '1');
 
+    // The listing's button follows the same rule as the event page's.
+    await page.goto('/events.php');
+    const listingSignup = page.locator(`tr.event_row[data-event-id="${eventId}"] .event_signup_link`);
+    await expect(listingSignup).toHaveText('Join Waitlist');
+    await expect(listingSignup).toHaveAttribute('data-waitlist', '1');
+
     await page.goto(`/rsvp.php?id=${eventId}`);
     await expect(page.locator('label:has(#signup_role_trooper)')).toContainText('full - join the waitlist');
 
@@ -150,6 +156,8 @@ test.describe('signing up to a full event', () => {
     await page.goto(`/event.php?id=${eventId}`);
     await expect(page.locator('#event_signup')).toHaveText('Join Waitlist');
     await expect(page.locator('#event_signup_full_note')).toHaveCount(0);
+    await page.goto('/events.php');
+    await expect(page.locator(`tr.event_row[data-event-id="${eventId}"] .event_signup_link`)).toHaveText('Join Waitlist');
 
     await page.goto(`/rsvp.php?id=${eventId}`);
     await page.locator('#signup_role_wrangler').check();
