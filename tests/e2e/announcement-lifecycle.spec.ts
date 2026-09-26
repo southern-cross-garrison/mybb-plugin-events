@@ -1,7 +1,8 @@
 import { test, expect } from '../helpers/fixtures';
-import { loginAs, loginToAdminCp, followAdminActionLink } from '../helpers/auth';
+import { loginAs, loginToAdminCp, followAdminActionLink, gotoEventsAdmin } from '../helpers/auth';
 import { runPhp } from '../helpers/container';
 import { withSettings } from '../helpers/settings';
+import { submitFormAtOnce } from '../helpers/double-submit';
 import {
   createEvent,
   execute,
@@ -173,5 +174,60 @@ require_once MYBB_ROOT.'inc/class_moderation.php';
     await followAdminActionLink(page, `action=delete&id=${eventId}`);
 
     expect(await query(`SELECT id FROM ${T('event_plugin_events')} WHERE id = ?`, [eventId])).toHaveLength(0);
+  });
+});
+
+/** Every thread on the board with this subject, oldest first. */
+async function threadsTitled(title: string): Promise<number[]> {
+  const rows = await query(`SELECT tid FROM ${T('threads')} WHERE subject = ? ORDER BY tid`, [title]);
+  return rows.map((row: any) => Number(row.tid));
+}
+
+test.describe('announcing an event twice at once', () => {
+  // Both requests used to read "no thread yet" before either had written thread_id, so
+  // each posted one, and the second overwrote the first's id - leaving a thread linked to
+  // no event, which the exclusion hooks therefore never hid. One lost race is enough, and
+  // it only loses some of the time, so each is fired three times over.
+
+  test('a double-clicked Make Live posts one announcement', async ({ page }) => {
+    const title = announcementTitle('Double Make Live Troop');
+    const eventId = await createEvent({ title, status: 'pending', region: 'Sydney' });
+
+    await loginToAdminCp(page);
+    await gotoEventsAdmin(page);
+
+    const href = await page
+      .locator(`a[href*="action=status"][href*="id=${eventId}"][href*="status=live"]`)
+      .first()
+      .getAttribute('href');
+    expect(href).toContain('my_post_key=');
+
+    // fetch() from the page, so each carries the session and the same-origin header a click
+    // does. Each URL is made distinct because Chrome holds identical GETs back behind one
+    // another for its cache, and requests that never overlap cannot race.
+    await page.evaluate(async (url) => {
+      await Promise.all(
+        [0, 1, 2].map((n) => fetch(`${url}&attempt=${n}`, { credentials: 'same-origin', cache: 'no-store' })),
+      );
+    }, new URL(href!, page.url()).href);
+
+    const threads = await threadsTitled(title);
+    expect(threads).toHaveLength(1);
+    expect(Number((await getEvent(eventId)).thread_id)).toBe(threads[0]);
+  });
+
+  test('a double-clicked Save posts one announcement', async ({ page }) => {
+    const title = announcementTitle('Double Save Troop');
+    const eventId = await createEvent({ title, status: 'pending', region: 'Sydney' });
+
+    await loginAs(page, 'gec');
+    await page.goto(`/manage_event.php?id=${eventId}`);
+    await submitFormAtOnce(page, '#manage_event_form', { times: 3, overrides: { status: 'live' } });
+
+    expect((await getEvent(eventId)).status).toBe('live');
+
+    const threads = await threadsTitled(title);
+    expect(threads).toHaveLength(1);
+    expect(Number((await getEvent(eventId)).thread_id)).toBe(threads[0]);
   });
 });

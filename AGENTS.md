@@ -366,7 +366,10 @@ baseline picks the change up.
   holds the same lock across its withdrawals, cancellations, day changes and rebalance, and
   so calls `events_write_signup()` (the unlocked body) rather than `events_save_signup()`. `troop_report.php` and the reminder
   task share a lock per event, so a second submit is told the report is posted and linked
-  to it. `tests/helpers/double-submit.ts` fires overlapping submits from the page. The
+  to it. `events_sync_event_thread()` holds `events_thread_lock()` around reading
+  `thread_id` and posting the announcement, so a double-clicked Save or Make Live updates
+  the first request's thread instead of posting a second one that no event points at (and
+  that the exclusion hooks therefore never hide). The body is `events_write_event_thread()`. `tests/helpers/double-submit.ts` fires overlapping submits from the page. The
   signup race only loses some of the time, so one passing run of a test like that proves
   little.
 - Maximum troopers and wranglers work on one rule: a *place* is a role on one day (or on

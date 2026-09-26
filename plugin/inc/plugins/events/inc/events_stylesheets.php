@@ -32,6 +32,25 @@ define('EVENTS_STYLESHEET_ATTACHEDTO', 'events.php|event.php|manage_event.php|rs
 define('EVENTS_MASTER_THEME', 1);
 
 /**
+ * The Admin CP directory, with a trailing slash.
+ *
+ * A board may rename it, so it is never hard-coded as admin/. Inside the Admin CP,
+ * MYBB_ADMIN_DIR is the directory actually being served; from the CLI (provisioning) the
+ * config is all there is, which is how MyBB's own css.php and tasks find it.
+ */
+function events_admin_dir()
+{
+    global $mybb;
+
+    if(defined('MYBB_ADMIN_DIR'))
+    {
+        return MYBB_ADMIN_DIR;
+    }
+
+    return MYBB_ROOT . $mybb->config['admin_dir'] . '/';
+}
+
+/**
  * Install (or refresh) the plugin's stylesheet on the master theme.
  *
  * Safe to call repeatedly - the existing row is updated in place, so editing the .css file
@@ -44,7 +63,7 @@ function events_install_stylesheet()
     // update_theme_stylesheet_list() and cache_stylesheet() are ACP functions. The plugin is
     // normally installed from the Admin CP, where they are already loaded, but provisioning
     // scripts call events_activate() from the CLI, so pull them in either way.
-    require_once MYBB_ROOT . "admin/inc/functions_themes.php";
+    require_once events_admin_dir() . "inc/functions_themes.php";
 
     $css = file_get_contents(MYBB_ROOT . "inc/plugins/events/stylesheets/" . EVENTS_STYLESHEET);
     if($css === false)
@@ -99,7 +118,7 @@ function events_uninstall_stylesheet()
 {
     global $db;
 
-    require_once MYBB_ROOT . "admin/inc/functions_themes.php";
+    require_once events_admin_dir() . "inc/functions_themes.php";
 
     $query = $db->simple_select("themestylesheets", "tid", "name = '" . $db->escape_string(EVENTS_STYLESHEET) . "'");
     while($sheet = $db->fetch_array($query))

@@ -261,6 +261,52 @@ function events_event_post_content(array $event)
  */
 function events_sync_event_thread($event_id, &$error = null, array $former_forum_ids = array())
 {
+    global $db;
+
+    $error = null;
+
+    // Whether to post a thread or update one is decided by reading thread_id, and a
+    // double-clicked Save or Make Live is two requests that both read "none" before either
+    // had written it - so both posted, and the second overwrote thread_id, leaving the
+    // first announcement linked to no event and so open to the members it excludes. The
+    // second waits here instead, and reads the event only once it holds the lock, so it
+    // finds the first one's thread and updates it.
+    $lock = events_thread_lock($event_id);
+    if(!events_acquire_lock($lock))
+    {
+        $error = "The event's announcement thread is still being posted. Save the event again in a moment to refresh it.";
+        return (int)$db->fetch_field($db->simple_select("event_plugin_events", "thread_id", "id = " . (int)$event_id), "thread_id");
+    }
+
+    $thread_id = events_write_event_thread($event_id, $error, $former_forum_ids);
+
+    events_release_lock($lock);
+
+    return $thread_id;
+}
+
+/**
+ * The name of the lock held while an event's announcement thread is posted or updated.
+ *
+ * @param int $event_id
+ * @return string
+ */
+function events_thread_lock($event_id)
+{
+    return 'thread:' . (int)$event_id;
+}
+
+/**
+ * The body of events_sync_event_thread(), for a caller that already holds
+ * events_thread_lock(). Anything else calls events_sync_event_thread().
+ *
+ * @param int $event_id
+ * @param string|null $error
+ * @param array $former_forum_ids
+ * @return int
+ */
+function events_write_event_thread($event_id, &$error = null, array $former_forum_ids = array())
+{
     global $db, $mybb, $lang;
 
     $error = null;
