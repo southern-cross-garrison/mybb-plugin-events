@@ -37,6 +37,46 @@ function events_admin_settings_value($input_name, $setting_name)
 }
 
 /**
+ * MyBB's own forum dropdown: the board's forums in display order, children indented
+ * under their parents.
+ *
+ * Its "None" option posts -1 rather than an empty string, so a caller that offers it
+ * reads the choice back through events_admin_forum_input().
+ *
+ * @param Form   $form
+ * @param string $name  Name of the form control
+ * @param string $value Selected forum id, '' for none
+ * @param string $id    Element id
+ * @param bool   $none  Whether to offer None at the top
+ * @return string
+ */
+function events_admin_forum_select($form, $name, $value, $id, $none = false)
+{
+    $options = array('id' => $id);
+    if($none)
+    {
+        $options['main_option'] = 'None';
+        if((int)$value <= 0)
+        {
+            $value = -1;
+        }
+    }
+
+    return $form->generate_forum_select($name, (int)$value, $options);
+}
+
+/**
+ * A forum id posted by events_admin_forum_select(), with its None read as ''.
+ *
+ * @param mixed $value
+ * @return string
+ */
+function events_admin_forum_input($value)
+{
+    return (int)$value > 0 ? (string)(int)$value : '';
+}
+
+/**
  * A fingerprint of every stored plugin setting, which the settings form carries so a
  * save can tell whether it is overwriting a state it was never shown.
  *
@@ -55,6 +95,21 @@ function events_admin_settings_value($input_name, $setting_name)
  */
 function events_admin_settings_version()
 {
+    return sha1(json_encode(events_admin_stored_settings()));
+}
+
+/**
+ * Every setting in the plugin's group, as the settings table holds it right now.
+ *
+ * $mybb->settings comes from the generated inc/settings.php, and rebuild_settings()
+ * rewrites that file without invalidating opcache. On a host that caches compiled
+ * files, the page a save redirects to runs the old copy, and the form showed the
+ * values from before the save until opcache next checked the file.
+ *
+ * @return array Setting name => value
+ */
+function events_admin_stored_settings()
+{
     global $db;
 
     $query = $db->write_query("SELECT s.name, s.value
@@ -69,12 +124,16 @@ function events_admin_settings_version()
         $values[$row['name']] = $row['value'];
     }
 
-    return sha1(json_encode($values));
+    return $values;
 }
 
 function events_admin_settings()
 {
     global $mybb, $db, $page, $lang;
+
+    // Everything on this page - the form's values, the region rows and their forums -
+    // reads $mybb->settings, so it is brought up to the table first.
+    $mybb->settings = array_merge($mybb->settings, events_admin_stored_settings());
 
     // Adding and deleting a region are actions of their own on this page rather than
     // edits to the form below: each asks a question of its own first, and a deletion's
@@ -131,7 +190,7 @@ function events_admin_settings()
                 'events_501st_members_group' => $mybb->input['501st_members_group'],
                 'events_troop_report_forum' => $mybb->input['troop_report_forum'],
                 'events_timezone' => $timezone,
-                'events_event_forum' => $mybb->get_input('event_forum'),
+                'events_event_forum' => events_admin_forum_input($mybb->get_input('event_forum')),
                 'events_regions' => $region_plan['list'],
                 // One dropdown per region, folded back into the single Region=fid setting
                 // under the names the regions now have - without that, renaming a region
@@ -194,14 +253,6 @@ function events_admin_settings()
     while($group = $db->fetch_array($query))
     {
         $user_groups[$group['gid']] = $group['title'];
-    }
-    
-    // Get all forums
-    $forums = array();
-    $query = $db->simple_select("forums", "fid, name", "", array("order_by" => "name", "order_dir" => "ASC"));
-    while($forum = $db->fetch_array($query))
-    {
-        $forums[$forum['fid']] = $forum['name'];
     }
     
     $form = new Form("index.php?module=events&action=settings", "post");
@@ -285,18 +336,16 @@ function events_admin_settings()
     // Troop report forum
     $form_container->output_row("Troop Report Forum",
         "Forum where troop reports should be posted",
-        $form->generate_select_box("troop_report_forum", $forums, events_admin_settings_value('troop_report_forum', 'events_troop_report_forum')));
+        events_admin_forum_select($form, "troop_report_forum", events_admin_settings_value('troop_report_forum', 'events_troop_report_forum'), "troop_report_forum"));
     
     // Event announcement forums. An event's thread is generated and posted by the
     // plugin, so the board has to say where - and a garrison running regions across
     // several states wants each region's events in that region's forum rather than all
     // of them in one. The per-region choice is on the region's own row, below; this is
     // the fallback for the regions that have not made one.
-    $forum_choices = array('' => 'None') + $forums;
-
     $form_container->output_row("Default Event Forum",
         "Forum where event threads are posted when the region they belong to has None beside it in the list below. Leave this unset too and those events are not announced at all.",
-        $form->generate_select_box("event_forum", $forum_choices, events_admin_settings_value('event_forum', 'events_event_forum')));
+        events_admin_forum_select($form, "event_forum", events_admin_settings_value('event_forum', 'events_event_forum'), "event_forum", true));
 
     $form_container->end();
 
@@ -304,7 +353,7 @@ function events_admin_settings()
     // Which forum a region posts to is a property of that region, so it belongs on the
     // region rather than in a parallel list of "<Region> Event Forum" rows that the two
     // would have to be read side by side to make sense of.
-    events_admin_output_region_rows($form, $region_rows, $region_counts, $forum_choices);
+    events_admin_output_region_rows($form, $region_rows, $region_counts);
 
     $buttons = array($form->generate_submit_button("Save Settings"));
     $form->output_submit_wrapper($buttons);

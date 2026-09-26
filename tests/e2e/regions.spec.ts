@@ -133,7 +133,7 @@ async function restoreRegions(page: Page): Promise<void> {
       await select.selectOption(
         (await select.getAttribute("id")) === `region_forum_${hunter}`
           ? String(fixtures().forums.events_hunter)
-          : "",
+          : "-1",
       );
     }
     await save(page);

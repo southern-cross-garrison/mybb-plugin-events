@@ -41,6 +41,12 @@ if($events_action === 'settings' && $mybb->request_method != "post")
     header('Pragma: no-cache');
 }
 
+// Buffered so the actions below, which run after output_header(), can still send
+// headers. Without it admin_redirect() finds the headers gone and falls back to a meta
+// refresh of the same URL, which a browser may treat as a reload and fill the form back
+// in from what it had before the save.
+ob_start();
+
 $page->add_breadcrumb_item("Event Management", "index.php?module=events");
 $page->output_header("Event Management");
 
@@ -85,3 +91,4 @@ switch($events_action)
 }
 
 $page->output_footer();
+ob_end_flush();

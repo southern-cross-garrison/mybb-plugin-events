@@ -699,11 +699,10 @@ function events_admin_output_region_delete_page($region)
  * not have to go and count them.
  *
  * @param Form $form
- * @param array $rows          From events_admin_region_rows()
- * @param array $counts        From events_admin_region_event_counts()
- * @param array $forum_choices forum id => name, with '' => 'None' at the front
+ * @param array $rows   From events_admin_region_rows()
+ * @param array $counts From events_admin_region_event_counts()
  */
-function events_admin_output_region_rows($form, array $rows, array $counts, array $forum_choices)
+function events_admin_output_region_rows($form, array $rows, array $counts)
 {
     $container = new FormContainer("Regions");
 
@@ -720,8 +719,8 @@ function events_admin_output_region_rows($form, array $rows, array $counts, arra
 
         // Keyed by the row, like the name box beside it, and not by the region's name:
         // see events_admin_region_rows().
-        $forum = $form->generate_select_box("event_forums[" . $index . "]",
-            $forum_choices, $row['forum'], array("id" => "region_forum_" . $index));
+        $forum = events_admin_forum_select($form, "event_forums[" . $index . "]",
+            $row['forum'], "region_forum_" . $index, true);
 
         $content = '<span class="events_region_row">'
             . $form->generate_hidden_field("region_original[" . $index . "]", $original)
