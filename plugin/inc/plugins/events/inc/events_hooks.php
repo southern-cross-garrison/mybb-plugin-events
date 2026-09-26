@@ -1265,3 +1265,47 @@ function events_rebuild_profile_field_dropdowns()
 
     rebuild_settings();
 }
+
+/**
+ * Word the plugin's rows on the Administrator Log page.
+ *
+ * MyBB looks each row up as the language string admin_log_{module}_{sub}_{action}, and the
+ * plugin ships no language files, so its rows would otherwise print as a bare
+ * "events - edit (12, Title, ...)". The strings are set here, just before MyBB formats the
+ * row: it escapes each data value after this hook runs and then fills the {n}
+ * placeholders, so the string itself may carry markup and the values may not.
+ *
+ * @param array $args 'logitem' and 'lang_string', both by reference
+ *
+ * Hook: admin_tools_get_admin_log_action
+ */
+function events_admin_log_action(&$args)
+{
+    global $lang;
+
+    if($args['logitem']['module'] !== 'events')
+    {
+        return;
+    }
+
+    $edit_link = '<a href="index.php?module=events&amp;action=edit&amp;id={1}">event #{1} ({2})</a>';
+    $strings = array(
+        'add'            => 'Created ' . $edit_link,
+        'add_frontend'   => 'Created ' . $edit_link . ' from the front end',
+        'edit'           => 'Edited ' . $edit_link . ' - changed {3}',
+        'edit_frontend'  => 'Edited ' . $edit_link . ' from the front end - changed {3}',
+        'status'         => 'Set ' . $edit_link . ' to {3}',
+        // No link: there is nothing left to open.
+        'delete'         => 'Deleted event #{1} ({2})',
+    );
+
+    $action = $args['logitem']['action'];
+    if(!isset($strings[$action]))
+    {
+        return;
+    }
+
+    $key = 'events_admin_log_' . $action;
+    $lang->$key = $strings[$action];
+    $args['lang_string'] = $key;
+}

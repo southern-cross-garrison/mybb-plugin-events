@@ -2612,3 +2612,35 @@ function events_can_create_troop_report($event, $user_id = null)
 
     return !$report || empty($report['posted_at']);
 }
+
+/**
+ * Record something done to an event in the board's administrator log
+ * (Admin CP -> Tools & Maintenance -> Administrator Log).
+ *
+ * Not MyBB's log_admin_action(): that lives in the Admin CP's own functions file and takes
+ * its module and action from the request, and events are also edited by coordinators from
+ * manage_event.php, who have no Admin CP access at all. So the row is written here, the
+ * same shape log_admin_action() writes, under the one module name `events` whichever side
+ * it came from - the log's module filter then lists every event change together.
+ *
+ * The log renders a row by passing its data to $lang->sprintf() in order, so $data is a
+ * plain list: see events_admin_log_action() for the wording each action gets. Only the
+ * two event forms and the Admin CP's status and delete links call this; anything that
+ * writes events from the command line (the demo seed, tests) is not an administrator.
+ *
+ * @param string $action add, edit, status or delete, with _frontend for manage_event.php
+ * @param array $data Values for the log line's placeholders, in order
+ */
+function events_log_action($action, array $data)
+{
+    global $db, $mybb;
+
+    $db->insert_query("adminlog", array(
+        'uid'       => (int)$mybb->user['uid'],
+        'ipaddress' => $db->escape_binary(my_inet_pton(get_ip())),
+        'dateline'  => TIME_NOW,
+        'module'    => 'events',
+        'action'    => $db->escape_string($action),
+        'data'      => $db->escape_string(my_serialize(array_values(array_map('strval', $data)))),
+    ));
+}

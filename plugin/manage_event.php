@@ -88,7 +88,9 @@ if($mybb->request_method === 'post')
             $withdrawn = 0;
             $promoted = 0;
             $demoted = 0;
+            $log_before = $is_edit ? events_event_log_state($event_id) : array();
             $saved_id = events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error, $cancelled, $withdrawn, $promoted, $demoted);
+            events_log_event_save($saved_id, $log_before, true);
 
             // The event is saved either way; a thread that could not be written is
             // reported rather than swallowed, because nothing else on the page would

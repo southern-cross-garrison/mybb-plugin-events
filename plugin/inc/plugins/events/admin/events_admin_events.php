@@ -170,7 +170,9 @@ function events_admin_edit_event()
                 $withdrawn = 0;
                 $promoted = 0;
                 $demoted = 0;
-                events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error, $cancelled, $withdrawn, $promoted, $demoted);
+                $log_before = $is_edit ? events_event_log_state($event_id) : array();
+                $saved_id = events_save_event($is_edit ? $event_id : 0, $values, $mybb->user['uid'], $thread_error, $cancelled, $withdrawn, $promoted, $demoted);
+                events_log_event_save($saved_id, $log_before, false);
 
                 $message = $is_edit ? "Event updated successfully." : "Event created successfully.";
                 if($cancelled > 0)
@@ -378,6 +380,8 @@ function events_admin_set_status()
         'updated_at' => $db->escape_string(events_date('Y-m-d H:i:s')),
     ), "id = " . $event_id);
 
+    events_log_action('status', array($event_id, $event['title'], $status));
+
     // An event reaches "live" from here as often as it does from the form, and that is
     // the point at which it is announced.
     $thread_error = null;
@@ -456,6 +460,8 @@ function events_admin_delete_event()
     $db->delete_query("event_plugin_event_exclusions", "event_id = " . $event_id);
     $db->delete_query("event_plugin_troop_reports", "event_id = " . $event_id);
     $db->delete_query("event_plugin_events", "id = " . $event_id);
+
+    events_log_action('delete', array($event_id, $event['title']));
 
     flash_message("Event deleted successfully.", "success");
     admin_redirect("index.php?module=events");

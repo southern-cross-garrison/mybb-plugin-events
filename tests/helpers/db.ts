@@ -201,6 +201,10 @@ export async function resetPluginData(): Promise<void> {
   // order once the clock starts moving.
   await conn.query(`TRUNCATE TABLE ${T('tasklog')}`);
 
+  // Event changes are logged here, and event ids start again from 1 in every test, so
+  // an entry left by an earlier test would name an event this one is about to create.
+  await conn.query(`TRUNCATE TABLE ${T('adminlog')}`);
+
   const [backups] = await conn.query<any[]>(`SHOW TABLES LIKE '${USERFIELDS_BACKUP}'`);
   if (backups.length) {
     await conn.query(`DELETE FROM ${T('userfields')}`);

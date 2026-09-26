@@ -1723,6 +1723,111 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
 }
 
 /**
+ * An event as the administrator log compares it: every part of it the form can change,
+ * keyed by the name the form gives it.
+ *
+ * Read from the database rather than from what was posted, on both sides of the save, so
+ * a field only counts as changed when what is stored is different - a date retyped the
+ * same, or a description whose line endings the browser rewrote, is not a change.
+ *
+ * @param int $event_id
+ * @return array Field name => stored value; empty when there is no such event
+ */
+function events_event_log_state($event_id)
+{
+    global $db;
+
+    $event_id = (int)$event_id;
+    $event = events_get_event($event_id);
+    if(!$event)
+    {
+        return array();
+    }
+
+    $columns = array(
+        'title'         => 'Title',
+        'description'   => 'Description',
+        'status'        => 'Status',
+        'region'        => 'Region',
+        'address'       => 'Address',
+        'start_date'    => 'Start Date',
+        'end_date'      => 'End Date',
+        'signup_cutoff' => 'Signup Cutoff',
+        'max_troopers'  => 'Maximum Troopers',
+        'max_wranglers' => 'Maximum Wranglers',
+        'requires_wwcc' => 'Requires WWCC',
+        'gec_user_id'   => 'Coordinator',
+        'poc_user_id'   => 'Point of Contact',
+    );
+
+    $state = array();
+    foreach($columns as $column => $label)
+    {
+        $state[$label] = (string)$event[$column];
+    }
+
+    $days = array();
+    $query = $db->simple_select("event_plugin_event_days", "date, start_time, end_time", "event_id = " . $event_id, array('order_by' => 'date'));
+    while($day = $db->fetch_array($query))
+    {
+        $days[] = $day['date'] . ' ' . $day['start_time'] . '-' . $day['end_time'];
+    }
+    $state['Event Days'] = implode(', ', $days);
+
+    $excluded = array();
+    $query = $db->simple_select("event_plugin_event_exclusions", "user_id", "event_id = " . $event_id, array('order_by' => 'user_id'));
+    while($row = $db->fetch_array($query))
+    {
+        $excluded[] = (int)$row['user_id'];
+    }
+    $state['Excluded Members'] = implode(',', $excluded);
+
+    return $state;
+}
+
+/**
+ * Log a save from either event form to the administrator log - see events_log_action().
+ *
+ * An edit names the fields it changed, so the log says what somebody did to an event
+ * rather than only that they opened the form and pressed Save.
+ *
+ * @param int $event_id The id events_save_event() returned
+ * @param array $before events_event_log_state() from before the save; empty for a new event
+ * @param bool $frontend Whether the save came from manage_event.php
+ */
+function events_log_event_save($event_id, array $before, $frontend)
+{
+    $after = events_event_log_state($event_id);
+    if(empty($after))
+    {
+        return;
+    }
+
+    $suffix = $frontend ? '_frontend' : '';
+
+    if(empty($before))
+    {
+        events_log_action('add' . $suffix, array($event_id, $after['Title']));
+        return;
+    }
+
+    $changed = array();
+    foreach($after as $label => $value)
+    {
+        if(!isset($before[$label]) || $before[$label] !== $value)
+        {
+            $changed[] = $label;
+        }
+    }
+
+    events_log_action('edit' . $suffix, array(
+        $event_id,
+        $after['Title'],
+        $changed ? implode(', ', $changed) : 'nothing',
+    ));
+}
+
+/**
  * What a save did to the waitlist, for the message both forms show after it.
  *
  * @param int $promoted

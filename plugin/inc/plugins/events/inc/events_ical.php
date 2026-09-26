@@ -88,6 +88,21 @@ function events_ical_signup_line(array $roles, array $signup, $day_id, $multi_da
 }
 
 /**
+ * Whether an event day row is the whole day: both boxes left blank, which the form stores
+ * as 00:00:00 to 23:59:59 (events_day_time()), or no times stored at all.
+ *
+ * @param array $day event_day row
+ * @return bool
+ */
+function events_ical_whole_day(array $day)
+{
+    $start = !empty($day['start_time']) ? $day['start_time'] : '00:00:00';
+    $end = !empty($day['end_time']) ? $day['end_time'] : '23:59:59';
+
+    return $start === '00:00:00' && $end === '23:59:59';
+}
+
+/**
  * Escape a value for an iCal text property.
  */
 function events_ical_escape($value)
@@ -150,13 +165,16 @@ function events_ical_vevents(array $event, $user_id)
     $days = events_get_event_days($event_id);
 
     // Single-day events have no rows in event_days; fall back to the event's own window.
+    // It carries the event's own instants rather than a date and two times: an event on
+    // one date can still run 24 hours or more (see events_event_dates()), and rebuilt from
+    // its times on its start date a 02:00 to 03:00-the-next-day troop came out an hour long.
     if(empty($days))
     {
         $days = array(array(
-            'id'         => 0,
-            'date'       => events_date('Y-m-d', events_strtotime($event['start_date'])),
-            'start_time' => events_date('H:i:s', events_strtotime($event['start_date'])),
-            'end_time'   => events_date('H:i:s', events_strtotime($event['end_date'])),
+            'id'    => 0,
+            'date'  => events_date('Y-m-d', events_strtotime($event['start_date'])),
+            'start' => events_strtotime($event['start_date']),
+            'end'   => events_strtotime($event['end_date']),
         ));
     }
 
@@ -252,18 +270,41 @@ function events_ical_vevents(array $event, $user_id)
     $lines = array();
     foreach($days as $day)
     {
-        // The stored day is a wall clock in the event's timezone; DTSTART and DTEND are
-        // written as UTC instants, so reading it in that zone is what makes the two agree.
-        $start = events_strtotime($day['date'] . ' ' . ($day['start_time'] ? $day['start_time'] : '00:00:00'));
-        $end = events_strtotime($day['date'] . ' ' . ($day['end_time'] ? $day['end_time'] : '23:59:59'));
-
-        // A day stores only its times, so one that finishes at or before the time it
-        // starts - ending at midnight, or running overnight - finishes on the following
-        // date. Stepped on the wall clock in the event's zone, so a DST change that night
-        // is honoured.
-        if($end <= $start)
+        if(isset($day['start']))
         {
-            $end = events_strtotime('+1 day', $end);
+            $dtstart = "DTSTART:" . gmdate('Ymd\THis\Z', $day['start']);
+            $dtend = "DTEND:" . gmdate('Ymd\THis\Z', $day['end']);
+        }
+        elseif(events_ical_whole_day($day))
+        {
+            // A day left with blank boxes is stored as 00:00:00 to 23:59:59, which as two
+            // instants is a timed entry that stops a second short of midnight. A calendar
+            // shows it as the day itself only when it is written as a date, and a DATE end
+            // is exclusive, so it is the following one. Dates have no zone, so this is
+            // arithmetic on the date string in UTC rather than on the wall clock.
+            $next = new DateTime($day['date'], new DateTimeZone('UTC'));
+            $next->modify('+1 day');
+            $dtstart = "DTSTART;VALUE=DATE:" . str_replace('-', '', $day['date']);
+            $dtend = "DTEND;VALUE=DATE:" . $next->format('Ymd');
+        }
+        else
+        {
+            // The stored day is a wall clock in the event's timezone; DTSTART and DTEND are
+            // written as UTC instants, so reading it in that zone is what makes the two agree.
+            $start = events_strtotime($day['date'] . ' ' . ($day['start_time'] ? $day['start_time'] : '00:00:00'));
+            $end = events_strtotime($day['date'] . ' ' . ($day['end_time'] ? $day['end_time'] : '23:59:59'));
+
+            // A day stores only its times, so one that finishes at or before the time it
+            // starts - ending at midnight, or running overnight - finishes on the following
+            // date. Stepped on the wall clock in the event's zone, so a DST change that night
+            // is honoured.
+            if($end <= $start)
+            {
+                $end = events_strtotime('+1 day', $end);
+            }
+
+            $dtstart = "DTSTART:" . gmdate('Ymd\THis\Z', $start);
+            $dtend = "DTEND:" . gmdate('Ymd\THis\Z', $end);
         }
 
         $description = array_merge(
@@ -291,8 +332,8 @@ function events_ical_vevents(array $event, $user_id)
         $lines[] = "BEGIN:VEVENT";
         $lines[] = "UID:" . $uid . "@" . $host;
         $lines[] = "DTSTAMP:" . gmdate('Ymd\THis\Z', TIME_NOW);
-        $lines[] = "DTSTART:" . gmdate('Ymd\THis\Z', $start);
-        $lines[] = "DTEND:" . gmdate('Ymd\THis\Z', $end);
+        $lines[] = $dtstart;
+        $lines[] = $dtend;
         $lines[] = "SUMMARY:" . events_ical_escape(events_ical_summary($role_days, $event['title'], $day['id']));
         $lines[] = "DESCRIPTION:" . events_ical_escape($description);
         $lines[] = "LOCATION:" . events_ical_escape($location);

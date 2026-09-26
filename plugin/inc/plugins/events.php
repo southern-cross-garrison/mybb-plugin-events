@@ -24,6 +24,9 @@ if(defined('IN_ADMINCP'))
     $plugins->add_hook("admin_config_profile_fields_add_commit", "events_rebuild_profile_field_dropdowns");
     $plugins->add_hook("admin_config_profile_fields_edit_commit", "events_rebuild_profile_field_dropdowns");
     $plugins->add_hook("admin_config_profile_fields_delete_commit", "events_rebuild_profile_field_dropdowns");
+
+    // Event changes are written to the administrator log; this words them there.
+    $plugins->add_hook("admin_tools_get_admin_log_action", "events_admin_log_action");
 }
 else
 {

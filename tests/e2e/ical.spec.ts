@@ -146,6 +146,46 @@ test.describe('iCal export', () => {
     expect(body).toContain('DTEND:20261021T010000Z');
   });
 
+  test('keeps the full length of a one-date event that runs 24 hours or more', async ({ page }) => {
+    // Ending before 06:00, this counts as one date (events_event_dates()), so it has no
+    // day rows. Rebuilt from its times on the start date it came out 02:00 to 03:00.
+    const eventId = await createEvent({
+      title: 'Marathon Export Troop',
+      start: '2026-10-20 02:00:00',
+      end: '2026-10-21 03:00:00',
+    });
+
+    await loginAs(page, 'trooper1');
+    const body = await fetchCalendar(page, eventId);
+
+    expect(body.match(/BEGIN:VEVENT/g)).toHaveLength(1);
+    expect(body).toContain('DTSTART:20261020T020000Z');
+    expect(body).toContain('DTEND:20261021T030000Z');
+  });
+
+  test('exports a whole-day day as an all-day entry', async ({ page }) => {
+    // Blank boxes are stored as 00:00:00 to 23:59:59, which as instants is a timed entry
+    // a second short of midnight. An all-day entry is a DATE, and its end is exclusive.
+    const eventId = await createEvent({
+      title: 'All Day Export Troop',
+      start: '2026-10-17 00:00:00',
+      end: '2026-10-18 17:00:00',
+      days: [
+        { date: '2026-10-17', start: '00:00:00', end: '23:59:59' },
+        { date: '2026-10-18', start: '10:00:00', end: '17:00:00' },
+      ],
+    });
+
+    await loginAs(page, 'trooper1');
+    const body = await fetchCalendar(page, eventId);
+
+    expect(body).toContain('DTSTART;VALUE=DATE:20261017');
+    expect(body).toContain('DTEND;VALUE=DATE:20261018');
+    expect(body).not.toContain('T235959Z');
+    expect(body).toContain('DTSTART:20261018T100000Z');
+    expect(body).toContain('DTEND:20261018T170000Z');
+  });
+
   test('keeps each entry\'s UID when the event\'s days are recreated', async ({ page }) => {
     // A calendar app matches a re-import by UID; one that changes leaves a duplicate.
     const eventId = await createEvent({ title: 'Stable Weekend Troop', ...WEEKEND });

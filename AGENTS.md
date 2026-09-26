@@ -441,3 +441,14 @@ baseline picks the change up.
   reminder task off mid-test. A test that reads a listing to prove a thread is *absent*
   should check the listing is one page first, as `openForumListing()` in
   `exclusions.spec.ts` does.
+
+- Every change to an event - created, edited, status set, deleted - is written to MyBB's
+  Administrator Log by `events_log_action()`, under module `events`, whichever form made it.
+  It writes the `adminlog` row itself rather than calling MyBB's `log_admin_action()`, which
+  exists only in the Admin CP and reads its module from the request, and coordinators edit
+  from `manage_event.php` with no Admin CP at all. Logging sits in the two forms and the
+  status/delete actions, *not* in `events_save_event()`, because the demo seed and tests call
+  that from the command line. An edit names the fields it changed by comparing
+  `events_event_log_state()` before and after the save; a new field on the event form belongs
+  in that list too. The wording on the log page comes from `events_admin_log_action()` on
+  `admin_tools_get_admin_log_action`, since the plugin ships no language files.

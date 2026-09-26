@@ -393,7 +393,7 @@ test.describe('the waitlist', () => {
 
     await loginAs(page, 'trooper2');
     const body = (await (await page.request.get(`/ical.php?id=${eventId}`)).text()).replace(/\r\n[ \t]/g, '');
-    const starts = [...body.matchAll(/^DTSTART:(\d{8})/gm)].map((match) => match[1]);
+    const starts = [...body.matchAll(/^DTSTART[^:\r\n]*:(\d{8})/gm)].map((match) => match[1]);
     expect(starts).toEqual(['20261025']);
   });
 });
@@ -1184,7 +1184,7 @@ test.describe('the calendar, for a member the plugin put on the waitlist', () =>
 
   const unfold = (body: string) => body.replace(/\r\n[ \t]/g, '');
   const summaries = (body: string) => [...body.matchAll(/^SUMMARY:(.*)$/gm)].map((match) => match[1].trim());
-  const starts = (body: string) => [...body.matchAll(/^DTSTART:(\d{8})/gm)].map((match) => match[1]);
+  const starts = (body: string) => [...body.matchAll(/^DTSTART[^:\r\n]*:(\d{8})/gm)].map((match) => match[1]);
 
   // The feed test above hand-writes the waitlisted status; here the queue is the plugin's
   // own, from two members signing up to an event with one trooping place.
