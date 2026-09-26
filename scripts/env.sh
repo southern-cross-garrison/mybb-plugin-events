@@ -55,3 +55,13 @@ dc() { docker compose "$@"; }
 
 log() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31mERROR:\033[0m %s\n' "$*" >&2; exit 1; }
+
+# Hand the web container back the real clock. Written aside and renamed into place, never
+# rewritten in place: libfaketime re-reads this file on every clock call and exit()s any
+# process that finds it empty, which a `>` redirect leaves it for an instant - and when
+# that process is Apache's parent, the container goes down. See tests/helpers/clock.ts.
+reset_faketime() {
+    mkdir -p "$(dirname "$FAKETIME_FILE")"
+    printf '+0' > "$FAKETIME_FILE.$$.tmp"
+    mv -f "$FAKETIME_FILE.$$.tmp" "$FAKETIME_FILE"
+}

@@ -20,9 +20,18 @@ const toEpochSeconds = (mysqlDateTime: string): number => Date.parse(`${mysqlDat
 const toMysqlDateTime = (epochSeconds: number): string =>
   new Date(epochSeconds * 1000).toISOString().slice(0, 19).replace('T', ' ');
 
+/**
+ * Replaced by rename, never rewritten in place. FAKETIME_NO_CACHE has every process in the
+ * container re-read the file on every clock call, and libfaketime 0.9.13 exit()s a process
+ * that reads it empty or half-written - which is what a truncate-then-write leaves it for
+ * an instant. When the reader was Apache's parent the whole container went down, and the
+ * rest of the run failed on "Could not read the container clock".
+ */
 function write(spec: string): void {
   fs.mkdirSync(path.dirname(FAKETIME_FILE), { recursive: true });
-  fs.writeFileSync(FAKETIME_FILE, spec);
+  const staging = `${FAKETIME_FILE}.${process.pid}.tmp`;
+  fs.writeFileSync(staging, spec);
+  fs.renameSync(staging, FAKETIME_FILE);
 }
 
 /** What PHP inside the container currently thinks the time is. */

@@ -14,8 +14,7 @@ if [ "$FRESH" = "1" ]; then
     rm -rf "$FORUM_DIR" "$SNAPSHOT_FILE"
 fi
 
-mkdir -p "$(dirname "$FAKETIME_FILE")"
-printf '+0' > "$FAKETIME_FILE"
+reset_faketime
 
 if [ ! -f "$FORUM_DIR/inc/class_core.php" ]; then
     "$REPO_ROOT/scripts/fetch-mybb.sh"

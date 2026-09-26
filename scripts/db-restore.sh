@@ -41,8 +41,7 @@ while($theme = $db->fetch_array($roots))
 }
 ' > /dev/null
 
-mkdir -p "$(dirname "$FAKETIME_FILE")"
-printf '+0' > "$FAKETIME_FILE"
+reset_faketime
 
 # MyBB's shutdown handler adds `now - lastactive` to users.timeonline, which is UNSIGNED.
 # The snapshot carries whatever timestamps the clock held when it was taken, so restoring
