@@ -1042,8 +1042,52 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 
 /* Calendar subscription (calendar_feed.php). */
 .events_feed_link { margin: 12px 0; }
-.events_feed_link .events_notice { margin-bottom: 12px; }
-.events_feed_url { width: 100%; box-sizing: border-box; font-family: monospace; }
+/* A split button: the subscribe link, and a caret that opens a menu under it. Styled
+   here rather than with the theme's .button, which themes tend to write for form inputs
+   only - on the garrison's an <a class="button"> is a plain link. Links name the element
+   so the text colour survives a theme's a:hover (see .event_btn). */
+.events_feed_split { display: inline-flex; position: relative; align-items: stretch; }
+a.events_feed_split_main, a.events_feed_split_main:hover, a.events_feed_split_main:visited, .events_feed_split_toggle {
+	background: var(--events-accent, #2f6f9f); border: 1px solid var(--events-accent-border, #2a6390); color: #fff;
+	text-decoration: none;
+}
+a.events_feed_split_main {
+	display: inline-block; padding: 10px 18px; border-radius: 4px 0 0 4px; line-height: 1.2;
+	font-weight: 600; font-size: 1.05em;
+}
+a.events_feed_split_main:hover, .events_feed_split_toggle:hover { filter: brightness(1.08); }
+.events_feed_menu { display: flex; margin: 0; }
+.events_feed_split_toggle {
+	display: flex; align-items: center; padding: 0 12px; border-radius: 0 4px 4px 0; cursor: pointer;
+	border-left-color: rgba(255, 255, 255, 0.45); list-style: none;
+}
+.events_feed_split_toggle::-webkit-details-marker { display: none; }
+.events_feed_split_toggle::after {
+	content: ""; width: 0; height: 0;
+	border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid currentColor;
+}
+.events_feed_menu_list {
+	position: absolute; top: 100%; right: 0; z-index: 10; margin-top: 4px; min-width: 100%;
+	box-sizing: border-box; padding: 4px 0; background: #fff; color: #333;
+	border: 1px solid rgba(0, 0, 0, 0.15); border-radius: 4px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.events_feed_menu_list a { display: block; padding: 8px 14px; white-space: nowrap; }
+.events_feed_menu_list a:hover { background: rgba(0, 0, 0, 0.05); }
+
+.events_feed_copy { display: none; margin-top: 16px; }
+.events_feed_copy:target, .events_feed_copy.events_feed_copy_open { display: block; }
+.events_feed_copy .events_notice { margin-bottom: 12px; }
+.events_feed_url_row { display: flex; align-items: center; gap: 8px; }
+.events_feed_url {
+	flex: 1; min-width: 0; padding: 8px 10px; border-radius: 4px; background: rgba(127, 127, 127, 0.1);
+	color: inherit; font-family: monospace; overflow-wrap: anywhere; user-select: all;
+}
+#calendar_feed_copy_button { flex: none; margin: 0; }
+/* The id as well as the class, to out-specify the theme's button.button fill. */
+#calendar_feed_copy_button.events_feed_copied,
+#calendar_feed_copy_button.events_feed_copied:hover { background: #2e7d32; border-color: #276b2b; color: #fff; }
+/* A theme's .button sets display, which would otherwise beat the attribute. */
+#calendar_feed_copy_button[hidden] { display: none; }
 .events_feed_actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
 .events_feed_form { display: inline; margin: 0; }
 

@@ -26,7 +26,7 @@ const WEEKEND = {
 async function makeFeedLink(page: Page): Promise<string> {
   await page.goto('/calendar_feed.php');
   await page.locator('#calendar_feed_create, #calendar_feed_reset').click();
-  const url = await page.locator('#calendar_feed_url').inputValue();
+  const url = (await page.locator('#calendar_feed_url').textContent())!.trim();
   expect(url).toMatch(/\/ical_feed\.php\?token=[A-Za-z0-9_-]{86}$/);
   return url;
 }
@@ -84,7 +84,7 @@ test.describe('calendar subscription feed', () => {
     await loginAs(page, 'trooper1');
     await page.goto('/usercp.php?action=events_calendar');
     await page.locator('#calendar_feed_create').click();
-    const url = await page.locator('#calendar_feed_url').inputValue();
+    const url = (await page.locator('#calendar_feed_url').textContent())!.trim();
     const feed = async () => entries((await fetchFeed(request, url)).body);
 
     // Nothing signed up for yet, so nothing in it - but it is a working, empty calendar.
@@ -229,6 +229,46 @@ test.describe('calendar subscription feed', () => {
     await expect(page.locator('#calendar_feed_status')).toBeVisible();
     await expect(page.locator('#calendar_feed_url')).toHaveCount(0);
     expect(await page.content()).not.toContain(new URL(url).searchParams.get('token')!);
+  });
+
+  test('leads with the subscribe button and keeps the URL behind its menu', async ({ page, context }) => {
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    await loginAs(page, 'trooper1');
+    await page.goto('/calendar_feed.php');
+    await page.locator('#calendar_feed_create').click();
+
+    const subscribe = page.locator('#calendar_feed_subscribe');
+    await expect(subscribe).toBeVisible();
+    expect(await subscribe.getAttribute('href')).toMatch(/^webcal:\/\/.*\/ical_feed\.php\?token=[A-Za-z0-9_-]{86}$/);
+    await expect(page.locator('#calendar_feed_url')).toBeHidden();
+
+    await page.locator('#calendar_feed_menu_toggle').click();
+    await page.locator('#calendar_feed_show_url').click();
+    await expect(page.locator('#calendar_feed_show_url')).toBeHidden();
+    await expect(page.locator('#calendar_feed_url')).toBeVisible();
+
+    const url = (await page.locator('#calendar_feed_url').textContent())!.trim();
+    await page.locator('#calendar_feed_copy_button').click();
+    await expect(page.locator('#calendar_feed_copy_button')).toHaveText('✓ Copied');
+    await expect(page.locator('#calendar_feed_copy_button')).toHaveClass(/events_feed_copied/);
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(url);
+    expect(url.replace(/^https?:/, 'webcal:')).toBe(await subscribe.getAttribute('href'));
+  });
+
+  test.describe('with scripts off', () => {
+    test.use({ javaScriptEnabled: false });
+
+    test('the menu still shows the URL', async ({ page }) => {
+      await loginAs(page, 'trooper1');
+      await page.goto('/calendar_feed.php');
+      await page.locator('#calendar_feed_create').click();
+
+      await page.locator('#calendar_feed_menu_toggle').click();
+      await page.locator('#calendar_feed_show_url').click();
+      await expect(page.locator('#calendar_feed_url')).toBeVisible();
+      // Copying needs a script; without one the URL is text to select.
+      await expect(page.locator('#calendar_feed_copy_button')).toBeHidden();
+    });
   });
 
   test('refuses every bad token with the same answer', async ({ page, request }) => {
@@ -418,7 +458,7 @@ $cache->update_usergroups();
 
       await page.locator('#calendar_feed_create').click();
       await expect(page).toHaveURL(/usercp\.php$/);
-      const url = await page.locator('#calendar_feed_url').inputValue();
+      const url = (await page.locator('#calendar_feed_url').textContent())!.trim();
       await expectBesideNav(page);
       expect((await fetchFeed(request, url)).body).toContain('Feed From User CP Troop');
 

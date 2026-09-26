@@ -188,6 +188,73 @@ function events_feed_webcal_url($token)
 }
 
 /**
+ * The subscription link's menu and Copy button.
+ *
+ * Opening the URL panel is done with a class rather than by following the link, so the
+ * page does not jump to it; the link's :target still opens it with the script off. The
+ * Copy button starts hidden because it can do nothing without script - the URL is plain
+ * text and selects like any other. execCommand is the fallback for a board served over
+ * plain http, where the Clipboard API does not exist.
+ *
+ * @return string
+ */
+function events_calendar_feed_script()
+{
+    return <<<'SCRIPT'
+<script type="text/javascript">
+(function() {
+	var menu = document.getElementById('calendar_feed_menu');
+	var show = document.getElementById('calendar_feed_show_url');
+	var panel = document.getElementById('calendar_feed_copy');
+	var url = document.getElementById('calendar_feed_url');
+	var copy = document.getElementById('calendar_feed_copy_button');
+	if(!menu || !show || !panel || !url || !copy) { return; }
+
+	show.addEventListener('click', function(e) {
+		e.preventDefault();
+		menu.open = false;
+		panel.classList.add('events_feed_copy_open');
+		copy.focus();
+	});
+
+	document.addEventListener('click', function(e) {
+		if(menu.open && !menu.contains(e.target)) { menu.open = false; }
+	});
+
+	function fallback(text) {
+		var range = document.createRange();
+		range.selectNodeContents(url);
+		var selection = window.getSelection();
+		selection.removeAllRanges();
+		selection.addRange(range);
+		var done = false;
+		try { done = document.execCommand('copy'); } catch(err) {}
+		return done ? Promise.resolve() : Promise.reject();
+	}
+
+	var reset;
+	copy.hidden = false;
+	copy.addEventListener('click', function() {
+		var text = url.textContent;
+		var write = navigator.clipboard && window.isSecureContext
+			? navigator.clipboard.writeText(text).catch(function() { return fallback(text); })
+			: fallback(text);
+		write.then(function() {
+			copy.textContent = '\u2713 Copied';
+			copy.classList.add('events_feed_copied');
+			clearTimeout(reset);
+			reset = setTimeout(function() {
+				copy.textContent = 'Copy';
+				copy.classList.remove('events_feed_copied');
+			}, 2000);
+		}, function() {});
+	});
+})();
+</script>
+SCRIPT;
+}
+
+/**
  * A one-button POST form. Actions that change the link are never GET links, so nothing
  * can be tricked into resetting a member's feed by getting them to follow a URL.
  *
@@ -273,16 +340,34 @@ function events_calendar_feed_body($form_action, array $hidden = array())
         $https = htmlspecialchars_uni(events_feed_url($token));
         $webcal = htmlspecialchars_uni(events_feed_webcal_url($token));
 
+        // The subscribe link is the whole job for most members, so it is the button; the
+        // raw URL is for calendars that have no webcal handler (Google's, on the web) and
+        // waits behind the button's menu. Without script the menu is a <details> and the
+        // panel opens as the link's :target, so both still work.
         $body .= '<div class="events_feed_link" id="calendar_feed_link">'
+            . '<div class="events_feed_split">'
+            . '<a href="' . $webcal . '" class="events_feed_split_main" id="calendar_feed_subscribe">Subscribe in my calendar app</a>'
+            . '<details class="events_feed_menu" id="calendar_feed_menu">'
+            . '<summary class="events_feed_split_toggle" id="calendar_feed_menu_toggle" aria-label="More subscribe options"></summary>'
+            . '<div class="events_feed_menu_list">'
+            . '<a href="#calendar_feed_copy" id="calendar_feed_show_url">Copy calendar URL</a>'
+            . '</div>'
+            . '</details>'
+            . '</div>'
+            . '<div class="events_feed_copy" id="calendar_feed_copy">'
             . '<p class="events_notice"><strong>Copy this link now.</strong> It is shown only this once. '
             . 'If you lose it, make a new one - that also turns this one off.</p>'
-            . '<p><a href="' . $webcal . '" class="button" id="calendar_feed_subscribe">Subscribe in my calendar app</a></p>'
-            . '<label class="events_label" for="calendar_feed_url">Or paste this into your calendar\'s "subscribe by URL" option '
-            . '(in Google Calendar: Other calendars &rarr; From URL)</label>'
-            . '<input type="text" readonly="readonly" class="events_input events_feed_url" id="calendar_feed_url" value="' . $https . '" onfocus="this.select();" />'
+            . '<p class="events_label">Paste this into your calendar\'s "subscribe by URL" option '
+            . '(in Google Calendar: Other calendars &rarr; From URL)</p>'
+            . '<div class="events_feed_url_row">'
+            . '<code class="events_feed_url" id="calendar_feed_url">' . $https . '</code>'
+            . '<button type="button" class="button" id="calendar_feed_copy_button" hidden="hidden">Copy</button>'
+            . '</div>'
             . '<p class="events_hint">Treat it like a password: anyone who has it can see the events you have signed up for. '
             . 'Do not post it or share it.</p>'
-            . '</div>';
+            . '</div>'
+            . '</div>'
+            . events_calendar_feed_script();
     }
 
     if($status)

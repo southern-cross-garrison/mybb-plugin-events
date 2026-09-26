@@ -865,7 +865,7 @@ echo events_event_post_content(events_get_event(${eventId}));
     await loginAs(page, 'trooper2');
     await page.goto('/calendar_feed.php');
     await page.locator('#calendar_feed_create, #calendar_feed_reset').click();
-    const url = await page.locator('#calendar_feed_url').inputValue();
+    const url = (await page.locator('#calendar_feed_url').textContent())!.trim();
 
     const body = (await (await request.get(url)).text()).replace(/\r\n[ \t]/g, '');
     expect(body).toContain('Feed Attending Troop');
@@ -1202,7 +1202,7 @@ test.describe('the calendar, for a member the plugin put on the waitlist', () =>
   async function makeFeedLink(page: Page): Promise<string> {
     await page.goto('/calendar_feed.php');
     await page.locator('#calendar_feed_create, #calendar_feed_reset').click();
-    const url = await page.locator('#calendar_feed_url').inputValue();
+    const url = (await page.locator('#calendar_feed_url').textContent())!.trim();
     expect(url).toMatch(/\/ical_feed\.php\?token=/);
     return url;
   }

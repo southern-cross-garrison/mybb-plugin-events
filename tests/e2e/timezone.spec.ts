@@ -551,7 +551,7 @@ test.describe(`the calendar subscription feed in ${SYDNEY}`, () => {
     await loginAs(page, 'trooper1');
     await page.goto('/calendar_feed.php');
     await page.locator('#calendar_feed_create, #calendar_feed_reset').click();
-    const url = await page.locator('#calendar_feed_url').inputValue();
+    const url = (await page.locator('#calendar_feed_url').textContent())!.trim();
     expect(url).toMatch(/\/ical_feed\.php\?token=/);
 
     // No cookies: the `request` fixture shares nothing with the signed-in page.

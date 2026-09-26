@@ -123,7 +123,7 @@ test.describe('runtime health', () => {
     // A real token, made the way a member makes one, so the feed renders its entries
     // rather than stopping at the token check.
     await page.locator('#calendar_feed_create, #calendar_feed_reset').click();
-    const feedUrl = await page.locator('#calendar_feed_url').inputValue();
+    const feedUrl = (await page.locator('#calendar_feed_url').textContent())!.trim();
     expect(feedUrl).toMatch(/\/ical_feed\.php\?token=[A-Za-z0-9_-]{86}$/);
     const feed = await page.request.get(feedUrl);
     expect(feed.status()).toBe(200);

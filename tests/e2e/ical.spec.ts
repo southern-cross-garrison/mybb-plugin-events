@@ -530,7 +530,7 @@ test.describe('iCal line folding with multibyte text', () => {
     await loginAs(page, 'trooper1');
     await page.goto('/calendar_feed.php');
     await page.locator('#calendar_feed_create, #calendar_feed_reset').click();
-    const url = await page.locator('#calendar_feed_url').inputValue();
+    const url = (await page.locator('#calendar_feed_url').textContent())!.trim();
 
     // Fetched as a calendar server would, with no session.
     const response = await request.get(url);
