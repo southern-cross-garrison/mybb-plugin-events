@@ -103,3 +103,26 @@ jobs:
       - name: Tear down
         if: always()
         run: docker compose down -v
+
+  # The zip an administrator uploads to a board. Its root is the forum root - the contents
+  # of plugin/, with no folder around them - so it expands straight over a MyBB install.
+  # That is also why the documentation stays out of it: anything in the zip lands in the
+  # web root. It waits for both PHP versions so a downloaded zip is always one the suite
+  # passed on.
+  package:
+    name: Package the plugin
+    needs: e2e
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # The artifact is the zip: Actions zips an artifact's files for download, so zipping
+      # them here would hand over a zip inside a zip. A directory path uploads what is in
+      # it, not the directory itself.
+      - name: Upload the plugin zip
+        uses: actions/upload-artifact@v7
+        with:
+          name: mybb-plugin-events-${{ github.sha }}
+          path: plugin/
+          if-no-files-found: error

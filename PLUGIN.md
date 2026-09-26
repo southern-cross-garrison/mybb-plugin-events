@@ -40,11 +40,11 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 
 ## Installation
 
-1. Upload the contents of the `plugin/` directory to your forum's root directory (the one
-   holding `global.php`), merging into the existing `inc/`, `jscripts/` and `admin/`
-   folders. `plugin/` mirrors a forum root, so nothing needs moving by hand. If your board's
-   Admin CP directory has been renamed from `admin`, put `admin/modules/events/` under that
-   directory instead
+1. Expand the release zip into your forum's root directory (the one holding `global.php`),
+   merging into the existing `inc/`, `jscripts/` and `admin/` folders - or, from a checkout,
+   upload the contents of the `plugin/` directory there. Both mirror a forum root, so
+   nothing needs moving by hand. If your board's Admin CP directory has been renamed from
+   `admin`, put `admin/modules/events/` under that directory instead
 2. Go to Admin CP → Plugins
 3. Find "Event Management" and click "Activate"
 4. Go to Admin CP → Event Management → Settings
@@ -622,7 +622,8 @@ accordingly.
 
 The front-end pages live at the web root because MyBB pages `require ./global.php`. The
 repository's `plugin/` directory is laid out exactly like this, so it can be uploaded over a
-forum root as-is; `scripts/deploy.sh` does the same thing for the test forum.
+forum root as-is; `scripts/deploy.sh` does the same thing for the test forum, and the
+release zip is its contents.
 
 ## Styling and Theming
 

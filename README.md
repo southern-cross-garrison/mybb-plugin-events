@@ -247,6 +247,11 @@ once on PHP 7.4 and once on 8.5, and uploads each one's Playwright report, trace
 container logs when something fails. Before the suite it lints every PHP file in `plugin/`
 and `scripts/`, which is what catches PHP 8-only syntax in a file no test loads.
 
+Once both versions pass, the *Package the plugin* job uploads the release as the run's
+`mybb-plugin-events-<sha>` artifact. Downloaded, it is a zip of the contents of `plugin/`
+with no folder around them, so it expands straight over a forum root. `PLUGIN.md` is left
+out of it for the same reason it is kept out of `plugin/`.
+
 ### The `THEME_TOKEN` secret
 
 Bootstrapping clones two private sibling repos - the custom theme and Smart Thread Link
