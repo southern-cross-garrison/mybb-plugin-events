@@ -648,6 +648,31 @@ test.describe('keeping a place in the queue', () => {
     await expect(page.locator('#event_signup_waitlist_trooper')).toHaveText('Waitlisted: Trooping (24 Oct #1, 25 Oct #2)');
   });
 
+  // trooper1 signed up for Sunday days ago and added Saturday in the same second trooper2
+  // signed up for it, just after. claimed_at cannot tell the two apart, and trooper1's
+  // signup is the older one, but trooper2's claim came first and the place is theirs.
+  test('two claims on the last place in the same second go in the order they were made', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Same Second Troop', coordinator: 'gec', maxTroopers: 1, ...WEEKEND });
+    const [saturday, sunday] = (await getEventDays(eventId)).map((day: any) => Number(day.id));
+    const early = await createRsvp(eventId, 'trooper1', { dayIds: [sunday], at: relativeToTestNow({ days: -4 }) });
+    const sameSecond = relativeToTestNow({ days: -1 });
+    await createRsvp(eventId, 'trooper2', { dayIds: [saturday], at: sameSecond });
+    await execute(
+      `INSERT INTO ${T('event_plugin_rsvp_days')} (rsvp_id, event_day_id, status, claimed_at) VALUES (?, ?, 'waitlisted', ?)`,
+      [early, saturday, sameSecond],
+    );
+
+    // Any save settles the queues.
+    await loginAs(page, 'gec');
+    await saveEventForm(page, eventId, '1');
+    await expect(page.locator('#event_days li.event_day')).toHaveCount(2);
+
+    expect(await getClaimStatuses(eventId, 'trooper2')).toEqual({ [saturday]: 'attending' });
+    expect(await getClaimStatuses(eventId, 'trooper1')).toEqual({ [saturday]: 'waitlisted', [sunday]: 'attending' });
+    expect(await countPrivateMessages('trooper2', '%Same Second Troop%')).toBe(0);
+    expect(await countPrivateMessages('trooper1', '%Same Second Troop%')).toBe(0);
+  });
+
   test('switching to a role that is full joins its waitlist, and frees the place in the old one', async ({ page }) => {
     const eventId = await createEvent({ title: 'Role Switch Troop', coordinator: 'gec', maxTroopers: 1, maxWranglers: 1 });
     await createRsvp(eventId, 'wrangler', { role: 'wrangler', at: relativeToTestNow({ days: -4 }) });

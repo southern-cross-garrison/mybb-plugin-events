@@ -135,12 +135,20 @@ function events_install_database()
     // the role: claimed_at is the order the queue is in, and a day added to a signup later
     // joins the back of it. The first max_troopers / max_wranglers of a queue are
     // attending and the rest waitlisted - see events_waitlist_moves().
+    //
+    // claimed_at only has whole seconds, so two claims on the last place can share one.
+    // The id breaks that tie: claims are inserted under the event's signup lock, so id
+    // order is the order they were actually made in. The signup's own id is not - a
+    // member who signed up weeks ago and adds this day now has the older signup and the
+    // newer claim.
     $db->write_query("CREATE TABLE IF NOT EXISTS `" . TABLE_PREFIX . "event_plugin_rsvp_days` (
+        `id` int(11) NOT NULL AUTO_INCREMENT,
         `rsvp_id` int(11) NOT NULL,
         `event_day_id` int(11) NOT NULL,
         `status` enum('attending','waitlisted') NOT NULL DEFAULT 'attending',
         `claimed_at` datetime NOT NULL,
-        PRIMARY KEY (`rsvp_id`, `event_day_id`),
+        PRIMARY KEY (`id`),
+        UNIQUE KEY `rsvp_day` (`rsvp_id`, `event_day_id`),
         KEY `event_day_id` (`event_day_id`)
     ) ENGINE=MyISAM {$charset};");
     

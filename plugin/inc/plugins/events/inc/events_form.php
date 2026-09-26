@@ -1880,7 +1880,10 @@ function events_claim_every_day($event_id)
         FROM " . TABLE_PREFIX . "event_plugin_rsvps r
         WHERE r.event_id = " . $event_id . "
           AND NOT EXISTS (SELECT 1 FROM " . TABLE_PREFIX . "event_plugin_rsvp_days d WHERE d.rsvp_id = r.id)
+        ORDER BY r.rsvp_date ASC, r.id ASC
     ");
+    // In queue order, so claims copied from signups made in the same second get ids that
+    // keep them the way the day-less queue had them.
     while($row = $db->fetch_array($query))
     {
         foreach($days as $day)

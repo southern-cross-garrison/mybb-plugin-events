@@ -374,7 +374,7 @@ baseline picks the change up.
   little.
 - Maximum troopers and wranglers work on one rule: a *place* is a role on one day (or on
   the whole event, for an event with no days), its queue is every claim on it ordered by
-  `claimed_at`, and the first `max` of the queue are attending and the rest waitlisted.
+  `claimed_at` (ties within the second by the claim's own `id`, never the signup's), and the first `max` of the queue are attending and the rest waitlisted.
   `events_waitlist_moves()` is that rule and nothing else; `events_rebalance_waitlist()`
   applies it and must run, under the event's signup lock, after anything that changes
   signups, days or maximums. It holds only because a claim keeps its `claimed_at` for as

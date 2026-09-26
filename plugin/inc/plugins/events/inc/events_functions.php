@@ -1539,7 +1539,10 @@ function events_event_cap(array $event, $role)
  * A place is a role on one day, keyed by the day's id, or by 0 for a signup with no day
  * claims - which is every signup to an event with no days, where the row itself carries
  * the place. A queue is ordered by when each claim was made, which is signup order: a
- * claim is kept, with its claimed_at, for as long as the member holds that day.
+ * claim is kept, with its claimed_at, for as long as the member holds that day. Claims
+ * made in the same second are in the order they were inserted, which is the claim's id -
+ * never the signup's, which says when the member first signed up, not when they claimed
+ * this day.
  *
  * @param int $event_id
  * @return array role => place => list of array(rsvp_id, uid, status, claimed_at)
@@ -1556,7 +1559,7 @@ function events_signup_queues($event_id)
         FROM " . TABLE_PREFIX . "event_plugin_rsvps r
         INNER JOIN " . TABLE_PREFIX . "event_plugin_rsvp_days d ON d.rsvp_id = r.id
         WHERE r.event_id = " . $event_id . "
-        ORDER BY d.claimed_at ASC, r.id ASC
+        ORDER BY d.claimed_at ASC, d.id ASC
     ");
     while($row = $db->fetch_array($query))
     {
@@ -2273,7 +2276,10 @@ function events_get_attendees($event_id, array $filters = array())
 
     $queued_at = "COALESCE((SELECT MIN(q.claimed_at) FROM " . TABLE_PREFIX . "event_plugin_rsvp_days q"
         . " WHERE q.rsvp_id = r.id AND q.status = '" . $status . "'" . ($day_id ? " AND q.event_day_id = " . $day_id : "") . "), r.rsvp_date)";
-    $order = $status === 'waitlisted' ? "queued_at ASC, r.id ASC" : "u.username ASC";
+    // Ties within the second go by the claim, as the queue itself does (events_signup_queues()).
+    $queued_id = "(SELECT MIN(q.id) FROM " . TABLE_PREFIX . "event_plugin_rsvp_days q"
+        . " WHERE q.rsvp_id = r.id AND q.status = '" . $status . "'" . ($day_id ? " AND q.event_day_id = " . $day_id : "") . ")";
+    $order = $status === 'waitlisted' ? "queued_at ASC, " . $queued_id . " ASC, r.id ASC" : "u.username ASC";
 
     $query = $db->query("
         SELECT r.id, r.user_id, r.role, r.rsvp_date, {$queued_at} AS queued_at, u.username, u.usergroup, u.additionalgroups, uf.*
