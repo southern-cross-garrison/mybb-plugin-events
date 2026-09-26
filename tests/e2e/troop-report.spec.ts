@@ -20,6 +20,7 @@ import {
   fixtures,
   query,
   T,
+  uid,
 } from "../helpers/db";
 
 const [TK, TD] = [0, 1].map((index) => fixtures().costumeOptions[index]);
@@ -453,6 +454,39 @@ test.describe("troop reports", () => {
     await expect(page.locator("body")).toContainText(
       "Troop report has been posted",
     );
+  });
+
+  test("posts the report and its pointer under MyBB's post flood check", async ({ page }) => {
+    // The suite's board runs with the flood check off (scripts/provision.php); a real one
+    // runs MyBB's default of 60 seconds. Posting the report sets the trooper's last post
+    // time, so the pointer that follows it in the same second was refused as flooding -
+    // silently, since a refused pointer is not an error - and a trooper who had posted
+    // anything a moment before was refused the report itself.
+    const restore = await withSettings({ postfloodcheck: "1", postfloodsecs: "60" });
+    try {
+      const discussionId = await createThread(
+        "Discussion: Flooded Troop",
+        fixtures().forums.general,
+        "gec",
+      );
+      const eventId = await finishedEvent("Flooded Troop", {
+        threadId: discussionId,
+      });
+      await createRsvp(eventId, "trooper1", { costumes: [TK] });
+      await runPhp(`$db->update_query('users', array('lastpost' => TIME_NOW), 'uid = ${uid("trooper1")}');`);
+
+      const postsBefore = await countPostsInThread(discussionId);
+
+      await loginAs(page, "trooper1");
+      await page.goto(`/troop_report.php?id=${eventId}`);
+      await fillDescription(page, "troop_report_content", "Flooded report body.");
+      await page.locator("#troop_report_submit").click();
+      await expect(page.locator("body")).toContainText("Flooded report body.");
+
+      expect(await countPostsInThread(discussionId)).toBe(postsBefore + 1);
+    } finally {
+      await restore();
+    }
   });
 
   test("rewrites the event's announcement as over once the report is posted", async ({

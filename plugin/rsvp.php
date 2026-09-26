@@ -478,8 +478,7 @@ if($render === 'success')
     {
         $signup_mode = 'waitlist';
         $rsvp_success_title = "You're on the Waitlist";
-        $rsvp_success_message = 'Every place you asked for at <strong>' . $event_title . '</strong> is taken, so you are on the waitlist.'
-            . ' You are not signed up to attend yet: if a place opens up it goes to the first person waiting, and you will be sent a PM.';
+        $rsvp_success_message = 'Every place you asked for at <strong>' . $event_title . '</strong> is taken, so you are on the waitlist.';
     }
     else
     {

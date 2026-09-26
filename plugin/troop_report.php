@@ -95,8 +95,12 @@ if($mybb->request_method === 'post' && $mybb->get_input('action') === 'post')
 
     require_once MYBB_ROOT . "inc/datahandlers/post.php";
 
+    // Past MyBB's post flood check, which is all admin_override does to a post. Without it
+    // a trooper who posted anything in the last postfloodsecs is refused their report, and
+    // the pointer below - always posted within the same second as the report - never is.
     $posthandler = new PostDataHandler("insert");
     $posthandler->action = "thread";
+    $posthandler->admin_override = true;
     $posthandler->set_data(array(
         'fid'       => $forum_id,
         'subject'   => "Troop Report: " . $event['title'],
@@ -142,6 +146,7 @@ if($mybb->request_method === 'post' && $mybb->get_input('action') === 'post')
     {
         $replyhandler = new PostDataHandler("insert");
         $replyhandler->action = "post";
+        $replyhandler->admin_override = true;
         $replyhandler->set_data(array(
             'tid'       => (int)$event['thread_id'],
             'message'   => "Troop report has been posted: [url=" . $mybb->settings['bburl'] . "/showthread.php?tid=" . $thread_id . "]View Troop Report[/url]",

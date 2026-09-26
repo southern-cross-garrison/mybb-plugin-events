@@ -155,10 +155,6 @@ if(events_is_gec())
         . '</form>';
 }
 
-// Every member can subscribe their calendar app to their own signups; the toolbar is
-// where they will look for it.
-$events_manage_link .= '<a href="calendar_feed.php" class="button" id="events_calendar_feed">Subscribe in Calendar</a>';
-
 if($view === 'calendar')
 {
     $month_input = $mybb->get_input('month');

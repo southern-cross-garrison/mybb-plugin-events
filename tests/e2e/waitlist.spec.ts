@@ -111,7 +111,7 @@ test.describe('signing up to a full event', () => {
     await loginAs(page, 'trooper2');
     await page.goto(`/event.php?id=${eventId}`);
     await expect(page.locator('#event_capacity')).toHaveText('1 trooper, 1 wrangler');
-    await expect(page.locator('#event_signup')).toHaveText('Join the Waitlist');
+    await expect(page.locator('#event_signup')).toHaveText('Join Waitlist');
     await expect(page.locator('#event_signup')).toHaveAttribute('data-waitlist', '1');
 
     await page.goto(`/rsvp.php?id=${eventId}`);
@@ -148,8 +148,8 @@ test.describe('signing up to a full event', () => {
 
     await loginAs(page, 'wrangler');
     await page.goto(`/event.php?id=${eventId}`);
-    await expect(page.locator('#event_signup')).toHaveText('Sign Up to Attend');
-    await expect(page.locator('#event_signup_full_note')).toContainText('Trooper places are full');
+    await expect(page.locator('#event_signup')).toHaveText('Join Waitlist');
+    await expect(page.locator('#event_signup_full_note')).toHaveCount(0);
 
     await page.goto(`/rsvp.php?id=${eventId}`);
     await page.locator('#signup_role_wrangler').check();
@@ -1045,7 +1045,7 @@ test.describe('real signups against trooper and wrangler limits on a multi-day e
     // is told so before they pick anything.
     await loginAs(page, 'wrangler');
     await page.goto(`/event.php?id=${event.eventId}`);
-    await expect(page.locator('#event_signup')).toHaveText('Join the Waitlist');
+    await expect(page.locator('#event_signup')).toHaveText('Join Waitlist');
     await page.goto(`/rsvp.php?id=${event.eventId}`);
     await expect(page.locator('label:has(#signup_role_wrangler)')).toContainText('full - join the waitlist');
     await expect(page.locator('label:has(#signup_role_trooper)')).toContainText('full - join the waitlist');

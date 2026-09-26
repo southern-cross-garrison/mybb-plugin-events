@@ -358,7 +358,6 @@ if($action === 'attendance')
 
         $attendance_waitlist .= '<div class="attendance_waitlist" data-day-id="' . (int)$place . '">'
             . '<h4 class="attendance_waitlist_heading">' . htmlspecialchars_uni($heading) . '</h4>'
-            . '<p class="events_hint">Not attending. In signup order: if a place opens up, it goes to the first person waiting.</p>'
             . '<table class="attendance_waitlist_table ' . $attendance_table_class . '">'
             . '<thead>' . $attendance_headers . '</thead>'
             . $render_attendee_rows($waiting, true)

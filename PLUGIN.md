@@ -413,7 +413,7 @@ only, since the report records costumed attendance.
 An event can be given a maximum number of troopers and of wranglers. Once one is reached,
 the event is still open to sign up to, but anybody who signs up for that role joins a
 waitlist instead of getting a place. Every step says so: the event page's button reads
-**Join the Waitlist** when both roles are full (and notes which one is when only one is),
+**Join Waitlist** once either role is full,
 the wizard labels a full role "full - join the waitlist", and the confirm button reads
 **Join the Waitlist** rather than Confirm Signup. Joining the waitlist asks for exactly the
 same prerequisites as signing up does, so a member who gets a place is already able to take it.
@@ -526,8 +526,8 @@ GECs can manage events and RSVPs directly from the event page (no Admin CP acces
 
 ## Calendar Subscription
 
-**Subscribe in Calendar** on the events toolbar opens `calendar_feed.php`, where a member
-makes a private link. The same page is in the User CP, as **Calendar Subscription** under
+`calendar_feed.php` is where a member makes a private link; it is offered after signing
+up for an event. The same page is in the User CP, as **Calendar Subscription** under
 Miscellaneous (`usercp.php?action=events_calendar`); both manage the one link. Opening it offers the calendar app's subscribe dialog (`webcal://`),
 and the same address can be pasted into Google Calendar's *Other calendars -> From URL*.
 The app then fetches `ical_feed.php` on its own schedule - Google roughly daily, Apple and

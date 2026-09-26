@@ -3,6 +3,7 @@ import { loginAs } from '../helpers/auth';
 import type { Page } from '@playwright/test';
 import { relativeToTestNow } from '../helpers/clock';
 import { runPhp } from '../helpers/container';
+import { withSettings } from '../helpers/settings';
 import {
   countPrivateMessages,
   createEvent,
@@ -10,6 +11,7 @@ import {
   createThread,
   execute,
   fixtures,
+  getSetting,
   getThread,
   getRsvpStatus,
   getThreadFirstPost,
@@ -107,6 +109,35 @@ echo $post['pid'];
   expect(postId, output).toBeGreaterThan(0);
 
   return postId;
+}
+
+/**
+ * Post an ordinary thread as a member, first post and all, and return its tid. Unlike
+ * createThread() the thread has a post, so showthread.php renders it rather than refusing
+ * it as invalid.
+ */
+async function postThread(subject: string, forumId: number, username: string): Promise<number> {
+  const output = await runPhp(`
+${LOAD_MESSAGES}
+require_once MYBB_ROOT.'inc/datahandlers/post.php';
+$user = get_user(${uid(username)});
+$handler = new PostDataHandler('insert');
+$handler->action = 'thread';
+$handler->admin_override = true;
+$handler->set_data(array(
+    'fid' => ${forumId}, 'subject' => ${JSON.stringify(subject)}, 'prefix' => 0, 'icon' => 0,
+    'uid' => $user['uid'], 'username' => $user['username'], 'message' => 'An ordinary thread.',
+    'ipaddress' => '127.0.0.1', 'options' => array('signature' => 0, 'subscriptionmethod' => '', 'disablesmilies' => 0),
+));
+if(!$handler->validate_thread()) { echo 'INVALID: ' . implode(' ', $handler->get_friendly_errors()); exit; }
+$thread = $handler->insert_thread();
+echo $thread['tid'];
+`);
+
+  const threadId = Number(output);
+  expect(threadId, output).toBeGreaterThan(0);
+
+  return threadId;
 }
 
 /** Put a poll on a thread, under a chosen id when one is given, and return its id. */
@@ -791,7 +822,14 @@ $cache->update_most_viewed_threads();
         [post.pid, post.uid, contents.length, attachname],
       );
 
-      const urls = [`/attachment.php?aid=${attachment.insertId}`, `/attachment.php?pid=${post.pid}`];
+      // A visible thread's tid alongside: attachment.php never reads tid, so it must not
+      // vouch for the attachment.
+      const visibleThreadId = await createThread(announcementTitle('Open Thread'), FORUMS.events, 'trooper1');
+      const urls = [
+        `/attachment.php?aid=${attachment.insertId}`,
+        `/attachment.php?pid=${post.pid}`,
+        `/attachment.php?aid=${attachment.insertId}&tid=${visibleThreadId}`,
+      ];
       const fetch = async (url: string): Promise<string> => (await page.request.get(url)).text();
 
       // page.request rather than a navigation: served, the file is a download, which a
@@ -878,7 +916,7 @@ $cache->update_most_viewed_threads();
       const moderate = async (form: Record<string, string | number>): Promise<string> => {
         const postKey = await postKeyFor(page);
         const response = await page.request.post('/moderation.php', {
-          form: { ...form, tid: threadId, my_post_key: postKey },
+          form: { tid: threadId, ...form, my_post_key: postKey },
           maxRedirects: 0,
         });
         return response.text();
@@ -896,6 +934,15 @@ $cache->update_most_viewed_threads();
       expect(form).toMatch(NO_PERMISSION);
       expect(form).not.toContain(title);
 
+      // moderation.php swaps the tid for the thread of the pid it is given, so a visible
+      // thread's tid next to the announcement's first post must not get the form either.
+      const visibleThreadId = await createThread(announcementTitle('Open Thread'), FORUMS.events, 'trooper1');
+      const firstPost = await getThreadFirstPost(threadId);
+      const moveByPost = () => moderate({ action: 'move', tid: visibleThreadId, pid: Number(firstPost.pid) });
+      const byPost = await moveByPost();
+      expect(byPost).toMatch(NO_PERMISSION);
+      expect(byPost).not.toContain(title);
+
       expect(await openClose()).toMatch(NO_PERMISSION);
       expect(await closed()).not.toBe('1');
 
@@ -907,12 +954,155 @@ $cache->update_most_viewed_threads();
       const allowed = await moveForm();
       expect(allowed).toContain('name="moveto"');
       expect(allowed).toContain(title);
+      expect(await moveByPost()).toContain(title);
 
       expect(await openClose()).not.toMatch(NO_PERMISSION);
       expect(await closed()).toBe('1');
     } finally {
       await execute(`DELETE FROM ${T('moderators')} WHERE mid = ?`, [moderator.insertId]);
       await runPhp(`$cache->update_moderators();`);
+    }
+  });
+
+  test("a visible thread's tid does not vouch for a hidden poll or a quoted post", async ({ page }) => {
+    // Pages do not agree on which reference they believe. polls.php finds its thread from
+    // the poll, and newreply.php quotes its replyto post whatever thread the tid names, so
+    // a tid the member may read sent alongside must not let either through.
+    const title = announcementTitle('Two Ids Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    const threadId = await announce(eventId);
+    const secret = `Meet behind the stage ${Math.random().toString(36).slice(2, 8)}`;
+    const hiddenPostId = await reply(threadId, 'trooper1', secret);
+    const question = `Hidden poll ${Math.random().toString(36).slice(2, 8)}`;
+    const pollId = await addPoll(threadId, question);
+
+    const visibleThreadId = await postThread(announcementTitle('Open Thread'), FORUMS.events, 'trooper1');
+
+    const pages = [
+      { url: `/polls.php?action=showresults&pid=${pollId}&tid=${visibleThreadId}`, proof: question },
+      { url: `/newreply.php?tid=${visibleThreadId}&replyto=${hiddenPostId}&load_all_quotes=1`, proof: secret },
+    ];
+
+    await loginAs(page, 'excluded');
+    for (const { url } of pages) {
+      await page.goto(url);
+      await expectMyBBError(page, NO_PERMISSION);
+      const html = await page.content();
+      expect(html, url).not.toContain(question);
+      expect(html, url).not.toContain(secret);
+      expect(html, url).not.toContain(title);
+    }
+
+    await loginAs(page, 'trooper1');
+    for (const { url, proof } of pages) {
+      await page.goto(url);
+      expect(await page.content(), url).toContain(proof);
+    }
+  });
+
+  test('the multiquote cookie does not quote a hidden post', async ({ page }) => {
+    // newthread.php, newreply.php and xmlhttp.php's get_multiquoted quote every post the
+    // multiquote cookie lists in full, whatever thread it is in. The hidden post is taken
+    // out of the list; the ordinary post quoted with it is not.
+    const title = announcementTitle('Quoted Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    const threadId = await announce(eventId);
+    const secret = `Keys are under the mat ${Math.random().toString(36).slice(2, 8)}`;
+    const hiddenPostId = await reply(threadId, 'trooper1', secret);
+
+    const visibleThreadId = await postThread(announcementTitle('Open Thread'), FORUMS.events, 'trooper1');
+    const ordinary = `Ordinary quote ${Math.random().toString(36).slice(2, 8)}`;
+    const visiblePostId = await reply(visibleThreadId, 'trooper1', ordinary);
+
+    const prefix = await getSetting('cookieprefix');
+    const quoteBoth = async (): Promise<void> => {
+      await page.context().addCookies([
+        { name: `${prefix}multiquote`, value: `${hiddenPostId}|${visiblePostId}`, url: new URL(page.url()).origin },
+      ]);
+    };
+
+    const urls = [
+      `/newthread.php?fid=${FORUMS.general}&load_all_quotes=1`,
+      `/newreply.php?tid=${visibleThreadId}&load_all_quotes=1`,
+      `/xmlhttp.php?action=get_multiquoted&load_all=1`,
+    ];
+
+    await loginAs(page, 'excluded');
+    await page.goto('/index.php');
+    await quoteBoth();
+    for (const url of urls) {
+      const body = await (await page.request.get(url)).text();
+      expect(body, url).toContain(ordinary);
+      expect(body, url).not.toContain(secret);
+    }
+
+    await loginAs(page, 'trooper1');
+    await page.goto('/index.php');
+    await quoteBoth();
+    for (const url of urls) {
+      const body = await (await page.request.get(url)).text();
+      expect(body, url).toContain(ordinary);
+      expect(body, url).toContain(secret);
+    }
+  });
+
+  test('the Forum Subscriptions page does not name it as the newest thread', async ({ page }) => {
+    // usercp.php?action=forumsubscriptions names each subscribed forum's newest thread the
+    // way the board index does, but builds its rows without build_forumbits(). The title
+    // is kept under the page's 25-character cut so the whole subject would show.
+    const title = announcementTitle('Subbed Troop');
+    const eventId = await createEvent({ title, excluded: ['excluded'] });
+    const threadId = await announce(eventId);
+
+    const forum = await queryOne(`SELECT lastposttid FROM ${T('forums')} WHERE fid = ?`, [FORUMS.events]);
+    expect(Number(forum?.lastposttid), 'the announcement is not the forum\'s newest thread').toBe(threadId);
+
+    for (const username of ['excluded', 'trooper1']) {
+      await execute(`INSERT INTO ${T('forumsubscriptions')} (fid, uid) VALUES (?, ?)`, [FORUMS.events, uid(username)]);
+    }
+
+    await loginAs(page, 'excluded');
+    await page.goto('/usercp.php?action=forumsubscriptions');
+    expect(await page.content()).not.toContain(title);
+    expect(await page.content()).not.toContain(`tid=${threadId}&`);
+
+    await loginAs(page, 'trooper1');
+    await page.goto('/usercp.php?action=forumsubscriptions');
+    await expect(page.locator('body')).toContainText(title);
+  });
+
+  test('Similar Threads leaves it out', async ({ page }) => {
+    // The board ships with it off, but a board that turns it on lists other threads in the
+    // same forum by subject, below any thread. A similarity rating of 0 matches every
+    // thread in the forum, so the test does not depend on MySQL's full-text relevance.
+    // The garrison's theme leaves {$similarthreads} out of its showthread template, so
+    // both members read the thread in MyBB's Default theme (tid 2), which keeps it.
+    const restore = await withSettings({ showsimilarthreads: '1', similarityrating: '0', similarlimit: '20' });
+    const members = [uid('excluded'), uid('trooper1')];
+    const styles = await query(`SELECT uid, style FROM ${T('users')} WHERE uid IN (?, ?)`, members);
+    await execute(`UPDATE ${T('users')} SET style = 2 WHERE uid IN (?, ?)`, members);
+    try {
+      const title = announcementTitle('Lookalike Troop');
+      const eventId = await createEvent({ title, excluded: ['excluded'] });
+      await announce(eventId);
+
+      const neighbour = announcementTitle('Lookalike Neighbour');
+      await postThread(neighbour, FORUMS.events, 'trooper1');
+      const visibleThreadId = await postThread(announcementTitle('Lookalike Open'), FORUMS.events, 'trooper1');
+
+      await loginAs(page, 'excluded');
+      await page.goto(`/showthread.php?tid=${visibleThreadId}`);
+      await expect(page.locator('body')).toContainText(neighbour);
+      expect(await page.content()).not.toContain(title);
+
+      await loginAs(page, 'trooper1');
+      await page.goto(`/showthread.php?tid=${visibleThreadId}`);
+      await expect(page.locator('body')).toContainText(title);
+    } finally {
+      for (const row of styles) {
+        await execute(`UPDATE ${T('users')} SET style = ? WHERE uid = ?`, [row.style, row.uid]);
+      }
+      await restore();
     }
   });
 });

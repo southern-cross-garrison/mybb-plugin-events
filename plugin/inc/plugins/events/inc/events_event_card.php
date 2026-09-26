@@ -219,24 +219,15 @@ function events_render_event_card(array $event, $thread_id = 0)
     {
         // A full event is still one to sign up to - the waitlist is how its places are
         // given out again - but the button has to say that is what it does. "Sign Up to
-        // Attend" on an event with no room left reads as a promise of a place.
-        $full_roles = events_full_roles($event, $queues);
-
-        if(count($full_roles) === count(events_rsvp_roles()))
+        // Attend" on an event with no room left reads as a promise of a place. One full
+        // role is enough: the wizard still offers a place in the other.
+        if(!empty(events_full_roles($event, $queues)))
         {
-            $event_actions .= '<a class="event_action event_action_primary event_action_waitlist" href="rsvp.php?id=' . $event_id . '" id="event_signup" data-waitlist="1">Join the Waitlist</a>'
-                            . '<span class="event_signup_full_note" id="event_signup_full_note">Every place is taken. Signing up puts you on the waitlist, and places are given out in signup order as they free up.</span>';
+            $event_actions .= '<a class="event_action event_action_primary event_action_waitlist" href="rsvp.php?id=' . $event_id . '" id="event_signup" data-waitlist="1">Join Waitlist</a>';
         }
         else
         {
             $event_actions .= '<a class="event_action event_action_primary" href="rsvp.php?id=' . $event_id . '" id="event_signup">Sign Up to Attend</a>';
-
-            if(!empty($full_roles))
-            {
-                $role = reset($full_roles);
-                $event_actions .= '<span class="event_signup_full_note" id="event_signup_full_note">'
-                                . events_role_label($role) . ' places are full - new ' . strtolower(events_role_label($role)) . ' signups join the waitlist.</span>';
-            }
         }
     }
     else
@@ -436,7 +427,6 @@ function events_render_card_waitlist($event_id, array $event_days, $filter_costu
 
     return '<div id="waitlist_list">'
         . '<h3 id="waitlist_heading" class="events_section_heading">Waitlist <span id="waitlist_count">(' . count($waiting) . ')</span></h3>'
-        . '<p class="events_hint" id="waitlist_hint">In signup order. When a place frees up it goes to the first person waiting for that role and day.</p>'
         . '<ol id="waitlist_rows">' . $rows . '</ol>'
         . '</div>';
 }

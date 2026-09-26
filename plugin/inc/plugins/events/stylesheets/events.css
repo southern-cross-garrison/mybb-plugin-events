@@ -760,10 +760,6 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 .event_action_status_wrangler { background: #fdf3e3; border-color: #f0d5a8; color: #8a5300; }
 .event_action_status_waitlisted { background: #f6f2fa; border-color: #a58dbd; border-style: dashed; color: #5b3f78; }
 
-/* Why the button says "Join the Waitlist", or why one role will. A line of its own under
-   the bar's buttons rather than squeezed between them. */
-.event_signup_full_note { flex-basis: 100%; order: 1; font-size: 0.9em; opacity: 0.8; }
-
 /* The wizard's submit row: the button is the theme's, the link beside it needs the gap. */
 #rsvp_cancel, #troop_report_cancel { margin-left: 12px; }
 /* The tick's glyph carries almost no side bearing, so the gap is set here rather
@@ -842,7 +838,6 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 /* The waitlist, under the attendance list: numbered, because its order is who is next. */
 #waitlist_list { margin-top: 18px; }
 #waitlist_count { font-weight: normal; opacity: 0.7; }
-#waitlist_hint { margin: 0 0 6px; }
 #waitlist_rows { margin: 8px 0 0; padding-left: 22px; }
 #waitlist_rows li { margin: 0 0 5px; line-height: 1.8; }
 .waitlist_row .event_pill { margin: 0 7px 0 0; }
@@ -967,7 +962,6 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
    on screen or on paper. */
 .attendance_waitlist { margin-top: 24px; border-left: 4px dashed #a58dbd; padding-left: 12px; }
 .attendance_waitlist_heading { margin: 0 0 4px; }
-.attendance_waitlist .events_hint { margin: 0 0 4px; }
 .attendance_waitlist_table .attendee_role { font-style: italic; }
 
 :is(#attendance_table, .attendance_waitlist_table) { width: 100%; border-collapse: collapse; margin: 16px 0; }
@@ -1158,7 +1152,6 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 	   is a background colour's worth of distinction, and printers drop those. */
 	.attendance_waitlist { margin-top: 14pt; border-left: 3pt dashed #000; padding-left: 6pt; }
 	.attendance_waitlist_heading { font-size: 11pt; margin: 0 0 2pt; }
-	.attendance_waitlist .events_hint { font-size: 8.5pt; margin: 0 0 4pt; }
 
 	:is(#attendance_table, .attendance_waitlist_table) { margin: 0; font-size: 9pt; }
 	/* 0.75pt is one device pixel at 96dpi. Below that the grid is sub-pixel, and the

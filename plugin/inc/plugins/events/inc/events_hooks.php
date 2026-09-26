@@ -58,6 +58,10 @@ function events_register_hooks()
     $plugins->add_hook("archive_start", "events_block_hidden_thread");
     $plugins->add_hook("forumdisplay_get_threads", "events_hide_threads_in_forum");
     $plugins->add_hook("build_forumbits_forum", "events_hide_thread_in_forumbit");
+    $plugins->add_hook("usercp_forumsubscriptions_end", "events_hide_threads_in_forum_subscriptions");
+    $plugins->add_hook("showthread_linear", "events_mark_similar_threads");
+    $plugins->add_hook("showthread_threaded", "events_mark_similar_threads");
+    $plugins->add_hook("showthread_end", "events_hide_similar_threads");
     $plugins->add_hook("search_do_search_process", "events_hide_threads_in_search");
     $plugins->add_hook("search_results_start", "events_hide_threads_in_saved_search");
     $plugins->add_hook("syndication_get_posts", "events_hide_threads_in_feed");
@@ -105,7 +109,10 @@ function events_request_hidden_threads()
  * really is in one through. So pid is a post everywhere but those two pages, and aid is an
  * attachment only on attachment.php, which is the one page that serves attachments.
  *
- * @return array of int (thread id, post id, attachment id, poll id)
+ * newreply.php names a second post as replyto, the post its Quote button quotes, and
+ * fills the reply box with that post's whole message whatever thread the tid names.
+ *
+ * @return array (int thread id, array of int post ids, int attachment id, int poll id)
  */
 function events_request_thread_refs()
 {
@@ -128,6 +135,13 @@ function events_request_thread_refs()
         $post_id = 0;
     }
 
+    $post_ids = $post_id > 0 ? array($post_id) : array();
+
+    if($script === 'newreply.php' && $mybb->get_input('replyto', MyBB::INPUT_INT) > 0)
+    {
+        $post_ids[] = $mybb->get_input('replyto', MyBB::INPUT_INT);
+    }
+
     // attachment.php takes a thumbnail's id in place of aid, and prefers it when both are sent.
     if($script === 'attachment.php')
     {
@@ -136,7 +150,65 @@ function events_request_thread_refs()
             : $mybb->get_input('aid', MyBB::INPUT_INT);
     }
 
-    return array($thread_id, $post_id, $attachment_id, $poll_id);
+    return array($thread_id, $post_ids, $attachment_id, $poll_id);
+}
+
+/**
+ * The post ids in the multiquote cookie, which newreply.php, newthread.php and xmlhttp.php's
+ * get_multiquoted all quote in full without asking which thread each post is in.
+ *
+ * @return array of int
+ */
+function events_multiquote_post_ids()
+{
+    global $mybb;
+
+    if(empty($mybb->cookies['multiquote']) || !is_string($mybb->cookies['multiquote']))
+    {
+        return array();
+    }
+
+    // MyBB writes the list with '|' and, after a partial quote in newreply.php, with ','.
+    $ids = array_map('intval', preg_split('/[|,]/', $mybb->cookies['multiquote']));
+
+    return array_slice(array_values(array_unique(array_filter($ids, function($id) { return $id > 0; }))), 0, 100);
+}
+
+/**
+ * Take the posts in hidden threads out of the multiquote cookie for this request.
+ *
+ * Filtered rather than refused: the cookie is built up while browsing, and the other posts
+ * in it are the member's own business. Only $mybb->cookies is changed - every page that
+ * quotes reads it from there - so the browser's cookie is left as it was.
+ */
+function events_drop_hidden_quotes(array $post_ids, array $hidden)
+{
+    global $mybb, $db;
+
+    $hidden_posts = array();
+    $query = $db->simple_select("posts", "pid, tid", "pid IN (" . implode(',', $post_ids) . ")");
+    while($post = $db->fetch_array($query))
+    {
+        if(in_array((int)$post['tid'], $hidden, true))
+        {
+            $hidden_posts[] = (int)$post['pid'];
+        }
+    }
+
+    if(empty($hidden_posts))
+    {
+        return;
+    }
+
+    $kept = array_diff($post_ids, $hidden_posts);
+    if(empty($kept))
+    {
+        unset($mybb->cookies['multiquote']);
+    }
+    else
+    {
+        $mybb->cookies['multiquote'] = implode('|', $kept);
+    }
 }
 
 /**
@@ -149,6 +221,11 @@ function events_request_thread_refs()
  * is covered the day it ships. See events_request_thread_refs() for the pages where those
  * names mean something else.
  *
+ * Every reference a request carries is checked, not just the first one found. Pages do not
+ * agree on which they believe: attachment.php never reads tid, polls.php and editpost.php
+ * find the thread from the poll or the post, and moderation.php overwrites tid with the
+ * post's. Stopping at a tid let a visible one vouch for a hidden aid, pid or poll.
+ *
  * Hooks: global_intermediate (every board page, once the theme is up and error_no_permission()
  * can render), xmlhttp and archive_start (neither of which loads global.php's furniture).
  */
@@ -157,7 +234,8 @@ function events_block_hidden_thread()
     global $mybb, $db, $lang;
 
     // Read first: most page views carry none of these, and this runs on all of them.
-    list($thread_id, $post_id, $attachment_id, $poll_id) = events_request_thread_refs();
+    list($thread_id, $post_ids, $attachment_id, $poll_id) = events_request_thread_refs();
+    $quoted_ids = events_multiquote_post_ids();
 
     // The archive names its thread in the URL *path* - archive/index.php?thread-12.html -
     // and archive/global.php parses that into its own $action and $id before archive_start
@@ -175,7 +253,7 @@ function events_block_hidden_thread()
         }
     }
 
-    if($thread_id <= 0 && $post_id <= 0 && $attachment_id <= 0 && $poll_id <= 0)
+    if($thread_id <= 0 && empty($post_ids) && $attachment_id <= 0 && $poll_id <= 0 && empty($quoted_ids))
     {
         return;
     }
@@ -186,31 +264,44 @@ function events_block_hidden_thread()
         return;
     }
 
+    if(!empty($quoted_ids))
+    {
+        events_drop_hidden_quotes($quoted_ids, $hidden);
+    }
+
+    $thread_ids = $thread_id > 0 ? array($thread_id) : array();
+
     // A post or an attachment names a thread as surely as a tid does, and a thread handed
     // back one post at a time is not hidden.
-    if($thread_id <= 0 && $attachment_id > 0)
+    if($attachment_id > 0)
     {
         $attachment = $db->fetch_array($db->simple_select("attachments", "pid", "aid = " . $attachment_id));
         if(!empty($attachment['pid']))
         {
-            $post_id = (int)$attachment['pid'];
+            $post_ids[] = (int)$attachment['pid'];
         }
     }
 
-    if($thread_id <= 0 && $post_id > 0)
+    if(!empty($post_ids))
     {
-        $post = $db->fetch_array($db->simple_select("posts", "tid", "pid = " . $post_id));
-        $thread_id = empty($post['tid']) ? 0 : (int)$post['tid'];
+        $query = $db->simple_select("posts", "tid", "pid IN (" . implode(',', array_map('intval', $post_ids)) . ")");
+        while($post = $db->fetch_array($query))
+        {
+            $thread_ids[] = (int)$post['tid'];
+        }
     }
 
     // A poll's results, its voters and its edit form are all reached by the poll's id.
-    if($thread_id <= 0 && $poll_id > 0)
+    if($poll_id > 0)
     {
         $poll = $db->fetch_array($db->simple_select("polls", "tid", "pid = " . $poll_id));
-        $thread_id = empty($poll['tid']) ? 0 : (int)$poll['tid'];
+        if(!empty($poll['tid']))
+        {
+            $thread_ids[] = (int)$poll['tid'];
+        }
     }
 
-    if($thread_id <= 0 || !in_array($thread_id, $hidden, true))
+    if(!array_intersect($thread_ids, $hidden))
     {
         return;
     }
@@ -273,8 +364,6 @@ function events_hide_threads_in_forum()
  */
 function events_hide_thread_in_forumbit($forum)
 {
-    global $db;
-
     if(empty($forum['lastposttid']))
     {
         return $forum;
@@ -286,11 +375,26 @@ function events_hide_thread_in_forumbit($forum)
         return $forum;
     }
 
+    return events_forum_visible_lastpost($forum, $hidden);
+}
+
+/**
+ * A forum row with its "last post" fields pointing at the newest thread in it that is not
+ * hidden, or cleared if there is none.
+ *
+ * @param array $forum
+ * @param array $hidden thread ids
+ * @return array
+ */
+function events_forum_visible_lastpost(array $forum, array $hidden)
+{
+    global $db;
+
     $thread = $db->fetch_array($db->simple_select(
         "threads",
         "tid, subject, lastpost, lastposter, lastposteruid",
         "fid = " . (int)$forum['fid'] . " AND visible = 1 AND closed NOT LIKE 'moved|%'"
-            . " AND tid NOT IN (" . implode(',', $hidden) . ")",
+            . " AND tid NOT IN (" . implode(',', array_map('intval', $hidden)) . ")",
         array('order_by' => 'lastpost', 'order_dir' => 'desc', 'limit' => 1)
     ));
 
@@ -312,6 +416,192 @@ function events_hide_thread_in_forumbit($forum)
     $forum['lastposteruid'] = (int)$thread['lastposteruid'];
 
     return $forum;
+}
+
+/**
+ * Keep a hidden thread out of the User CP's Forum Subscriptions list.
+ *
+ * That page names each subscribed forum's newest thread the way the board index does, but
+ * builds its rows itself rather than through build_forumbits(), and offers no hook between
+ * its query and its output. So when one of those rows advertises a hidden thread, the list
+ * is rendered again here, with core's own query, checks and templates, and each row's
+ * "last post" put through events_forum_visible_lastpost() first - the same way
+ * events_hide_threads_in_stats() re-renders its lists.
+ *
+ * Hooks: usercp_forumsubscriptions_end
+ */
+function events_hide_threads_in_forum_subscriptions()
+{
+    global $mybb, $db, $lang, $templates, $theme, $parser, $forums;
+
+    $hidden = events_request_hidden_threads();
+    if(empty($hidden))
+    {
+        return;
+    }
+
+    $uid = (int)$mybb->user['uid'];
+    $query = $db->query("
+        SELECT fs.*, f.*, t.subject AS lastpostsubject, fr.dateline AS lastread
+        FROM " . TABLE_PREFIX . "forumsubscriptions fs
+        LEFT JOIN " . TABLE_PREFIX . "forums f ON (f.fid = fs.fid)
+        LEFT JOIN " . TABLE_PREFIX . "threads t ON (t.tid = f.lastposttid)
+        LEFT JOIN " . TABLE_PREFIX . "forumsread fr ON (fr.fid = f.fid AND fr.uid = " . $uid . ")
+        WHERE f.type = 'f' AND fs.uid = " . $uid . "
+        ORDER BY f.name ASC
+    ");
+
+    $rows = array();
+    $affected = false;
+    while($forum = $db->fetch_array($query))
+    {
+        if(!empty($forum['lastposttid']) && in_array((int)$forum['lastposttid'], $hidden, true))
+        {
+            $forum = events_forum_visible_lastpost($forum, $hidden);
+            $affected = true;
+        }
+        $rows[] = $forum;
+    }
+
+    if(!$affected)
+    {
+        return;
+    }
+
+    $fpermissions = forum_permissions();
+    $html = '';
+    foreach($rows as $forum)
+    {
+        $forum_url = get_forum_link($forum['fid']);
+        $forumpermissions = $fpermissions[$forum['fid']];
+
+        if($forumpermissions['canview'] == 0 || $forumpermissions['canviewthreads'] == 0)
+        {
+            continue;
+        }
+
+        $lightbulb = get_forum_lightbulb(array('open' => $forum['open'], 'lastread' => $forum['lastread']), array('lastpost' => $forum['lastpost']));
+        $folder = $lightbulb['folder'];
+
+        if(isset($forumpermissions['canonlyviewownthreads']) && $forumpermissions['canonlyviewownthreads'] != 0)
+        {
+            $posts = '-';
+            $threads = '-';
+        }
+        else
+        {
+            $posts = my_number_format($forum['posts']);
+            $threads = my_number_format($forum['threads']);
+        }
+
+        if($forum['lastpost'] == 0)
+        {
+            eval("\$lastpost = \"" . $templates->get("forumbit_depth2_forum_lastpost_never") . "\";");
+        }
+        elseif(isset($forumpermissions['canonlyviewownthreads']) && $forumpermissions['canonlyviewownthreads'] != 0 && $forum['lastposteruid'] != $mybb->user['uid'])
+        {
+            eval("\$lastpost = \"" . $templates->get("forumbit_depth2_forum_lastpost_hidden") . "\";");
+        }
+        else
+        {
+            $forum['lastpostsubject'] = $parser->parse_badwords($forum['lastpostsubject']);
+            $lastpost_date = my_date('relative', $forum['lastpost']);
+            $lastposttid = $forum['lastposttid'];
+            $lastposter = (!$forum['lastposteruid'] && !$forum['lastposter'])
+                ? htmlspecialchars_uni($lang->guest)
+                : htmlspecialchars_uni($forum['lastposter']);
+            $lastpost_profilelink = $forum['lastposteruid'] == 0
+                ? $lastposter
+                : build_profile_link($lastposter, $forum['lastposteruid']);
+            $full_lastpost_subject = $lastpost_subject = htmlspecialchars_uni($forum['lastpostsubject']);
+            if(my_strlen($lastpost_subject) > 25)
+            {
+                $lastpost_subject = my_substr($lastpost_subject, 0, 25) . "...";
+            }
+            $lastpost_link = get_thread_link($forum['lastposttid'], 0, "lastpost");
+            eval("\$lastpost = \"" . $templates->get("forumbit_depth2_forum_lastpost") . "\";");
+        }
+
+        if($mybb->settings['showdescriptions'] == 0)
+        {
+            $forum['description'] = "";
+        }
+
+        eval("\$html .= \"" . $templates->get("usercp_forumsubscriptions_forum") . "\";");
+    }
+
+    if($html === '')
+    {
+        eval("\$html = \"" . $templates->get("usercp_forumsubscriptions_none") . "\";");
+    }
+
+    $forums = $html;
+}
+
+/**
+ * Tag each row of showthread's Similar Threads block with its thread id, so that
+ * events_hide_similar_threads() can take the hidden ones back out.
+ *
+ * The block's query and its rendering sit between showthread_linear/showthread_threaded
+ * and showthread_end with no hook of their own, and are rendered from one template per row.
+ * Wrapping that template in marker comments is theme-proof where matching its markup is not.
+ *
+ * Hooks: showthread_linear, showthread_threaded
+ */
+function events_mark_similar_threads()
+{
+    global $mybb, $templates;
+
+    if(empty($mybb->settings['showsimilarthreads']) || empty(events_request_hidden_threads()))
+    {
+        return;
+    }
+
+    // get() fills the cache as a side effect, and the cache holds the raw template.
+    $templates->get('showthread_similarthreads_bit');
+    $templates->cache['showthread_similarthreads_bit'] = '<!--events_similar:{$similar_thread[\'tid\']}-->'
+        . $templates->cache['showthread_similarthreads_bit']
+        . '<!--/events_similar-->';
+}
+
+/**
+ * Drop hidden threads from the Similar Threads block, and the block itself if that leaves
+ * it empty, as MyBB does when it finds nothing. The block has fewer rows than
+ * similarlimit allows rather than being topped up: the query that would find the next one
+ * is core's, and has already run.
+ *
+ * Hooks: showthread_end
+ */
+function events_hide_similar_threads()
+{
+    global $similarthreads;
+
+    if(empty($similarthreads) || strpos($similarthreads, '<!--events_similar:') === false)
+    {
+        return;
+    }
+
+    $hidden = events_request_hidden_threads();
+    $kept = 0;
+    $similarthreads = preg_replace_callback(
+        '/<!--events_similar:(\d+)-->(.*?)<!--\/events_similar-->/s',
+        function($match) use ($hidden, &$kept)
+        {
+            if(in_array((int)$match[1], $hidden, true))
+            {
+                return '';
+            }
+            $kept++;
+
+            return $match[2];
+        },
+        $similarthreads
+    );
+
+    if($kept === 0)
+    {
+        $similarthreads = '';
+    }
 }
 
 /**

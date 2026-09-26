@@ -1233,8 +1233,7 @@ function events_signup_waitlist_html(array $event_days, array $outcomes, $id_pre
     }
 
     return '<div class="signup_waitlist_note" id="' . $id_prefix . '_waitlist">'
-        . '<p><strong>Waitlist:</strong> these places are full, so you are joining the waitlist rather than signing up to attend.'
-        . ' If a place opens up it goes to the first person waiting, and you will be sent a PM.</p>'
+        . '<p><strong>Waitlist:</strong> these places are full, so you are joining the waitlist rather than signing up to attend.</p>'
         . '<ul>' . $items . '</ul></div>';
 }
 

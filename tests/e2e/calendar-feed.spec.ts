@@ -374,14 +374,6 @@ $cache->update_usergroups();
     await expect(page.locator('#calendar_feed_last_used')).not.toHaveText('not yet');
   });
 
-  test('is reachable from the events toolbar', async ({ page }) => {
-    await loginAs(page, 'trooper1');
-    await page.goto('/events.php');
-    await page.locator('#events_calendar_feed').click();
-    await expect(page).toHaveURL(/calendar_feed\.php$/);
-    await expect(page.locator('#calendar_feed_create')).toBeVisible();
-  });
-
   test.describe('in the User CP', () => {
     /** The page sits beside the theme's nav column, not under it or instead of it. */
     async function expectBesideNav(page: Page) {

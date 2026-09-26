@@ -222,7 +222,7 @@ function events_calendar_feed_button($form_action, array $hidden, $feed_action, 
 /**
  * Handle the subscription page's POST, if there is one, and build the page's body.
  *
- * The page exists twice - calendar_feed.php off the events toolbar, and a User CP page
+ * The page exists twice - calendar_feed.php, linked from the signup confirmation, and a User CP page
  * (events_usercp_calendar_feed()) - and only its surroundings differ, so everything the
  * member sees and does lives here. Each posts back to itself: $form_action and $hidden
  * say how.
