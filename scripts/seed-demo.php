@@ -665,6 +665,27 @@ else
 $mybb->user = events_get_user($uids['gec']);
 
 // ---------------------------------------------------------------------------
+// Event timezone
+//
+// Provisioning pins the zone to UTC, because the suite drives time by moving the
+// container's clock and asserts on dates rendered from it. The demo has no such
+// constraint, and it is a Sydney garrison's board, so its events are dated in Sydney.
+//
+// Set before anything below is dated: demo_date() fixes "today" in this zone on its
+// first call.
+// ---------------------------------------------------------------------------
+
+if(events_get_setting('timezone') !== 'Australia/Sydney')
+{
+    $db->update_query('settings', array('value' => 'Australia/Sydney'), "name = 'events_timezone'");
+
+    // As below: pages, and the rest of this script, read the generated settings file.
+    rebuild_settings();
+
+    out('event timezone set to Australia/Sydney');
+}
+
+// ---------------------------------------------------------------------------
 // Region announcement forums
 //
 // An event's announcement landing in the forum configured for its region rather than in

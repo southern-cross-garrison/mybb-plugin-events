@@ -34,6 +34,30 @@ test.describe('signup wizard', () => {
     expect(await getRsvpCostumes(eventId, 'trooper1')).toEqual([TK]);
   });
 
+  test('offers the event and the subscription under one Add to Calendar menu', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Calendar Menu Troop' });
+
+    await loginAs(page, 'trooper1');
+    await signUpThroughWizard(page, eventId, { costumes: [TK] });
+
+    const toggle = page.locator('#rsvp_calendar_toggle');
+    await expect(toggle).toHaveText('Add to Calendar');
+    await expect(page.locator('#rsvp_ical')).toBeHidden();
+
+    await toggle.click();
+    await expect(page.locator('#rsvp_ical')).toHaveText('Add Event');
+    await expect(page.locator('#rsvp_ical')).toHaveAttribute('href', `ical.php?id=${eventId}`);
+    await expect(page.locator('#rsvp_calendar_feed')).toHaveText('Subscribe to All Events');
+    await expect(page.locator('#rsvp_calendar_feed')).toHaveAttribute('href', 'calendar_feed.php');
+
+    await page.locator('#rsvp_success_message').click();
+    await expect(page.locator('#rsvp_ical')).toBeHidden();
+
+    await toggle.click();
+    await page.locator('#rsvp_calendar_feed').click();
+    await expect(page).toHaveURL(/calendar_feed\.php$/);
+  });
+
   test('opens on the attendance step, defaulted to trooping', async ({ page }) => {
     const eventId = await createEvent({ title: 'Default Troop' });
 

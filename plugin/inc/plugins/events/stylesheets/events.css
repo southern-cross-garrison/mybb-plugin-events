@@ -1040,6 +1040,23 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
  * ------------------------------------------------------------------------ */
 .events_print_header { display: none; }
 
+/* A link that opens a menu under it (the signup confirmation's Add to Calendar). Inline,
+   so it sits in a row of links separated by pipes. */
+.events_dropdown { display: inline-block; position: relative; }
+.events_dropdown_toggle { display: inline; cursor: pointer; list-style: none; color: var(--events-accent, #2f6f9f); }
+.events_dropdown_toggle::-webkit-details-marker { display: none; }
+.events_dropdown_toggle::after {
+	content: ""; display: inline-block; margin-left: 5px; vertical-align: middle;
+	border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid currentColor;
+}
+.events_dropdown_list {
+	position: absolute; top: 100%; left: 0; z-index: 10; margin-top: 4px;
+	padding: 4px 0; background: #fff; color: #333;
+	border: 1px solid rgba(0, 0, 0, 0.15); border-radius: 4px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.events_dropdown_list a { display: block; padding: 8px 14px; white-space: nowrap; }
+.events_dropdown_list a:hover { background: rgba(0, 0, 0, 0.05); }
+
 /* Calendar subscription (calendar_feed.php). */
 .events_feed_link { margin: 12px 0; }
 /* A split button: the subscribe link, and a caret that opens a menu under it. Styled

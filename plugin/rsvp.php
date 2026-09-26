@@ -452,10 +452,49 @@ if($mybb->request_method === 'post')
 // ---------------------------------------------------------------------------
 // Success
 // ---------------------------------------------------------------------------
+
+/**
+ * The confirmation's Add to Calendar menu: this event's .ics and the subscription page.
+ * A <details>, so it opens with the script off; the script only closes it on an outside
+ * click or Escape.
+ *
+ * @param int $event_id
+ * @param bool $include_event False leaves out Add Event, for a signup with no place yet
+ * @return string
+ */
+function events_rsvp_calendar_menu($event_id, $include_event)
+{
+    $items = '';
+    if($include_event)
+    {
+        $items .= '<a href="ical.php?id=' . (int)$event_id . '" id="rsvp_ical">Add Event</a>';
+    }
+    $items .= '<a href="calendar_feed.php" id="rsvp_calendar_feed">Subscribe to All Events</a>';
+
+    return '<details class="events_dropdown" id="rsvp_calendar_menu">'
+        . '<summary class="events_dropdown_toggle" id="rsvp_calendar_toggle">Add to Calendar</summary>'
+        . '<div class="events_dropdown_list">' . $items . '</div>'
+        . '</details> | '
+        . <<<'SCRIPT'
+<script type="text/javascript">
+(function() {
+	var menu = document.getElementById('rsvp_calendar_menu');
+	if(!menu) { return; }
+	document.addEventListener('click', function(e) {
+		if(menu.open && !menu.contains(e.target)) { menu.open = false; }
+	});
+	document.addEventListener('keydown', function(e) {
+		if(menu.open && e.key === 'Escape') { menu.open = false; menu.querySelector('summary').focus(); }
+	});
+})();
+</script>
+SCRIPT;
+}
+
 if($render === 'success' && $withdrawing)
 {
     $signup_mode = 'withdraw';
-    $rsvp_ical_link = '';
+    $rsvp_calendar_menu = events_rsvp_calendar_menu($event_id, false);
     $rsvp_success_title = 'Signup Withdrawn';
     $rsvp_success_message = 'You are no longer signed up to attend <strong>' . $event_title . '</strong>.';
     $rsvp_summary = '';
@@ -492,8 +531,7 @@ if($render === 'success')
         . events_signup_waitlist_html($event_days, $outcomes, 'rsvp_summary');
 
     // A place in a queue is not on anybody's calendar yet.
-    $rsvp_ical_link = $waitlist_extent === 'all' ? ''
-        : '<a href="ical.php?id=' . $event_id . '" id="rsvp_ical">Add to Calendar</a> | ';
+    $rsvp_calendar_menu = events_rsvp_calendar_menu($event_id, $waitlist_extent !== 'all');
 
     if(!empty($selected_costumes))
     {
