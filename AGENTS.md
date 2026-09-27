@@ -505,3 +505,11 @@ baseline picks the change up.
   `events_event_log_state()` before and after the save; a new field on the event form belongs
   in that list too. The wording on the log page comes from `events_admin_log_action()` on
   `admin_tools_get_admin_log_action`, since the plugin ships no language files.
+
+- `LICENSE` and `NOTICE` exist twice: at the repository root, where GitHub reads them, and
+  in `plugin/inc/plugins/events/`, because the release zip is `plugin/` and Apache 2.0
+  requires the NOTICE to travel with every copy. Edit both copies together;
+  `plugin-setup.spec.ts` fails when they differ. The Admin CP's Support tab
+  (`events_admin_support.php`) says the same things in MyCode rather than rendering the
+  file, whose 80-column wrapping reads badly on a page - so a change to NOTICE's wording
+  belongs there too. The spec holds the tab's copyright line to the file's.

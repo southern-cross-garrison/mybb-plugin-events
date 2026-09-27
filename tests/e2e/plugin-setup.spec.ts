@@ -1,7 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { test, expect } from '../helpers/fixtures';
 import { loginAs, logout, loginToAdminCp, gotoEventsAdmin } from '../helpers/auth';
 import { query, T, getSetting, fixtures } from '../helpers/db';
 import { runPhp } from '../helpers/container';
+import { REPO_ROOT } from '../helpers/config';
 
 test.describe('plugin installation', () => {
   test('ships every template it renders into the master template set', async () => {
@@ -285,5 +288,39 @@ test.describe('admin module', () => {
     // the form at all is what could silently drop a region's forum.
     expect(await getSetting('events_event_forum')).toBe(String(f.forums.events));
     expect(await getSetting('events_event_forums')).toBe(`Hunter=${f.forums.events_hunter}`);
+  });
+
+  test('ships the licence and NOTICE, and credits and licenses the plugin on the Support tab', async ({ page }) => {
+    // The release zip is plugin/, so the root copies GitHub reads never reach a board.
+    // The packaged ones are what Apache 2.0 requires a redistributed copy to carry.
+    for (const file of ['LICENSE', 'NOTICE']) {
+      expect(
+        fs.readFileSync(path.join(REPO_ROOT, 'plugin/inc/plugins/events', file), 'utf8'),
+        `plugin/inc/plugins/events/${file} differs from the root ${file}`,
+      ).toBe(fs.readFileSync(path.join(REPO_ROOT, file), 'utf8'));
+    }
+
+    await loginToAdminCp(page);
+    await gotoEventsAdmin(page);
+    await page.locator('.nav_tabs a[href*="action=support"], #submenu a[href*="action=support"]').first().click();
+    await page.waitForLoadState('domcontentloaded');
+
+    const support = page.locator('.events_support');
+    await expect(support.locator('a[href="https://www.501st.com/member/33151/"]')).toHaveText('Kevin Brown (TK-33151)');
+    await expect(support.locator('a[href="https://www.501scg.org/"]')).toHaveText('Southern Cross Garrison');
+    await expect(
+      support.locator('a[href="https://github.com/southern-cross-garrison/mybb-plugin-events/issues"]'),
+    ).toBeVisible();
+    // Rendered, not shown as typed.
+    await expect(support).not.toContainText('[b]');
+
+    // The tab says in MyCode what NOTICE says in plain text; the copyright line is the
+    // part that changes, so it is the one held to the file.
+    const copyright = fs.readFileSync(path.join(REPO_ROOT, 'NOTICE'), 'utf8')
+      .split('\n').find((line) => line.startsWith('Copyright'));
+    expect(copyright).toBeTruthy();
+    const licence = page.locator('.events_licence');
+    await expect(licence).toContainText(copyright!);
+    await expect(licence.locator('a[href="http://www.apache.org/licenses/LICENSE-2.0"]')).toHaveText('Apache License, Version 2.0');
   });
 });

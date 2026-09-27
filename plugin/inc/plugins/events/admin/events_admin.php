@@ -54,7 +54,8 @@ $page->output_nav_tabs(array(
     'events'   => array('title' => 'Events', 'link' => 'index.php?module=events', 'description' => 'Create and manage events'),
     'rsvps'    => array('title' => 'RSVPs', 'link' => 'index.php?module=events&amp;action=rsvps', 'description' => 'Review who is attending'),
     'settings' => array('title' => 'Settings', 'link' => 'index.php?module=events&amp;action=settings', 'description' => 'Configure the plugin'),
-), in_array($events_action, array('rsvps', 'settings')) ? $events_action : 'events');
+    'support'  => array('title' => 'Support', 'link' => 'index.php?module=events&amp;action=support', 'description' => 'Who made the plugin and how it is licensed'),
+), in_array($events_action, array('rsvps', 'settings', 'support')) ? $events_action : 'events');
 
 switch($events_action)
 {
@@ -66,6 +67,11 @@ switch($events_action)
     case 'rsvps':
         require_once MYBB_ROOT . "inc/plugins/events/admin/events_admin_rsvps.php";
         events_admin_rsvps();
+        break;
+
+    case 'support':
+        require_once MYBB_ROOT . "inc/plugins/events/admin/events_admin_support.php";
+        events_admin_support();
         break;
 
     case 'add':

@@ -22,6 +22,7 @@ function events_meta()
 	$sub_menu['10'] = array("id" => "events", "title" => "Events", "link" => "index.php?module=events");
 	$sub_menu['20'] = array("id" => "rsvps", "title" => "RSVPs", "link" => "index.php?module=events&action=rsvps");
 	$sub_menu['30'] = array("id" => "settings", "title" => "Settings", "link" => "index.php?module=events&action=settings");
+	$sub_menu['40'] = array("id" => "support", "title" => "Support", "link" => "index.php?module=events&action=support");
 
 	$sub_menu = $plugins->run_hooks("admin_events_menu", $sub_menu);
 

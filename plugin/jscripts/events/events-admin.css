@@ -204,3 +204,15 @@ textarea.events_admin_description {
 .sceditor-container {
 	width: auto !important;
 }
+
+/* The Support tab: the credit reads at body size with room between its lines, and the
+   licence under it is the fine print. */
+.events_support {
+	line-height: 1.7;
+}
+
+.events_licence {
+	font-size: 11px;
+	line-height: 1.6;
+	color: #666;
+}

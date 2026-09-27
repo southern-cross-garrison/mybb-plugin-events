@@ -287,12 +287,14 @@ plugin/                     the plugin (source of truth), laid out as a forum ro
   *.php                     front-end pages (events.php, event.php, manage_event.php,
                             rsvp.php, troop_report.php, ical.php)
   inc/plugins/events.php    metadata, install/activate/uninstall
+  inc/plugins/events/LICENSE, NOTICE  copies of the root ones, shipped in the zip
   inc/plugins/events/inc/   functions, hooks, installers, render helpers
   inc/plugins/events/admin/ Admin CP module
   inc/plugins/events/templates/  templates, synced into MyBB on activate
   inc/tasks/                MyBB scheduled task entry points
   jscripts/events/          assets shared by the front end and the Admin CP
   admin/modules/events/     Admin CP module registration
+LICENSE, NOTICE             Apache 2.0 and its attribution notice
 PLUGIN.md                   the plugin's own documentation (kept out of plugin/ so it
                             is not uploaded to the web root)
 scripts/                    environment tooling (bootstrap, install, deploy, provision, snapshot)
@@ -301,3 +303,7 @@ docker/                     web image and PHP config
 test-forum/                 disposable MyBB tree (gitignored)
 .devenv/                    local state: download cache, snapshot, clock file, reports (gitignored)
 ```
+
+## License
+
+Apache License 2.0 - see [LICENSE](LICENSE) and [NOTICE](NOTICE).

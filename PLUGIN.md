@@ -594,6 +594,8 @@ accordingly.
 /inc/plugins/
   events.php                      # Plugin metadata, install / activate / uninstall
   /events/
+    LICENSE                       # Apache License 2.0
+    NOTICE                        # Attribution, restated on the Admin CP's Support tab
     /inc/
       events_functions.php        # Core helper functions
       events_form.php             # Reading, validating and saving an event
@@ -612,6 +614,7 @@ accordingly.
       events_admin_rsvps.php      # RSVP review
       events_admin_settings.php   # Plugin settings
       events_admin_regions.php    # The region list: renames, additions and deletions
+      events_admin_support.php    # The Support tab: credit and licence
     /templates/                   # Synced into MyBB's templates table on activate
       events_list.html
       events_calendar.html
@@ -730,8 +733,13 @@ end-to-end test suite.
 
 ## Support
 
-For issues or questions, please contact the plugin maintainer.
+Created by Kevin Brown (TK-33151) of the [Southern Cross Garrison](https://www.501scg.org/).
+Report issues and ask questions on the
+[GitHub repository](https://github.com/southern-cross-garrison/mybb-plugin-events). The
+Admin CP's Event Management -> Support tab shows the same credit and licence.
 
 ## License
 
-This plugin is developed for use by 501st Legion garrisons and outposts. If you have a different use case in mind, please open an issue and we'll be happy to discuss!
+Licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) for
+attribution; both files ship with the plugin in `inc/plugins/events/`, and a redistributed
+copy has to keep the NOTICE with it.
