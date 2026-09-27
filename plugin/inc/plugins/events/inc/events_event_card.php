@@ -120,9 +120,9 @@ function events_render_event_card(array $event, $thread_id = 0)
     }
 
     $event_wwcc_row = '';
-    if(!empty($event['requires_wwcc']))
+    if(events_event_requires_wwcc($event))
     {
-        $event_wwcc_row = '<p id="event_requires_wwcc"><strong>Requires WWCC:</strong> Yes</p>';
+        $event_wwcc_row = '<p id="event_requires_wwcc"><strong>Requires ' . htmlspecialchars_uni(events_wwcc_name()) . ':</strong> Yes</p>';
     }
 
     $event_days_block = '';

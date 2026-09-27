@@ -252,9 +252,9 @@ function events_ical_vevents(array $event, $user_id)
     $location = $address !== '' ? $address : $event['region'];
 
     $details = array();
-    if(!empty($event['requires_wwcc']))
+    if(events_event_requires_wwcc($event))
     {
-        $details[] = 'A Working With Children Check is required.';
+        $details[] = events_wwcc_name() . ' required.';
     }
     if($address !== '')
     {

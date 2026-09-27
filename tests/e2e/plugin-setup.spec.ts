@@ -178,7 +178,7 @@ update_theme_stylesheet_list(${tid}, false, true);
       `SELECT table_name AS name, table_collation AS collation FROM information_schema.tables
         WHERE table_schema = DATABASE() AND table_name LIKE '${T('event\\_plugin\\_%')}'`,
     );
-    expect(tables).toHaveLength(9);
+    expect(tables).toHaveLength(10);
     for (const table of tables as any[]) {
       expect(table.collation, table.name).toMatch(/^utf8mb4_/);
     }

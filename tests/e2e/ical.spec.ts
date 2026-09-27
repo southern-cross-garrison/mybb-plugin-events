@@ -343,7 +343,7 @@ test.describe('iCal export', () => {
 
     expect(body).toContain(
       "DESCRIPTION:You haven't signed up for this event yet.\\n" +
-        'A Working With Children Check is required.\\n' +
+        'WWCC required.\\n' +
         'Address: 1 Showground Rd\\, Sydney Olympic Park NSW 2127\\n' +
         'Map: https://www.google.com/maps/search/?api=1&query=1%20Showground%20Rd%2C%20Sydney%20Olympic%20Park%20NSW%202127\\n\\n' +
         'Meet at the loading dock. '.repeat(6).trim(),
@@ -361,7 +361,7 @@ test.describe('iCal export', () => {
     await loginAs(page, 'trooper1');
     const body = await fetchCalendar(page, eventId);
 
-    expect(body).not.toContain('Working With Children');
+    expect(body).not.toContain('WWCC');
   });
 
   test('links the address to a map, and leaves the link out when there is no address', async ({ page }) => {

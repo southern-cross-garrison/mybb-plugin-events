@@ -51,6 +51,11 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 5. Configure the plugin settings:
    - Set the event timezone (see _Event Timezone_ below)
    - Map custom profile fields (costume, TK ID, WWCC, preferred name, mobile, emergency contact)
+   - Turn working with children checks off if the garrison does not use them, or name the
+     check the way your state does (e.g. "Blue Card" in Queensland; the default is "WWCC").
+     Turned off, events no longer offer the requirement and nobody is asked for a number;
+     an event saved requiring one keeps that, and requires it again if the check is
+     turned back on
    - Set GEC user groups
    - Set Garrison Members and 501st Members group IDs
    - Set troop report forum ID
@@ -71,13 +76,22 @@ Before using the plugin, create the following custom profile fields in MyBB:
 
 1. **Costume Field** (multi-select, or a comma separated text field): User's available costumes
 2. **Legion ID Field** (text): User's 501st Legion ID, e.g. TK-12345
-3. **WWCC Field** (text): Working With Children Check number
+3. **WWCC Field** (text): Working With Children Check number. Not needed if the check is
+   turned off
 4. **Mobile Number Field** (text, hidden): Mobile phone number
 5. **Emergency Contact Field** (text, hidden): Emergency contact information
 6. **Preferred Name Field** (text): The name a member goes by on the day, which is what the
    attendance sheet greets them by - the username beside it is a forum handle
 
 The mobile and emergency contact fields should be configured as hidden fields (visible only to admins/GECs).
+
+## Upgrading
+
+Upload the new `plugin/` over the old one, then deactivate and re-activate the plugin in
+Admin CP → Plugins. MyBB has no upgrade step for plugins, so activation is where the plugin
+brings an existing board up to date: it runs any schema upgrades the board has not had yet,
+adds new settings (leaving existing ones as they are) and re-syncs its templates and
+stylesheet.
 
 ## Event Timezone
 

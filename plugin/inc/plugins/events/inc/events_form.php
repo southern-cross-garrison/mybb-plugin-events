@@ -1624,6 +1624,13 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
     // cleared in a second statement.
     $nullable = array();
 
+    // With the check turned off the forms do not offer the box, so an unticked one says
+    // nothing. The event keeps what it had, and turning the check back on restores it.
+    if(!events_wwcc_enabled() && $is_edit)
+    {
+        unset($data['requires_wwcc']);
+    }
+
     if($input['signup_cutoff'] !== '')
     {
         $data['signup_cutoff'] = $db->escape_string(events_date('Y-m-d H:i:s', events_strtotime($input['signup_cutoff'])));
@@ -1755,7 +1762,7 @@ function events_event_log_state($event_id)
         'signup_cutoff' => 'Signup Cutoff',
         'max_troopers'  => 'Maximum Troopers',
         'max_wranglers' => 'Maximum Wranglers',
-        'requires_wwcc' => 'Requires WWCC',
+        'requires_wwcc' => 'Requires ' . events_wwcc_name(),
         'gec_user_id'   => 'Coordinator',
         'poc_user_id'   => 'Point of Contact',
     );

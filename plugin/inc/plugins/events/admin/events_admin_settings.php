@@ -176,11 +176,21 @@ function events_admin_settings()
             $errors[] = "Choose an event timezone from the list.";
         }
 
+        // Blank falls back to the default rather than saving a name every label would
+        // then be missing.
+        $wwcc_name = trim($mybb->get_input('wwcc_name'));
+        if($wwcc_name === '')
+        {
+            $wwcc_name = EVENTS_DEFAULT_WWCC_NAME;
+        }
+
         if($region_plan !== false && empty($errors))
         {
             $settings = array(
                 'events_costume_field' => $mybb->input['costume_field'],
                 'events_tk_id_field' => $mybb->input['tk_id_field'],
+                'events_wwcc_enabled' => $mybb->get_input('wwcc_enabled', MyBB::INPUT_INT) ? '1' : '0',
+                'events_wwcc_name' => $wwcc_name,
                 'events_wwcc_field' => $mybb->input['wwcc_field'],
                 'events_mobile_field' => $mybb->input['mobile_field'],
                 'events_emergency_contact_field' => $mybb->input['emergency_contact_field'],
@@ -295,10 +305,25 @@ function events_admin_settings()
         "Select the custom profile field that contains TK IDs",
         $form->generate_select_box("tk_id_field", $profile_fields, events_admin_settings_value('tk_id_field', 'events_tk_id_field')));
     
-    // WWCC field
-    $form_container->output_row("WWCC Profile Field",
-        "Select the custom profile field that contains WWCC numbers",
-        $form->generate_select_box("wwcc_field", $profile_fields, events_admin_settings_value('wwcc_field', 'events_wwcc_field')));
+    // Working with children checks. The name and the profile field only mean anything
+    // while the check is on, so they are hidden with it - by script, with the rows left
+    // showing when there is none, since they post the same either way.
+    $wwcc_enabled = events_admin_settings_value('wwcc_enabled', 'events_wwcc_enabled');
+    $form_container->output_row("Working With Children Checks",
+        "Lets an event require its attendees to have one on file",
+        $form->generate_yes_no_radio("wwcc_enabled", (string)$wwcc_enabled === '0' ? '0' : '1', true,
+            array("id" => "wwcc_enabled_yes"), array("id" => "wwcc_enabled_no")),
+        "", array(), array("id" => "row_wwcc_enabled"));
+
+    $form_container->output_row("Check Name",
+        "What the check is called where the garrison is, e.g. Blue Card in Queensland",
+        $form->generate_text_box("wwcc_name", events_admin_settings_value('wwcc_name', 'events_wwcc_name'), array("id" => "wwcc_name", "maxlength" => 64)),
+        "wwcc_name", array(), array("id" => "row_wwcc_name"));
+
+    $form_container->output_row("Check Profile Field",
+        "Select the custom profile field that contains the check's number",
+        $form->generate_select_box("wwcc_field", $profile_fields, events_admin_settings_value('wwcc_field', 'events_wwcc_field'), array("id" => "wwcc_field")),
+        "wwcc_field", array(), array("id" => "row_wwcc_field"));
     
     // Mobile field
     $form_container->output_row("Mobile Number Profile Field",
@@ -358,6 +383,28 @@ function events_admin_settings()
     $buttons = array($form->generate_submit_button("Save Settings"));
     $form->output_submit_wrapper($buttons);
     $form->end();
+
+    echo <<<HTML
+<script type="text/javascript">
+(function () {
+    var yes = document.getElementById('wwcc_enabled_yes');
+    var no = document.getElementById('wwcc_enabled_no');
+    if (!yes || !no) { return; }
+
+    var rows = [document.getElementById('row_wwcc_name'), document.getElementById('row_wwcc_field')];
+
+    function update() {
+        for (var i = 0; i < rows.length; i++) {
+            if (rows[i]) { rows[i].style.display = yes.checked ? '' : 'none'; }
+        }
+    }
+
+    yes.addEventListener('change', update);
+    no.addEventListener('change', update);
+    update();
+})();
+</script>
+HTML;
 
     // After the form is closed: it carries a form of its own, and HTML has no nested
     // forms.

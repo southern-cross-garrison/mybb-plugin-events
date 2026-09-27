@@ -10,8 +10,8 @@ cd "$REPO_ROOT"
 
 # Kept in step with the MyBB the custom theme is exported from, so the theme imports
 # without MyBB's version check having to be waived.
-MYBB_VERSION="${MYBB_VERSION:-1840}"
-MYBB_SHA256="${MYBB_SHA256:-380fb63c50c63f52c747ba05d1002ad77f2f0b1d254db213092501dd5e9375dc}"
+MYBB_VERSION="${MYBB_VERSION:-1841}"
+MYBB_SHA256="${MYBB_SHA256:-48cc76e9e1146ea052756575991f43f51a634f125eea06d05ce9041b03eedeaa}"
 MYBB_URL="https://resources.mybb.com/downloads/mybb_${MYBB_VERSION}.zip"
 
 WEB_PORT="${WEB_PORT:-8080}"
@@ -21,7 +21,7 @@ BASE_URL="${BASE_URL:-http://localhost:${WEB_PORT}}"
 # The forum's custom theme, imported by scripts/install-theme.sh. Pinned to a commit so
 # the provisioned database snapshot is reproducible; override in .env to track a branch.
 THEME_REPO="${THEME_REPO:-https://github.com/southern-cross-garrison/mybb-custom-theme.git}"
-THEME_REF="${THEME_REF:-d9c45014d0d859bc21bd046ea403444b377b73df}"
+THEME_REF="${THEME_REF:-e90dd9c9c366df4d432757aa642df280dece0df6}"
 THEME_XML="${THEME_XML:-SCG-Responsive.xml}"
 
 # Smart Thread Link, the companion plugin the custom theme's thread listings need. The

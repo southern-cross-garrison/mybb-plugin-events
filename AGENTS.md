@@ -66,7 +66,13 @@ baseline picks the change up.
   0.9.10 does not intercept, so every file written under a moved clock looked older than
   `time()` and MyBB served a theme's cached stylesheet through `css.php` instead. 0.9.13
   also refuses - by killing the process - an offset with an `s` suffix, which older
-  versions ignored, so `tests/helpers/clock.ts` writes a bare number of seconds.
+  versions ignored, so `tests/helpers/clock.ts` writes a bare number of seconds. It kills a
+  process over an *empty* file just the same, and with `FAKETIME_NO_CACHE` every process
+  re-reads the file on every clock call, so the file is only ever replaced by rename
+  (`write()` in `clock.ts`, `reset_faketime` in `scripts/env.sh`), never rewritten with
+  `writeFileSync` or `>`. Rewritten in place, it is empty for an instant; when Apache's
+  parent reads it then, the container exits and the rest of the run fails with
+  `Could not read the container clock ... (fetch failed)`.
 - Everything runs in Docker. Log and file paths in debugging code must be container paths
   (`/var/www/html/...`); `test-forum/` on the host is the same directory.
 - MyBB's `insert_query()`/`update_query()` quote values but do **not** escape them. Every
@@ -130,6 +136,22 @@ baseline picks the change up.
   setting added to that list only reaches an already-installed board because activation
   tops it up - the same reason `events_upgrade_database()` runs there. Existing settings
   keep their values.
+- Every schema change is an upgrade file, one per change, in
+  `plugin/inc/plugins/events/upgrades/`, named `NNNN_what_it_does.php` so that name order
+  is age order. Each returns a closure taking `$db` rather than defining a function, so no
+  two can collide. `events_install_database()` is frozen at the schema the first boards
+  were installed with - never edit its `CREATE TABLE`s. `events_upgrade_database()` runs
+  every upgrade missing from `event_plugin_schema_upgrades`, oldest first, and records each
+  after it finishes; activation calls it on an installed board and `events_install()`
+  calls it straight after the baseline, so a new board and an upgraded one reach the
+  current schema by the same steps and there is one path to test. An upgrade interrupted
+  halfway runs again from the top (MyISAM, no transactions), so every step in one is
+  guarded on its own - check the column is missing before adding it. Never edit or rename
+  an upgrade that has shipped: a board that has run it will not run it again. A table an
+  upgrade creates also goes in `events_plugin_tables()`, or uninstall leaves it behind.
+  The tracking table is deliberately not in the suite's `PLUGIN_TABLES`, which are emptied
+  between tests.
+
 - Forms use the plugin's own `.events_label` / `.events_input` / `.events_hint` /
   `.events_option` classes, never MyBB's `.form_row`, which puts the label, control and
   hint on one line and leaves the control unstyled.

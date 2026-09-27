@@ -237,13 +237,17 @@ foreach(array('max_troopers' => 'Maximum Troopers', 'max_wranglers' => 'Maximum 
     );
 }
 
-$manage_details .= '<div class="events_field">'
-    . '<span class="events_label">Requirements</span>'
-    . '<div class="events_options">'
-    . '<label class="events_option"><input type="checkbox" name="requires_wwcc" id="event_form_requires_wwcc" value="1"'
-    . (!empty($values['requires_wwcc']) ? ' checked="checked"' : '') . ' /> '
-    . 'Attendees must have a WWCC number on file</label>'
-    . '</div></div>';
+// A board that does not use working with children checks is not asked about them.
+if(events_wwcc_enabled())
+{
+    $manage_details .= '<div class="events_field">'
+        . '<span class="events_label">Requirements</span>'
+        . '<div class="events_options">'
+        . '<label class="events_option"><input type="checkbox" name="requires_wwcc" id="event_form_requires_wwcc" value="1"'
+        . (!empty($values['requires_wwcc']) ? ' checked="checked"' : '') . ' /> '
+        . 'Attendees must have a ' . htmlspecialchars_uni(events_wwcc_name()) . ' on file</label>'
+        . '</div></div>';
+}
 
 $manage_details .= events_form_field(
     'event_form_gec_user_id',

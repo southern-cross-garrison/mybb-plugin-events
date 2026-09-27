@@ -93,6 +93,8 @@ function events_install()
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_templates.php";
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_stylesheets.php";
 
+    // The baseline schema, then every upgrade since - the same steps an installed board
+    // takes on activation.
     events_install_database();
     events_upgrade_database();
     events_install_templates();
@@ -113,7 +115,7 @@ function events_install_settings()
 {
     global $db;
 
-    // For EVENTS_DEFAULT_REGIONS and EVENTS_DEFAULT_TIMEZONE.
+    // For EVENTS_DEFAULT_REGIONS, EVENTS_DEFAULT_TIMEZONE and EVENTS_DEFAULT_WWCC_NAME.
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
 
     $query = $db->simple_select("settinggroups", "gid", "name = 'events'");
@@ -165,6 +167,8 @@ function events_install_settings()
         // renumbering the rest here would only ever reorder a fresh board's list and leave
         // every board that already has these settings in the old order.
         array("name" => "events_preferred_name_field", "title" => "Preferred Name Profile Field", "description" => "The custom profile field that holds the name a member goes by on the day", "optionscode" => "text", "disporder" => 15),
+        array("name" => "events_wwcc_enabled", "title" => "Working With Children Checks", "description" => "Whether an event can require its attendees to have a working with children check on file", "optionscode" => "yesno", "disporder" => 16, "value" => "1"),
+        array("name" => "events_wwcc_name", "title" => "Working With Children Check Name", "description" => "What the check is called where the garrison is, e.g. Blue Card in Queensland", "optionscode" => "text", "disporder" => 17, "value" => EVENTS_DEFAULT_WWCC_NAME),
         array("name" => "events_timezone", "title" => "Event Timezone", "description" => "Where the garrison is, not where the forum is hosted: every event date is entered, stored and shown in this zone, and the server's own timezone is ignored. A PHP timezone identifier such as Australia/Sydney. Pick it from the list in Admin CP -> Event Management -> Settings rather than typing it here - a name PHP does not recognise falls back to UTC.", "optionscode" => "text", "disporder" => 14, "value" => EVENTS_DEFAULT_TIMEZONE),
     );
 

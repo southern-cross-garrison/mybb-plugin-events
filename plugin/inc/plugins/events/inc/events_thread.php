@@ -206,9 +206,9 @@ function events_event_post_content(array $event)
         $content .= "[b]Places:[/b] " . $capacity . "\n";
     }
 
-    if(!empty($event['requires_wwcc']))
+    if(events_event_requires_wwcc($event))
     {
-        $content .= "[b]Requirement:[/b] attendees must have a current WWCC number on file.\n";
+        $content .= "[b]Requirement:[/b] attendees must have a current " . events_escape_bbcode(events_wwcc_name()) . " on file.\n";
     }
 
     // Days are what splits a multi-day event up for signups, so they are worth spelling

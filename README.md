@@ -114,7 +114,7 @@ To move to a newer theme commit, bump `THEME_REF` and re-import:
 Re-importing is a clean replace: the previous copy of the theme and its template set are
 dropped first, so nothing is left orphaned in ACP > Templates.
 
-`MYBB_VERSION` is pinned to the release the theme is exported from (1.8.40), so the import
+`MYBB_VERSION` is pinned to the release the theme is exported from (1.8.41), so the import
 runs under MyBB's own version check rather than waiving it. If the two drift apart the
 import stops with a message saying so, which is the point - a theme built against a
 different MyBB is worth looking at rather than waving through.

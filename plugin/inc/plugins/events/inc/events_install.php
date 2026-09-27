@@ -25,7 +25,8 @@ function events_plugin_tables()
         'event_plugin_rsvp_costumes',
         'event_plugin_troop_reports',
         'event_plugin_user_prefs',
-        'event_plugin_feed_tokens'
+        'event_plugin_feed_tokens',
+        'event_plugin_schema_upgrades'
     );
 }
 
@@ -46,6 +47,13 @@ function events_table_charset()
     return "DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci";
 }
 
+/**
+ * Create the baseline schema: the tables as the first deployed boards have them.
+ *
+ * Frozen. Do not edit these CREATE TABLEs to change the schema - add an upgrade file
+ * instead (see events_upgrade_database()), which events_install() runs straight after
+ * this, so a new board gets the change by the same step an existing one does.
+ */
 function events_install_database()
 {
     global $db;
@@ -176,6 +184,7 @@ function events_install_database()
     // Per-member preferences table
     events_create_user_prefs_table();
     events_create_feed_tokens_table();
+    events_create_schema_upgrades_table();
 }
 
 /**
@@ -226,15 +235,121 @@ function events_create_feed_tokens_table()
 }
 
 /**
- * Bring an already-installed board's schema up to date.
+ * Which schema upgrades a board has had, one row per file in upgrades/.
+ *
+ * Created by the upgrade run as well as by install: the first boards were installed
+ * before it existed.
+ */
+function events_create_schema_upgrades_table()
+{
+    global $db;
+
+    $charset = events_table_charset();
+
+    $db->write_query("CREATE TABLE IF NOT EXISTS `" . TABLE_PREFIX . "event_plugin_schema_upgrades` (
+        `name` varchar(191) NOT NULL,
+        `applied_at` int(10) unsigned NOT NULL DEFAULT 0,
+        PRIMARY KEY (`name`)
+    ) ENGINE=MyISAM {$charset};");
+}
+
+/**
+ * Every schema upgrade the plugin ships, in the order they run.
+ *
+ * One file each in upgrades/, named with a zero-padded sequence number first
+ * (0001_add_event_colour.php) so that sorting by name is sorting by age. A file returns
+ * a closure that makes the change; it does not define a function, so two upgrades can
+ * never collide over a name.
+ *
+ * @return array Upgrade name (the file name without .php) => path
+ */
+function events_schema_upgrades()
+{
+    $upgrades = array();
+    foreach((array)glob(MYBB_ROOT . "inc/plugins/events/upgrades/*.php") as $path)
+    {
+        $upgrades[basename($path, '.php')] = $path;
+    }
+
+    ksort($upgrades, SORT_STRING);
+
+    return $upgrades;
+}
+
+/**
+ * The upgrades this board has already had.
+ *
+ * @return array Upgrade name => true
+ */
+function events_applied_schema_upgrades()
+{
+    global $db;
+
+    $applied = array();
+    $query = $db->simple_select("event_plugin_schema_upgrades", "name");
+    while($row = $db->fetch_array($query))
+    {
+        $applied[$row['name']] = true;
+    }
+
+    return $applied;
+}
+
+/**
+ * Record an upgrade as applied.
+ *
+ * @param string $name
+ */
+function events_record_schema_upgrade($name)
+{
+    global $db;
+
+    $db->replace_query("event_plugin_schema_upgrades", array(
+        'name'       => $db->escape_string($name),
+        'applied_at' => TIME_NOW,
+    ));
+}
+
+/**
+ * Bring the board's schema up to date.
  *
  * MyBB gives plugins no upgrade hook and CREATE TABLE IF NOT EXISTS will not add a
- * column, so this runs from events_activate() on every activation. There is no deployed
- * board yet, so there is nothing to migrate: the schema in events_install_database() is
- * the only one. Once a board is live, a schema change goes both there and here, each
- * step guarded independently - MyISAM has no transactions, so a run interrupted between
- * two ALTERs has to be resumable.
+ * column, so this runs from events_activate() on every activation, and from
+ * events_install() straight after the baseline tables are created: each file in
+ * upgrades/ the board has not had yet is run, oldest first, and recorded. A new board
+ * and an upgraded one therefore reach the current schema by the same steps, and there
+ * is one path to test rather than two.
+ *
+ * Which is why events_install_database() is frozen at the schema the first boards were
+ * installed with: a schema change is a new upgrade file and nothing else. Each upgrade
+ * must be safe to run again, every step guarded on its own (check the column is missing
+ * before adding it): MyISAM has no transactions, and an upgrade is recorded only after
+ * it finishes, so one interrupted halfway runs again from the top on the next
+ * activation.
  */
 function events_upgrade_database()
 {
+    global $db;
+
+    events_create_schema_upgrades_table();
+
+    $applied = events_applied_schema_upgrades();
+    foreach(events_schema_upgrades() as $name => $path)
+    {
+        if(isset($applied[$name]))
+        {
+            continue;
+        }
+
+        $upgrade = require $path;
+        if(!is_callable($upgrade))
+        {
+            // A file that forgot its return would otherwise be recorded as done without
+            // having changed anything.
+            trigger_error("Event plugin upgrade {$name} does not return a closure.", E_USER_ERROR);
+        }
+
+        $upgrade($db);
+        events_record_schema_upgrade($name);
+    }
 }

@@ -23,6 +23,47 @@ function events_get_setting($name)
 }
 
 /**
+ * Whether the board uses working with children checks at all.
+ *
+ * Read as on unless the setting says otherwise, so a board that has not been re-activated
+ * since the setting was added keeps the behaviour it had.
+ *
+ * @return bool
+ */
+function events_wwcc_enabled()
+{
+    return (string)events_get_setting('wwcc_enabled') !== '0';
+}
+
+/**
+ * What the board calls a working with children check - "Blue Card" in Queensland, for
+ * one. Every label that names the check is built from this.
+ *
+ * @return string
+ */
+function events_wwcc_name()
+{
+    $name = trim((string)events_get_setting('wwcc_name'));
+
+    return $name !== '' ? $name : EVENTS_DEFAULT_WWCC_NAME;
+}
+
+/**
+ * Whether an event asks its attendees for a working with children check.
+ *
+ * Every surface asks this rather than reading requires_wwcc, so turning the check off
+ * for the board switches it off on events that were saved requiring one - and turning
+ * it back on brings them back, since the flag on the event is left as it was.
+ *
+ * @param array $event
+ * @return bool
+ */
+function events_event_requires_wwcc($event)
+{
+    return events_wwcc_enabled() && !empty($event['requires_wwcc']);
+}
+
+/**
  * The timezone every date the plugin stores is written and read in.
  *
  * Nothing the plugin stores carries an offset: an event's start, its signup cutoff, the
@@ -38,6 +79,11 @@ function events_get_setting($name)
  * a zone this host has never heard of.
  */
 define('EVENTS_DEFAULT_TIMEZONE', 'UTC');
+
+/**
+ * What a working with children check is called until the board names its own.
+ */
+define('EVENTS_DEFAULT_WWCC_NAME', 'WWCC');
 
 /**
  * The configured timezone's identifier, or UTC when there is not a usable one.
@@ -2133,7 +2179,7 @@ function events_check_prerequisites($event, $user_id = null, $roles = 'trooper')
         array_unshift($required, 'tk_id', 'costume');
     }
 
-    if(!empty($event['requires_wwcc']))
+    if(events_event_requires_wwcc($event))
     {
         $required[] = 'wwcc';
     }
@@ -2220,12 +2266,13 @@ function events_save_user_fields($user_id, array $values)
 function events_prerequisite_labels()
 {
     // 'multiline' picks the control: costumes are a list rather than a value, so the field
-    // is a textarea, matching the profile field they are saved to.
+    // is a textarea, matching the profile field they are saved to. The labels are HTML;
+    // the check's name is the one an admin typed.
     return array(
         'tk_id'             => array('label' => 'Legion ID', 'hint' => 'Your 501st legion ID, e.g. if you are TK-12345 then type "12345" here.'),
         'costume'           => array('label' => 'Approved Costumes', 'hint' => 'One per line. These are saved to your profile, and you pick from them on the next step.', 'multiline' => true),
         'preferred_name'    => array('label' => 'Preferred Name', 'hint' => 'What the coordinator should call you on the day. A first name is fine.'),
-        'wwcc'              => array('label' => 'WWCC Number', 'hint' => 'This event requires a Working With Children Check.'),
+        'wwcc'              => array('label' => htmlspecialchars_uni(events_wwcc_name()) . ' Number', 'hint' => 'Required for this event.'),
         'mobile'            => array('label' => 'Mobile Number', 'hint' => 'So the coordinator can reach you on the day.'),
         'emergency_contact' => array('label' => 'Emergency Contact', 'hint' => 'Name and number of someone to call in an emergency.'),
     );
