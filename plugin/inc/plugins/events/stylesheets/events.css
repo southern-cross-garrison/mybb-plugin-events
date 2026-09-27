@@ -431,19 +431,14 @@ textarea.events_input { resize: vertical; }
 .event_status_needs_report { color: #b36b00; font-weight: 600; }
 
 /* The last column is the one thing on the row the viewer can act on, and it holds either
-   a button or a pill. Left aligned, they all begin at the same place, which is the steady
-   thing to line a column of controls up on.
-
-   This wanted centring while the column could still hold a whole sentence - "Signups for
-   this event have closed." was as wide as the rest of the row, so it set the column's
-   width and left the button beside it starting somewhere else entirely. The states are one
-   word each now (events_signup_lock_label()), so every item is about as wide as the next
-   and there is no ragged edge left to hide.
+   a button or a pill. Centred, under a centred heading: the states are one word each
+   (events_signup_lock_label()) and the buttons do not wrap, so every item is about as
+   wide as the next and the column reads as one stack of controls.
 
    The cards at narrow widths still range this cell right, via justify-content on the grid
    area below - there it is the last thing in a stack rather than a column of its own, and
    the edge it is against is the card's, not the table's. */
-.event_you, .event_you_head { text-align: left; }
+.event_you, .event_you_head { text-align: center; }
 
 /* ---------------------------------------------------------------------------
  * The event page's turnout tab
@@ -534,7 +529,7 @@ textarea.events_input { resize: vertical; }
 .event_btn {
 	display: inline-block; padding: 5px 12px; border-radius: 4px; line-height: 1.2;
 	background: var(--events-accent, #2f6f9f); border: 1px solid var(--events-accent-border, #2a6390); color: #fff;
-	font-weight: 600; font-size: 0.9em; text-decoration: none;
+	font-weight: 600; font-size: 0.9em; text-decoration: none; white-space: nowrap;
 }
 .event_btn:hover { text-decoration: none; filter: brightness(1.08); }
 

@@ -172,11 +172,6 @@ The fallbacks are deliberately *not* defaults in a `:root` block inside `events.
 stylesheet is installed last in the display order, so a `:root` block there would
 out-order the theme's own and the override would silently never apply.
 
-The garrison's theme had dropped MyBB's table classes on the way to Bootstrap, which is
-why the plugin's pages first rendered as bare text on it.
-[mybb-custom-theme PR #2](https://github.com/southern-cross-garrison/mybb-custom-theme/pull/2)
-puts them back and sets the accent; `THEME_REF` points at that branch until it merges.
-
 [theme]: https://github.com/southern-cross-garrison/mybb-custom-theme
 [smartlink]: https://github.com/southern-cross-garrison/mybb-plugin-smartlink
 
@@ -251,58 +246,6 @@ Once both versions pass, the *Package the plugin* job uploads the release as the
 `mybb-plugin-events-<sha>` artifact. Downloaded, it is a zip of the contents of `plugin/`
 with no folder around them, so it expands straight over a forum root. `PLUGIN.md` is left
 out of it for the same reason it is kept out of `plugin/`.
-
-### The `THEME_TOKEN` secret
-
-Bootstrapping clones two private sibling repos - the custom theme and Smart Thread Link
-(see `THEME_REPO` and `SMARTLINK_REPO` in `scripts/env.sh`). The `GITHUB_TOKEN` that
-`actions/checkout` installs is scoped to this repository alone, so the workflow needs a
-credential of its own or both clones fail with `could not read Username for
-'https://github.com'`.
-
-Create a [fine-grained PAT](https://github.com/settings/personal-access-tokens/new) with:
-
-- **Resource owner** `southern-cross-garrison`
-- **Repository access** only `mybb-custom-theme` and `mybb-plugin-smartlink`
-- **Permissions** Contents: read-only (nothing else)
-
-Store it as the repository secret `THEME_TOKEN`
-(`gh secret set THEME_TOKEN`). The workflow's *Authenticate to the private sibling repos*
-step turns it into a `url.<...>.insteadOf` rewrite for `https://github.com/`, so the
-scripts keep their plain URLs and run unchanged on a developer machine, where your own git
-credentials already cover both repos.
-
-The rewrite is transport-only: a clone records the original URL, so no token reaches
-`.devenv/cache` or the Actions cache built from it. The token does land in the runner's
-`~/.gitconfig`, which is discarded with the runner.
-
-Fine-grained PATs expire. When one does, every run fails at that step with an explicit
-message; mint a replacement and update the secret.
-
-## Layout
-
-```
-plugin/                     the plugin (source of truth), laid out as a forum root:
-                            copy its contents over a MyBB install to deploy it
-  *.php                     front-end pages (events.php, event.php, manage_event.php,
-                            rsvp.php, troop_report.php, ical.php)
-  inc/plugins/events.php    metadata, install/activate/uninstall
-  inc/plugins/events/LICENSE, NOTICE  copies of the root ones, shipped in the zip
-  inc/plugins/events/inc/   functions, hooks, installers, render helpers
-  inc/plugins/events/admin/ Admin CP module
-  inc/plugins/events/templates/  templates, synced into MyBB on activate
-  inc/tasks/                MyBB scheduled task entry points
-  jscripts/events/          assets shared by the front end and the Admin CP
-  admin/modules/events/     Admin CP module registration
-LICENSE, NOTICE             Apache 2.0 and its attribution notice
-PLUGIN.md                   the plugin's own documentation (kept out of plugin/ so it
-                            is not uploaded to the web root)
-scripts/                    environment tooling (bootstrap, install, deploy, provision, snapshot)
-tests/                      Playwright suite
-docker/                     web image and PHP config
-test-forum/                 disposable MyBB tree (gitignored)
-.devenv/                    local state: download cache, snapshot, clock file, reports (gitignored)
-```
 
 ## License
 
