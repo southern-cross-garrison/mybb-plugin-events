@@ -54,8 +54,11 @@
 	line-height: 1.2;
 }
 
-/* A headline that names something - the best attended event, the busiest region - can
-   run long; it wraps to two lines at most rather than stretching its card. */
+/* A headline that names something - the best attended event, the busiest region - is
+   set smaller than a number, and wraps to two lines at most rather than stretching its
+   card. */
+.events_stat_name { font-size: 18px; }
+
 .events_stat_value {
 	overflow-wrap: anywhere;
 	display: -webkit-box;
@@ -233,9 +236,12 @@
 	width: var(--events-chart-at);
 	flex: none;
 	min-width: 2px;
-	background: var(--events-chart-trooper);
 	border-radius: 0 4px 4px 0;
 }
+
+/* Blue unless the bar stands for something with a colour of its own elsewhere on the
+   page - a region or a costume, which takes its slot from the month chart above. */
+.events_chart_bar:not([class*="events_chart_series_"]) { background: var(--events-chart-trooper); }
 
 .events_chart_bar_value {
 	flex: none;

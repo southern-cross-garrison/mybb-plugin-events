@@ -558,3 +558,11 @@ baseline picks the change up.
   (`events_admin_support.php`) says the same things in MyCode rather than rendering the
   file, whose 80-column wrapping reads badly on a page - so a change to NOTICE's wording
   belongs there too. The spec holds the tab's copyright line to the file's.
+
+- The Reports tab's Nudge (`events_admin_nudge.php`) checks the recipient's PM settings
+  itself, in `events_nudge_pm_block_reason()`, before sending and again when the send is
+  posted. It cannot leave that to `PMDataHandler`: for a sender whose group has
+  `canoverridepm` - which an administrator's has by default - MyBB skips "receive PMs",
+  the ignore list and buddy-only altogether, so a nudge from the Admin CP would reach a
+  member who had turned PMs off. Anything else that PMs a member on an admin's behalf,
+  rather than as a notice from the plugin, has to ask the same question.

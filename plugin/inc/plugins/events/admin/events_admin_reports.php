@@ -232,10 +232,10 @@ function events_admin_report_chart($view, array $rows, $ascending)
                 $bars[] = array($row['title'], (int)$row['attended'], $mybb->settings['bburl'] . "/event.php?id=" . (int)$row['id']);
                 break;
             case 'regions':
-                $bars[] = array($row['region'], (int)$row['troops'], '');
+                $bars[] = array($row['region'], (int)$row['troops'], '', events_attendance_series_class('regions', $row['region']));
                 break;
             case 'costumes':
-                $bars[] = array($row['costume'], (int)$row['worn'], '');
+                $bars[] = array($row['costume'], (int)$row['worn'], '', events_attendance_series_class('costumes', $row['costume']));
                 break;
             default:
                 $bars[] = array(events_admin_report_member_name($row), (int)$row['troops'], '');

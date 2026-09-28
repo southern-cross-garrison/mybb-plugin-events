@@ -68,10 +68,11 @@ function events_chart_tiles(array $tiles)
     $html = '<div class="events_stat_tiles">';
     foreach($tiles as $id => $tile)
     {
-        $value = is_int($tile[1]) || is_float($tile[1]) ? my_number_format($tile[1]) : htmlspecialchars_uni($tile[1]);
+        $numeric = is_int($tile[1]) || is_float($tile[1]);
+        $value = $numeric ? my_number_format($tile[1]) : htmlspecialchars_uni($tile[1]);
         $html .= '<div class="events_stat_tile" id="events_stat_' . htmlspecialchars_uni($id) . '">'
             . '<span class="events_stat_label">' . htmlspecialchars_uni($tile[0]) . '</span>'
-            . '<span class="events_stat_value">' . $value . '</span>'
+            . '<span class="events_stat_value' . ($numeric ? '' : ' events_stat_name') . '">' . $value . '</span>'
             . (isset($tile[2]) && $tile[2] !== '' ? '<span class="events_stat_note">' . htmlspecialchars_uni($tile[2]) . '</span>' : '')
             . '</div>';
     }
@@ -208,7 +209,9 @@ function events_chart_months(array $series, array $keys, $title, $id)
 /**
  * The top of a ranking, as horizontal bars with the value at each tip.
  *
- * @param array $rows array(label, value, href) - label unescaped, href already a URL or ''
+ * @param array $rows array(label, value, href, class) - label unescaped, href already a URL
+ *                    or '', class optional: the colour of an entity that has one of its own
+ *                    elsewhere on the page (a costume's slot on the month chart)
  * @param string $title
  * @param string $id
  * @return string HTML, empty when there is nothing to chart
@@ -239,7 +242,7 @@ function events_chart_bars(array $rows, $title, $id)
         $bars .= '<li class="events_chart_bar_row" title="' . htmlspecialchars_uni($row[0] . ': ' . my_number_format((int)$row[1])) . '">'
             . '<span class="events_chart_bar_label">' . $label . '</span>'
             . '<span class="events_chart_bar_track">'
-            . '<span class="events_chart_bar" style="--events-chart-at: ' . round((int)$row[1] / $max * 100, 3) . '%"></span>'
+            . '<span class="events_chart_bar' . (!empty($row[3]) ? ' ' . $row[3] : '') . '" style="--events-chart-at: ' . round((int)$row[1] / $max * 100, 3) . '%"></span>'
             . '<span class="events_chart_bar_value">' . my_number_format((int)$row[1]) . '</span>'
             . '</span>'
             . '</li>';

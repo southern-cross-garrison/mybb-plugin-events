@@ -464,33 +464,16 @@ function events_attendance_by_month($view, array $filters, $max_months = 24)
             $title = 'Troops per month by region';
             $keys = events_attendance_series_keys(events_regions(), 'Other regions');
             $sql = "SELECT {$month} AS month, e.region AS series, COUNT(DISTINCT a.event_id, a.user_id) AS n FROM {$from} WHERE {$where} GROUP BY {$month}, e.region";
-            $named = array_slice(events_regions(), 0, EVENTS_ATTENDANCE_CHART_SERIES);
-            $classify = function($name) use ($named)
-            {
-                $index = array_search($name, $named, true);
-                return $index === false ? 'other' : 's' . ($index + 1);
-            };
+            $classify = events_attendance_series_classifier('regions');
             break;
 
         case 'costumes':
             $title = 'Costumes worn per month';
-            $named = events_attendance_leading_costumes(EVENTS_ATTENDANCE_CHART_SERIES);
-            $keys = events_attendance_series_keys($named, 'Other costumes');
+            $keys = events_attendance_series_keys(events_attendance_leading_costumes(EVENTS_ATTENDANCE_CHART_SERIES), 'Other costumes');
             $sql = "SELECT {$month} AS month, c.costume AS series, COUNT(*) AS n FROM {$from}
                 INNER JOIN " . TABLE_PREFIX . "event_plugin_attendance_costumes c ON c.attendance_id = a.id
                 WHERE {$where} GROUP BY {$month}, c.costume";
-            // The costume column compares case-insensitively, so GROUP BY may hand back a
-            // different casing than the ranking did.
-            $lookup = array();
-            foreach($named as $index => $name)
-            {
-                $lookup[mb_strtolower($name)] = 's' . ($index + 1);
-            }
-            $classify = function($name) use ($lookup)
-            {
-                $name = mb_strtolower($name);
-                return isset($lookup[$name]) ? $lookup[$name] : 'other';
-            };
+            $classify = events_attendance_series_classifier('costumes');
             break;
 
         default:
@@ -557,6 +540,59 @@ function events_attendance_series_keys(array $names, $other_label)
     $keys['other'] = array($other_label, 'events_chart_series_other');
 
     return $keys;
+}
+
+/**
+ * Which series a region or a costume is drawn in: 's1' to 's5' for the named ones, 'other'
+ * for the rest.
+ *
+ * The month chart and the ranking chart both ask this, so a costume is the same colour in
+ * both. Costumes are matched without regard to case, as the costume column compares them:
+ * GROUP BY may hand back a different casing than the ranking did.
+ *
+ * @param string $view regions|costumes
+ * @return callable name => series key
+ */
+function events_attendance_series_classifier($view)
+{
+    static $classifiers = array();
+
+    if(!isset($classifiers[$view]))
+    {
+        $named = $view === 'regions'
+            ? array_slice(events_regions(), 0, EVENTS_ATTENDANCE_CHART_SERIES)
+            : events_attendance_leading_costumes(EVENTS_ATTENDANCE_CHART_SERIES);
+
+        $lookup = array();
+        foreach(array_values($named) as $index => $name)
+        {
+            $lookup[$view === 'regions' ? $name : mb_strtolower($name)] = 's' . ($index + 1);
+        }
+
+        $classifiers[$view] = function($name) use ($lookup, $view)
+        {
+            $name = $view === 'regions' ? (string)$name : mb_strtolower((string)$name);
+            return isset($lookup[$name]) ? $lookup[$name] : 'other';
+        };
+    }
+
+    return $classifiers[$view];
+}
+
+/**
+ * The CSS class that colours a region or a costume, as events_attendance_series_classifier()
+ * files it.
+ *
+ * @param string $view regions|costumes
+ * @param string $name
+ * @return string
+ */
+function events_attendance_series_class($view, $name)
+{
+    $classify = events_attendance_series_classifier($view);
+    $key = $classify($name);
+
+    return $key === 'other' ? 'events_chart_series_other' : 'events_chart_series_' . substr($key, 1);
 }
 
 /**

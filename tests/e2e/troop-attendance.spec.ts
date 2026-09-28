@@ -362,9 +362,16 @@ $handler->delete_user(array(${throwaway}));
         'Average | 1.8 | troops per member',
         'Most active | trooper1 | 3 troops',
       ]);
-      // One series, so no legend: the title says what it is. Four members in the first
-      // month, two in the second, one in the third.
-      expect(await monthChart(page)).toEqual({ title: 'Members trooping per month', legend: [], total: 7 });
+      // One series, so no legend: the title says what it is. A member who troops twice in
+      // a month is one member that month, and whether two of the three events share a
+      // month depends on where TEST_NOW falls - so the expected sum is asked of the rows.
+      const perMonth = await queryOne<any>(
+        `SELECT SUM(n) AS total FROM (
+           SELECT COUNT(DISTINCT a.user_id) AS n FROM ${T('event_plugin_attendance')} a
+           INNER JOIN ${T('event_plugin_events')} e ON e.id = a.event_id
+           GROUP BY DATE_FORMAT(e.start_date, '%Y-%m')) months`,
+      );
+      expect(await monthChart(page)).toEqual({ title: 'Members trooping per month', legend: [], total: Number(perMonth!.total) });
 
       expect((await column(page)).slice(0, 2)).toEqual(['trooper1', 'gec']);
       expect(await counts(page)).toEqual(['3', '2', '1', '1']);
@@ -424,6 +431,10 @@ $handler->delete_user(array(${throwaway}));
       const slotOf = (costume: string) =>
         page.locator('#events_chart_by_month .events_chart_key', { hasText: costume }).locator('.events_chart_swatch').getAttribute('class');
       const tbSlot = await slotOf(TB);
+
+      // The ranking bar below is the same colour as the costume's series.
+      const series = tbSlot!.match(/events_chart_series_\w+/)![0];
+      await expect(page.locator('#events_chart_ranking .events_chart_bar_row', { hasText: TB }).locator('.events_chart_bar')).toHaveClass(new RegExp(series));
 
       // ...and in the Hunter fete, where TB was worn, TB keeps the colour it had.
       await gotoEventsAdmin(page, '&action=reports&view=costumes&region=Hunter&role=trooper');

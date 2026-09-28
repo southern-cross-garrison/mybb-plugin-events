@@ -584,10 +584,23 @@ first · From 2026-01-01 · Hunter · Any role"), and open when the bar is click
 - **Regions** - troops, events, the average per event and how many members
 - **Costumes** - how often each was worn, by how many members, and when it was last out
 
-Above each view are the headline numbers for the selection, a chart of troops per month
-(troopers and wranglers stacked), and the top ten of the view as bars. Only what has been
-counted is ranked, so "least first" starts with members who have trooped once, not with
-members who never have.
+Above each view are headline cards, a month-by-month chart and the top ten of the view as
+bars, all for the current selection and all about what that view counts:
+
+| View | Cards | Month chart |
+|---|---|---|
+| People | members trooping, troops, average per member, most active | members trooping |
+| Events | events reported, troops, average turnout, best attended | troops, troopers and wranglers stacked |
+| Regions | regions, events, troops, busiest region | troops, stacked by region |
+| Costumes | costumes worn, times worn, members in costume, most worn | costumes worn, stacked by costume |
+
+The region and costume charts name the first five - regions in the order the region list
+has them, costumes by how often each has been worn overall - and fold the rest into
+"Other regions" or "Other costumes". A region or costume keeps its colour whatever the
+filter, and is the same colour in the month chart and in the bars beneath it.
+
+Only what has been counted is ranked, so "least first" starts with members who have
+trooped once, not with members who never have.
 
 ### My Troops
 
