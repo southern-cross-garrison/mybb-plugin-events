@@ -1398,6 +1398,19 @@ function events_signup_lock($event_id)
 }
 
 /**
+ * The name of the lock held while an event's troop report is posted, reminded about or
+ * counted: troop_report.php, the reminder task and the attendance recount all read the
+ * report row and then write on the strength of it.
+ *
+ * @param int $event_id
+ * @return string
+ */
+function events_troop_report_lock($event_id)
+{
+    return 'troop_report:' . (int)$event_id;
+}
+
+/**
  * Write a member's signup, replacing whatever they had before.
  *
  * $role_days is the whole intent: a role that is absent from it is a role the member is
@@ -2074,6 +2087,10 @@ function events_delete_member_data(array $user_ids)
     {
         $db->delete_query("event_plugin_feed_tokens", "user_id IN (" . $uids . ")");
     }
+
+    // Their troop attendance stays. It is the record of troops that happened, and the
+    // event, region and costume reports would all shrink retrospectively without it; the
+    // reports name a member who is gone as a deleted user.
 }
 
 /**

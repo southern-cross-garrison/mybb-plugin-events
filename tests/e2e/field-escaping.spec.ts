@@ -31,9 +31,10 @@ import { withSettings } from '../helpers/settings';
  * (events_parse_costumes() splits on it). A script that sets its flag without an `=` is
  * the price of one payload that is legal in all three.
  *
- * The User CP page the plugin adds (usercp.php?action=events_calendar) shows none of the
- * three - it is the feed link and its controls - so it is not visited here. health.spec.ts
- * renders it.
+ * The calendar subscription page in the User CP (usercp.php?action=events_calendar) shows
+ * none of the three - it is the feed link and its controls - so it is not visited here.
+ * health.spec.ts renders it. My Troops, the other User CP page, shows a troop's region and
+ * costumes, and is.
  */
 
 const HOSTILE = `<b>x</b> "q" 'a' & <script>window.__pwned++</script>`;
@@ -326,5 +327,70 @@ test.describe('region, address and costume values', () => {
     await expect(page.locator('body')).toContainText(`Deleting "${REGION}" cannot be undone.`);
     expect(await countWithAttribute(page, 'input[type="hidden"][name="region"]', 'value', REGION)).toBe(1);
     await expectInert(page, 'the region delete confirmation page');
+  });
+
+  test('are shown as typed in the attendance reports and on My Troops', async ({ page }) => {
+    // The title too: the reports name events in table cells, chart labels and tooltips,
+    // which title-escaping.spec.ts's list of pages predates.
+    const title = `Evt ${HOSTILE}`;
+    const eventId = await createEvent({
+      title,
+      region: REGION,
+      address: ADDRESS,
+      start: relativeToTestNow({ days: -3 }),
+      end: relativeToTestNow({ days: -2 }),
+      signupCutoff: relativeToTestNow({ days: -4 }),
+    });
+    await createRsvp(eventId, 'trooper1', { costumes: [COSTUME] });
+    const posted = await runPhp(`
+$lang->load('messages');
+require_once MYBB_ROOT.'inc/plugins/events/inc/events_troop_report.php';
+$event = events_get_event(${eventId});
+echo events_post_troop_report($event, get_user(${fixtures().users.trooper1}), events_troop_report_draft($event), $error) ? 'POSTED' : 'FAILED: '.$error;
+`);
+    expect(posted).toContain('POSTED');
+
+    await loginToAdminCp(page);
+
+    await gotoEventsAdmin(page, '&action=reports&view=people');
+    await expect(page.locator('.events_report_row td', { hasText: COSTUME })).toHaveText(COSTUME);
+    await expect(page.locator('.events_report_row a', { hasText: 'Evt' })).toHaveText(title);
+    await expectInert(page, 'the People report');
+
+    await gotoEventsAdmin(page, '&action=reports&view=events');
+    await expect(page.locator('.events_report_row .events_report_member')).toHaveText(title);
+    await expect(page.locator('.events_report_row td', { hasText: 'Rgn' })).toHaveText(REGION);
+    await expect(page.locator('#events_chart_ranking .events_chart_bar_label')).toHaveText(title);
+    expect(await countWithAttribute(page, '#events_chart_ranking .events_chart_bar_row', 'title', `${title}: 1`)).toBe(1);
+    await expectInert(page, 'the Events report');
+
+    await gotoEventsAdmin(page, `&action=reports&view=regions&region=${encodeURIComponent(REGION)}`);
+    await expect(page.locator('.events_report_row .events_report_member')).toHaveText(REGION);
+    await expect(page.locator('#events_chart_ranking .events_chart_bar_label')).toHaveText(REGION);
+    await expect(page.locator('#events_report_filter_summary')).toHaveText(`Regions, most first · All dates · ${REGION} · Any role`);
+    await expect(page.locator('#report_region option:checked')).toHaveText(REGION);
+    await expectInert(page, 'the Regions report, filtered to the region');
+    // Submitted again from the form, the region has to arrive as typed - an option value
+    // left unescaped breaks out of its attribute, and one escaped twice filters by the
+    // entities instead.
+    await page.locator('#events_report_filters > summary').click();
+    await page.locator('input[type="submit"][value="Show Report"]').click();
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('#events_report_filter_summary')).toHaveText(`Regions, most first · All dates · ${REGION} · Any role`);
+    await expect(page.locator('.events_report_row .events_report_member')).toHaveText(REGION);
+
+    await gotoEventsAdmin(page, '&action=reports&view=costumes');
+    await expect(page.locator('.events_report_row .events_report_member')).toHaveText(COSTUME);
+    expect(await countWithAttribute(page, '#events_chart_ranking .events_chart_bar_row', 'title', `${COSTUME}: 1`)).toBe(1);
+    await expectInert(page, 'the Costumes report');
+
+    await loginAs(page, 'trooper1');
+    await page.goto('/usercp.php?action=events_troops');
+    await expect(page.locator('#events_troops_last')).toHaveText(title);
+    await expect(page.locator('#events_troops_top_costume')).toHaveText(COSTUME);
+    await expect(page.locator('#events_troops_history td', { hasText: 'Rgn' })).toHaveText(REGION);
+    await expect(page.locator('#events_troops_history td', { hasText: 'TK <b>' })).toHaveText(COSTUME);
+    await expect(page.locator('#events_chart_my_costumes .events_chart_bar_label')).toHaveText(COSTUME);
+    await expectInert(page, 'My Troops');
   });
 });

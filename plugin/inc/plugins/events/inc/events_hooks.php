@@ -25,6 +25,7 @@ function events_register_hooks()
     // The calendar subscription page, inside the User CP as well as off the events toolbar.
     $plugins->add_hook("usercp_menu_built", "events_usercp_nav");
     $plugins->add_hook("usercp_start", "events_usercp_calendar_feed");
+    $plugins->add_hook("usercp_start", "events_usercp_troops");
 
     // An event is read in its announcement thread, with the event card standing in for the
     // thread's first post - see events_thread_postbit().
@@ -1064,15 +1065,15 @@ function events_nav_menu(&$page)
 }
 
 /**
- * Add "Calendar Subscription" to the User CP's navigation.
+ * Add "Calendar Subscription" and "My Troops" to the User CP's navigation.
  *
  * Like events_nav_menu(), and for the same reason: MyBB gives the nav no plugin
  * placeholder, and themes rewrite it wholesale - MyBB's own is table rows, the garrison's
  * is a column of Bootstrap buttons. So the new item is a copy of the theme's own Forum
  * Subscriptions item, whatever shape that is, with its link, label and id changed, and
- * it goes straight after it. A theme that uses Font Awesome gets its glyph swapped for a
- * calendar; any other icon (MyBB's sprite) rides across unchanged, which keeps the item
- * in line with its neighbours rather than leaving a gap where theirs are.
+ * they go straight after it. A theme that uses Font Awesome gets its glyph swapped for
+ * each item's own; any other icon (MyBB's sprite) rides across unchanged, which keeps the
+ * items in line with their neighbours rather than leaving a gap where theirs are.
  *
  * Hooks: usercp_menu_built
  *
@@ -1084,7 +1085,25 @@ function events_usercp_nav()
 
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 
-    if(!events_can_view_events_page() || strpos($usercpnav, 'id="usercp_nav_events_calendar"') !== false)
+    if(!events_can_view_events_page())
+    {
+        return;
+    }
+
+    // action => nav id, the Font Awesome glyph that replaces the copied one, label.
+    $items = array();
+    foreach(array(
+        'events_calendar' => array('usercp_nav_events_calendar', 'fa-calendar-days', 'Calendar Subscription'),
+        'events_troops'   => array('usercp_nav_events_troops', 'fa-chart-simple', 'My Troops'),
+    ) as $action => $item)
+    {
+        if(strpos($usercpnav, 'id="' . $item[0] . '"') === false)
+        {
+            $items[$action] = $item;
+        }
+    }
+
+    if(empty($items))
     {
         return;
     }
@@ -1115,27 +1134,33 @@ function events_usercp_nav()
 
     list($original, $offset) = $match[0];
 
-    $copy = preg_replace_callback('#<a\b([^>]*)>(.*?)</a>#is', function($anchor) {
-        $attributes = preg_replace('#\bhref="[^"]*"#i', 'href="usercp.php?action=events_calendar"', $anchor[1]);
-        $attributes = preg_replace('#\bid="[^"]*"#i', '', $attributes);
-        $attributes .= ' id="usercp_nav_events_calendar"';
+    $copies = '';
+    foreach($items as $action => $item)
+    {
+        list($id, $glyph, $label) = $item;
 
-        // A leading icon element is kept; the label after it is ours.
-        $icon = '';
-        if(preg_match('#^\s*(<(i|span|svg)\b[^>]*>.*?</\2>\s*(?:&nbsp;|&\#160;|\s)*)#is', $anchor[2], $icon_match))
-        {
-            $icon = preg_replace_callback('#\bclass="([^"]*)"#i', function($class) {
-                $glyphs = '#\bfa-(?!solid\b|regular\b|light\b|thin\b|duotone\b|brands\b|fw\b|lg\b|xs\b|sm\b|[0-9]+x\b)[a-z0-9-]+#i';
-                return preg_match($glyphs, $class[1])
-                    ? 'class="' . preg_replace($glyphs, 'fa-calendar-days', $class[1], 1) . '"'
-                    : $class[0];
-            }, $icon_match[1], 1);
-        }
+        $copies .= preg_replace_callback('#<a\b([^>]*)>(.*?)</a>#is', function($anchor) use ($action, $id, $glyph, $label) {
+            $attributes = preg_replace('#\bhref="[^"]*"#i', 'href="usercp.php?action=' . $action . '"', $anchor[1]);
+            $attributes = preg_replace('#\bid="[^"]*"#i', '', $attributes);
+            $attributes .= ' id="' . $id . '"';
 
-        return '<a' . $attributes . '>' . $icon . 'Calendar Subscription</a>';
-    }, $original, 1);
+            // A leading icon element is kept; the label after it is ours.
+            $icon = '';
+            if(preg_match('#^\s*(<(i|span|svg)\b[^>]*>.*?</\2>\s*(?:&nbsp;|&\#160;|\s)*)#is', $anchor[2], $icon_match))
+            {
+                $icon = preg_replace_callback('#\bclass="([^"]*)"#i', function($class) use ($glyph) {
+                    $glyphs = '#\bfa-(?!solid\b|regular\b|light\b|thin\b|duotone\b|brands\b|fw\b|lg\b|xs\b|sm\b|[0-9]+x\b)[a-z0-9-]+#i';
+                    return preg_match($glyphs, $class[1])
+                        ? 'class="' . preg_replace($glyphs, $glyph, $class[1], 1) . '"'
+                        : $class[0];
+                }, $icon_match[1], 1);
+            }
 
-    $usercpnav = substr_replace($usercpnav, $original . $copy, $offset, strlen($original));
+            return '<a' . $attributes . '>' . $icon . $label . '</a>';
+        }, $original, 1);
+    }
+
+    $usercpnav = substr_replace($usercpnav, $original . $copies, $offset, strlen($original));
 }
 
 /**
@@ -1176,6 +1201,50 @@ function events_usercp_calendar_feed()
     list($events_usercp_open, $events_usercp_close) = events_usercp_layout();
 
     eval("\$page = \"" . $templates->get("events_usercp_calendar_feed") . "\";");
+    output_page($page);
+    exit;
+}
+
+/**
+ * The member's own troop history, served as usercp.php?action=events_troops.
+ *
+ * Only ever the member who is asking: the page takes no member to show, so there is no
+ * way to point it at anybody else's figures. The garrison-wide picture is the Admin CP's
+ * Reports tab.
+ *
+ * Hooks: usercp_start
+ *
+ * @return void
+ */
+function events_usercp_troops()
+{
+    global $mybb, $lang, $templates, $theme, $headerinclude, $header, $footer, $usercpnav;
+
+    if($mybb->get_input('action') !== 'events_troops')
+    {
+        return;
+    }
+
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_attendance.php";
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_charts.php";
+
+    if(!$mybb->user['uid'] || !events_can_view_events_page())
+    {
+        error_no_permission();
+    }
+
+    // usercp.php adds its own crumb after this hook has run, so it is added here.
+    add_breadcrumb($lang->nav_usercp, "usercp.php");
+    add_breadcrumb("My Troops", "usercp.php?action=events_troops");
+
+    $troops_body = events_usercp_troops_body((int)$mybb->user['uid']);
+    $events_chart_assets = events_chart_assets('jscripts/events/');
+    $events_print_header = events_print_header('My Troops', array());
+    list($events_usercp_open, $events_usercp_close) = events_usercp_layout();
+
+    eval("\$page = \"" . $templates->get("events_usercp_troops") . "\";");
     output_page($page);
     exit;
 }
@@ -1363,6 +1432,46 @@ function events_user_deleted($handler)
 }
 
 /**
+ * Recount an event's troop attendance when its report is edited.
+ *
+ * Every post edit comes through here - including the plugin's own rewrites of an
+ * announcement's first post - so it is one indexed lookup that finds nothing unless the
+ * post is the first post of a posted troop report. A reply in the report thread is not
+ * the report.
+ *
+ * Hook: datahandler_post_update_end, after the new message is written.
+ *
+ * @param PostDataHandler $handler
+ */
+function events_troop_report_edited($handler)
+{
+    global $db;
+
+    $pid = isset($handler->data['pid']) ? (int)$handler->data['pid'] : 0;
+    if(!$pid)
+    {
+        return;
+    }
+
+    $report = $db->fetch_array($db->query("
+        SELECT r.event_id
+        FROM " . TABLE_PREFIX . "posts p
+        INNER JOIN " . TABLE_PREFIX . "threads t ON t.tid = p.tid AND t.firstpost = p.pid
+        INNER JOIN " . TABLE_PREFIX . "event_plugin_troop_reports r ON r.thread_id = t.tid
+        WHERE p.pid = " . $pid . " AND r.posted_at IS NOT NULL
+        LIMIT 1
+    "));
+    if(!$report)
+    {
+        return;
+    }
+
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_attendance.php";
+
+    events_record_troop_attendance((int)$report['event_id']);
+}
+
+/**
  * PM every attendee of a finished event that still has no posted troop report.
  *
  * Reminders are re-sent at most once a week per event. All time comparisons are done
@@ -1463,7 +1572,7 @@ function events_send_reminders(&$failures = array())
         // wrote is the one this would otherwise insert again, into a unique key. A report
         // that is being posted right now holds the lock, so this event waits for the next
         // run rather than being nagged about in the same second it is closed out.
-        $lock = 'troop_report:' . (int)$event['id'];
+        $lock = events_troop_report_lock($event['id']);
         if(!events_acquire_lock($lock))
         {
             $failures[] = "Event #" . (int)$event['id'] . ": skipped, its troop report was being posted.";

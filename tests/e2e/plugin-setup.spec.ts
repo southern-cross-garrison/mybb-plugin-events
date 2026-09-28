@@ -25,6 +25,7 @@ test.describe('plugin installation', () => {
       'events_rsvp_success',
       'events_troop_report',
       'events_usercp_calendar_feed',
+      'events_usercp_troops',
     ]);
   });
 
@@ -181,7 +182,7 @@ update_theme_stylesheet_list(${tid}, false, true);
       `SELECT table_name AS name, table_collation AS collation FROM information_schema.tables
         WHERE table_schema = DATABASE() AND table_name LIKE '${T('event\\_plugin\\_%')}'`,
     );
-    expect(tables).toHaveLength(10);
+    expect(tables).toHaveLength(12);
     for (const table of tables as any[]) {
       expect(table.collation, table.name).toMatch(/^utf8mb4_/);
     }
@@ -256,13 +257,14 @@ update_theme_stylesheet_list(${tid}, false, true);
 });
 
 test.describe('admin module', () => {
-  test('exposes Events, RSVPs and Settings', async ({ page }) => {
+  test('exposes Events, RSVPs, Reports and Settings', async ({ page }) => {
     await loginToAdminCp(page);
     await gotoEventsAdmin(page);
 
     await expect(page.locator('body')).toContainText('Event Management');
     await expect(page.locator('#events_add_button')).toBeVisible();
     await expect(page.locator('a[href*="module=events&action=rsvps"]').first()).toBeVisible();
+    await expect(page.locator('a[href*="module=events&action=reports"]').first()).toBeVisible();
     await expect(page.locator('a[href*="module=events&action=settings"]').first()).toBeVisible();
   });
 

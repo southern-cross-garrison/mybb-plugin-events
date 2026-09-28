@@ -15,6 +15,11 @@ require_once MYBB_ROOT . "inc/plugins/events/inc/events_hooks.php";
 global $plugins;
 $plugins->add_hook("datahandler_user_delete_end", "events_user_deleted");
 
+// Editing a troop report recounts its attendance. Registered in both contexts like the
+// hook above: a post is edited from editpost.php and quick edit, but nothing stops a
+// moderation plugin doing it from the Admin CP.
+$plugins->add_hook("datahandler_post_update_end", "events_troop_report_edited");
+
 if(defined('IN_ADMINCP'))
 {
     global $plugins;

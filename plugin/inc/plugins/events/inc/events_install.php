@@ -26,6 +26,8 @@ function events_plugin_tables()
         'event_plugin_troop_reports',
         'event_plugin_user_prefs',
         'event_plugin_feed_tokens',
+        'event_plugin_attendance',
+        'event_plugin_attendance_costumes',
         'event_plugin_schema_upgrades'
     );
 }

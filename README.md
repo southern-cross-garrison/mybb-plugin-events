@@ -77,7 +77,9 @@ state the plugin can put an event in - an empty roster, a three-day convention w
 troopers and two wranglers across different days, WWCC-gated, excluded members, a pending
 draft, signups locked by a passed cutoff, a region announcing into its own forum, one
 finished event still owing a troop report and one that has posted its report, and an
-archived event - plus eighteen demo members to sign up as:
+archived event - plus a year of twenty reported troops behind them, so the Admin CP's
+Reports tab and the User CP's My Troops have history to rank and chart, and eighteen demo
+members to sign up as:
 
 ```bash
 docker compose exec -T web php /dev/stdin < scripts/seed-demo.php
@@ -90,7 +92,8 @@ member it lists; the password is the fixtures' `testpass123`.
 The board administrator is rostered as a trooper on the finished event that still owes a
 report, because writing one needs a trooper signup on an event that has ended - so the
 report can be drafted and posted from the admin account without signing in as anybody else.
-Posting it archives that event, and re-running the seed puts it back.
+Posting it archives that event, and re-running the seed puts it back. The administrator is also rostered on five of
+the reported troops (and a no-show at one), so My Troops has something to show from that account.
 
 Do not run `./scripts/db-snapshot.sh` after seeding - it is a plain dump, and it would bake
 the demo into the baseline every later test run starts from. Restore first if you need one.

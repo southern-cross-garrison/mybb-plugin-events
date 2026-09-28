@@ -42,10 +42,11 @@ require_once MYBB_ROOT . 'inc/datahandlers/user.php';
 require_once MYBB_ROOT . 'inc/datahandlers/post.php';
 
 // events_hooks.php is the only plugin include loaded on every request; the writers this
-// script drives live in the other two.
+// script drives live in the others.
 require_once MYBB_ROOT . 'inc/plugins/events/inc/events_functions.php';
 require_once MYBB_ROOT . 'inc/plugins/events/inc/events_form.php';
 require_once MYBB_ROOT . 'inc/plugins/events/inc/events_thread.php';
+require_once MYBB_ROOT . 'inc/plugins/events/inc/events_troop_report.php';
 
 /** @var DB_MySQLi $db */
 /** @var MyBB $mybb */
@@ -432,9 +433,14 @@ function demo_signup($event_id, $username, array $opts = array())
 }
 
 /**
- * Post a troop report for an event, the way troop_report.php does: a thread in the
- * configured forum, the report row marked posted, and a pointer left on the event's own
- * announcement thread.
+ * Post a troop report for an event through events_post_troop_report(), which is what
+ * troop_report.php calls: a thread in the configured forum, the report row marked posted,
+ * a pointer left on the event's own announcement thread, and the attendance the report
+ * names counted.
+ *
+ * A report already posted on an earlier run is left as it is - re-posting would leave a
+ * second thread behind on every run - but its attendance is counted again, since the
+ * roster it is counted against has just been rewritten.
  *
  * @param array $event
  * @param string $username Author; must have trooped the event
@@ -443,89 +449,17 @@ function demo_signup($event_id, $username, array $opts = array())
  */
 function demo_troop_report(array $event, $username, $content)
 {
-    global $db;
-
     $existing = events_get_troop_report($event['id']);
     if($existing && !empty($existing['posted_at']))
     {
-        // Re-posting would leave a second thread behind on every run.
+        events_record_troop_attendance($event['id']);
         return;
     }
 
-    $forum_id = (int)events_get_setting('troop_report_forum');
-    if(!$forum_id)
+    $error = '';
+    if(!events_post_troop_report($event, events_get_user(demo_uid($username)), $content, $error))
     {
-        out("  ! no troop report forum configured, skipping the report for '{$event['title']}'");
-        return;
-    }
-
-    $author = events_get_user(demo_uid($username));
-
-    $handler = new PostDataHandler('insert');
-    $handler->action = 'thread';
-    $handler->admin_override = true;
-    $handler->set_data(array(
-        'fid'       => $forum_id,
-        'subject'   => 'Troop Report: ' . $event['title'],
-        'message'   => $content,
-        'uid'       => (int)$author['uid'],
-        'username'  => $author['username'],
-        'ipaddress' => '127.0.0.1',
-        'dateline'  => TIME_NOW,
-        'savedraft' => 0,
-        'options'   => array('signature' => 0, 'subscriptionmethod' => '', 'disablesmilies' => 0),
-    ));
-
-    if(!$handler->validate_thread())
-    {
-        out("  ! troop report for '{$event['title']}' not posted: " . implode(' ', $handler->get_friendly_errors()));
-        return;
-    }
-
-    $thread = $handler->insert_thread();
-    $thread_id = (int)$thread['tid'];
-    $now = events_date('Y-m-d H:i:s');
-
-    if($existing)
-    {
-        $db->update_query('event_plugin_troop_reports', array(
-            'thread_id'  => $thread_id,
-            'created_by' => (int)$author['uid'],
-            'posted_at'  => $db->escape_string($now),
-        ), 'id = ' . (int)$existing['id']);
-    }
-    else
-    {
-        $db->insert_query('event_plugin_troop_reports', array(
-            'event_id'   => (int)$event['id'],
-            'thread_id'  => $thread_id,
-            'created_by' => (int)$author['uid'],
-            'created_at' => $db->escape_string($now),
-            'posted_at'  => $db->escape_string($now),
-        ));
-    }
-
-    if(!empty($event['thread_id']))
-    {
-        $reply = new PostDataHandler('insert');
-        $reply->action = 'post';
-        $reply->admin_override = true;
-        $reply->set_data(array(
-            'tid'       => (int)$event['thread_id'],
-            'message'   => 'Troop report has been posted: [url=' . $GLOBALS['mybb']->settings['bburl']
-                           . '/showthread.php?tid=' . $thread_id . ']View Troop Report[/url]',
-            'uid'       => (int)$author['uid'],
-            'username'  => $author['username'],
-            'ipaddress' => '127.0.0.1',
-            'dateline'  => TIME_NOW,
-            'savedraft' => 0,
-            'options'   => array('signature' => 0, 'subscriptionmethod' => '', 'disablesmilies' => 0),
-        ));
-
-        if($reply->validate_post())
-        {
-            $reply->insert_post();
-        }
+        out("  ! troop report for '{$event['title']}' not posted: " . $error);
     }
 }
 
@@ -1156,14 +1090,17 @@ foreach(array('AlexVoss', 'BriannaKade', 'DanaOkoye', 'FreyaLind', 'HanaMorrow',
     demo_signup($id, $username);
 }
 demo_signup($id, 'wrangler', array('roles' => array('wrangler')));
-demo_troop_report(events_get_event($id), 'AlexVoss',
+// The drafted roll call with the write-up as its mission report, which is what counts
+// the roster in the attendance reports - a report that named nobody would count nobody.
+$event = events_get_event($id);
+demo_troop_report($event, 'AlexVoss', str_replace("[b]Mission Report:[/b]\n", "[b]Mission Report:[/b]\n" .
     "Ten of us turned out for the fun run, plus one wrangler keeping the water coming.\n\n"
   . "[b]Attendance:[/b] 10 troopers, 1 wrangler\n"
   . "[b]Charity:[/b] Ronald McDonald House Charities\n\n"
   . "Around 1,200 runners this year. We split three ways as planned - start line, Busby's Pond and the"
   . " finish - and the medal table at the finish was the busiest photo spot of the morning. No kit"
   . " failures and no heat casualties. The organisers told us the run raised a record amount and have"
-  . " already asked us back next year. Photos are with the media team.");
+  . " already asked us back next year. Photos are with the media team." . "\n", events_troop_report_draft($event)));
 note('finished - troop report posted', $id);
 
 // 11. Archived: hidden from the listing until the filter asks for it.
@@ -1445,6 +1382,148 @@ foreach(array('BriannaKade', 'GusHolloway', 'PiaSolano') as $username)
     demo_signup($id, $username);
 }
 note('3/4 troopers - one place left before the waitlist', $id);
+
+// ---------------------------------------------------------------------------
+// Troop history
+//
+// A year of finished, reported troops, so the Admin CP's Reports tab and the User CP's
+// My Troops have something to rank and chart. The rosters are weighted - a few regulars
+// on nearly everything, a middle tier, and members who come out now and then - so most
+// and least active, and where a member sits in the garrison, all have a spread to show.
+//
+// Each report is the generated draft plus a line of write-up, so what is counted is
+// exactly what a member posting the draft as it came would have counted. Every fifth one
+// has a no-show taken out of the draft (signed up, never came), and one of those quotes
+// the no-show's Legion number in the write-up without their name, which is how a stray
+// number is told apart from a trooper.
+//
+// Deterministic: who is rostered where is a hash of the event and the member, not a
+// random draw, so a re-run lands on the same rosters.
+// ---------------------------------------------------------------------------
+
+$HISTORY = array(
+    // title, region, days ago it started, days it ran, start, end
+    array('Parramatta Lanes Festival',            'Sydney',   14, 1, '17:00:00', '22:00:00'),
+    array('Maitland Riverlights',                 'Hunter',   27, 2, '10:00:00', '21:00:00'),
+    array('Canberra Hospital Ward Visit',         'Canberra', 38, 1, '10:00:00', '12:30:00'),
+    array('Westfield Penrith Book Week',          'Sydney',   52, 1, '09:30:00', '13:00:00'),
+    array('Newcastle Supanova Showcase',          'Hunter',   66, 2, '09:00:00', '17:00:00'),
+    array('Sydney Royal Easter Show Parade',      'Sydney',   81, 1, '11:00:00', '15:00:00'),
+    array('Questacon Science Night',              'Canberra', 97, 1, '18:00:00', '21:30:00'),
+    array('Blacktown Hospital Children\'s Ward',  'Sydney',  112, 1, '10:00:00', '12:00:00'),
+    array('Tamworth Toy Drive',                   'Other',   128, 1, '10:00:00', '14:00:00'),
+    array('Manly Relay for Life',                 'Sydney',  143, 2, '10:00:00', '17:00:00'),
+    array('Cessnock Library Open Day',            'Hunter',  160, 1, '10:00:00', '13:00:00'),
+    array('Floriade Opening Weekend',             'Canberra',176, 2, '09:30:00', '16:30:00'),
+    array('Liverpool Christmas Parade',           'Sydney',  195, 1, '16:00:00', '20:00:00'),
+    array('Sydney Children\'s Hospital Christmas','Sydney',  201, 1, '10:00:00', '13:00:00'),
+    array('Port Macquarie Show',                  'Other',   223, 1, '09:00:00', '15:00:00'),
+    array('Lake Macquarie Fun Run',               'Hunter',  244, 1, '07:00:00', '11:00:00'),
+    array('Belconnen Mall Fundraiser',            'Canberra',268, 1, '10:00:00', '14:00:00'),
+    array('Star Wars Day at the Museum',          'Sydney',  291, 1, '10:00:00', '16:00:00'),
+    array('Wollongong Comic Fair',                'Other',   318, 2, '09:30:00', '17:00:00'),
+    array('Bankstown Halloween Walk',             'Sydney',  347, 1, '17:30:00', '21:00:00'),
+);
+
+// Chance in 100 of being rostered on any one event.
+$HISTORY_WEIGHTS = array(
+    'AlexVoss' => 90, 'CarloRen' => 85, 'DanaOkoye' => 80, 'trooper1' => 75,
+    'BriannaKade' => 55, 'EliTanaka' => 50, 'FreyaLind' => 50, 'GusHolloway' => 45,
+    'HanaMorrow' => 40, 'IvanPetrov' => 40,
+    'JadeNkemdi' => 20, 'KaiWhitfield' => 18, 'LenaBauer' => 15, 'OscarBright' => 12,
+    'PiaSolano' => 10, 'trooper2' => 10, 'gec' => 8,
+);
+$HISTORY_WRANGLERS = array('RaySutton' => 60, 'TeganMoss' => 35, 'wrangler' => 20);
+
+$history_troops = 0;
+
+foreach($HISTORY as $index => $spec)
+{
+    list($title, $region, $ago, $length, $start_time, $end_time) = $spec;
+
+    $first_day = -$ago;
+    $last_day = -$ago + $length - 1;
+
+    $id = demo_event(array(
+        'title'       => $title,
+        'region'      => $region,
+        'status'      => 'archived',
+        'description' => 'One of the garrison\'s regular appearances - photos, high fives and a bucket for the charity of the day.',
+        'start_date'  => demo_at($first_day, $start_time),
+        'end_date'    => demo_at($last_day, $end_time),
+        'days'        => demo_days($first_day, $last_day, $start_time, $end_time),
+    ));
+
+    $rostered = array();
+    foreach($HISTORY_WEIGHTS as $username => $weight)
+    {
+        if(crc32($title . '|' . $username) % 100 < $weight)
+        {
+            $rostered[] = $username;
+        }
+    }
+    // Never an empty troop: the most regular of the regulars always comes.
+    if(!$rostered)
+    {
+        $rostered[] = 'AlexVoss';
+    }
+
+    foreach($rostered as $position => $username)
+    {
+        // A different one of their costumes from one troop to the next.
+        $owned = events_parse_costumes(events_get_user_field(demo_uid($username), 'costume'));
+        $costume = $owned ? array($owned[($index + $position) % count($owned)]) : array($costumes[0]);
+        demo_signup($id, $username, array('costumes' => $costume));
+    }
+
+    // The administrator troops every fourth one, so My Troops has something to show from
+    // the account the plugin is demonstrated from.
+    if($ADMIN_USERNAME !== null && $index % 4 === 1)
+    {
+        demo_signup($id, $ADMIN_USERNAME, array('costumes' => array($costumes[$index % count($costumes)])));
+        $rostered[] = $ADMIN_USERNAME;
+    }
+
+    foreach($HISTORY_WRANGLERS as $username => $weight)
+    {
+        if(crc32($title . '|' . $username) % 100 < $weight)
+        {
+            demo_signup($id, $username, array('roles' => array('wrangler')));
+        }
+    }
+
+    $event = events_get_event($id);
+    $draft = events_troop_report_draft($event);
+
+    $write_up = 'Good crowd, no kit failures, and the organisers have already asked us back.';
+
+    $no_show = null;
+    if($index % 5 === 2 && count($rostered) > 1)
+    {
+        $no_show = end($rostered);
+        $draft = implode("\n", array_filter(explode("\n", $draft), function($line) use ($no_show) {
+            return strpos($line, ' - ' . $no_show) === false && strpos($line, $no_show . ' - ') !== 0;
+        }));
+
+        // Their number is in the report and their name is not, so they are not counted.
+        $number = preg_replace('/\D/', '', events_get_user_field(demo_uid($no_show), 'tk_id'));
+        if($index === 2 && $number !== '')
+        {
+            $write_up .= ' Raffle ticket ' . $number . ' won the signed helmet.';
+        }
+    }
+
+    $draft = str_replace("[b]Mission Report:[/b]\n", "[b]Mission Report:[/b]\n" . $write_up . "\n", $draft);
+
+    demo_troop_report($event, $rostered[0], $draft);
+
+    $counted = (int)$db->fetch_field($db->simple_select('event_plugin_attendance', 'COUNT(*) AS n', 'event_id = ' . (int)$id), 'n');
+    $history_troops += $counted;
+
+    note('reported - ' . $counted . ' counted' . ($no_show !== null ? ', ' . $no_show . ' a no-show' : ''), $id);
+}
+
+out($history_troops . ' troops counted across ' . count($HISTORY) . ' reported events - see Admin CP > Event Management > Reports');
 
 // ---------------------------------------------------------------------------
 

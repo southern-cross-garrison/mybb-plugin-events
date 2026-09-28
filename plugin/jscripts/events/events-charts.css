@@ -1,0 +1,229 @@
+/**
+ * The attendance charts (events_charts.php), in the Admin CP's Reports and the User CP's
+ * My Troops.
+ *
+ * A sheet here rather than in events.css for the reason the datepicker's is: the same
+ * charts are drawn in the Admin CP, which loads no theme stylesheet. The colours are the
+ * plugin's --events-* properties, falling back to the same trooper blue and wrangler
+ * amber the event card's turnout counts use, so a theme that sets them retints the charts
+ * too and the Admin CP gets the fallbacks.
+ *
+ * Every mark's size arrives as --events-chart-at on its style attribute - a value, not
+ * styling - and is turned into a height, width or position here.
+ */
+
+.events_chart,
+.events_stat_tiles {
+	--events-chart-ink: var(--events-chart-text, #52514e);
+	--events-chart-muted: var(--events-chart-axis, #898781);
+	--events-chart-grid: var(--events-chart-gridline, rgba(127, 127, 127, 0.22));
+	--events-chart-trooper: var(--events-accent, #2f6f9f);
+	--events-chart-wrangler: var(--events-wrangle, #c77700);
+}
+
+/* Headline numbers */
+.events_stat_tiles {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+	gap: 12px;
+	margin: 0 0 16px;
+}
+
+.events_stat_tile {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 12px 14px;
+	border: 1px solid var(--events-chart-grid);
+	border-radius: 6px;
+}
+
+.events_stat_label {
+	font-size: 12px;
+	color: var(--events-chart-ink);
+}
+
+.events_stat_note {
+	font-size: 12px;
+	color: var(--events-chart-ink);
+}
+
+.events_stat_value {
+	font-size: 24px;
+	font-weight: 600;
+	line-height: 1.2;
+}
+
+/* Every chart */
+.events_chart {
+	margin: 0 0 20px;
+	padding: 0;
+}
+
+.events_chart_title {
+	font-weight: 600;
+	margin: 0 0 6px;
+}
+
+.events_chart_legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 14px;
+	margin: 0 0 8px;
+	font-size: 12px;
+	color: var(--events-chart-ink);
+}
+
+.events_chart_key {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.events_chart_swatch {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	border-radius: 2px;
+}
+
+.events_chart_trooper { background: var(--events-chart-trooper); }
+.events_chart_wrangler { background: var(--events-chart-wrangler); }
+
+/* Columns: troops per month */
+.events_chart_plot {
+	position: relative;
+	height: 180px;
+	margin: 0 0 44px 32px;
+}
+
+.events_chart_grid {
+	position: absolute;
+	inset: 0;
+	pointer-events: none;
+}
+
+.events_chart_gridline {
+	position: absolute;
+	left: 0;
+	right: 0;
+	bottom: var(--events-chart-at);
+	border-top: 1px solid var(--events-chart-grid);
+}
+
+.events_chart_tick {
+	position: absolute;
+	right: 100%;
+	margin-right: 6px;
+	transform: translateY(-50%);
+	font-size: 11px;
+	font-variant-numeric: tabular-nums;
+	color: var(--events-chart-muted);
+}
+
+.events_chart_columns {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: stretch;
+}
+
+.events_chart_column {
+	position: relative;
+	flex: 1 1 0;
+	min-width: 0;
+	display: flex;
+	justify-content: center;
+	cursor: default;
+}
+
+.events_chart_column:hover { background: rgba(127, 127, 127, 0.08); }
+
+/* Trooper at the base, wrangler above it, a 2px gap between them. Only the top segment
+   is rounded, and the base stays square on the axis. */
+.events_chart_stack {
+	display: flex;
+	flex-direction: column-reverse;
+	justify-content: flex-start;
+	gap: 2px;
+	width: 70%;
+	max-width: 24px;
+	height: 100%;
+}
+
+.events_chart_segment {
+	display: block;
+	height: var(--events-chart-at);
+	flex: 0 0 auto;
+}
+
+.events_chart_segment:last-child { border-radius: 4px 4px 0 0; }
+
+.events_chart_label {
+	position: absolute;
+	top: 100%;
+	left: 50%;
+	transform: translateX(-50%);
+	margin-top: 4px;
+	font-size: 11px;
+	line-height: 1.2;
+	text-align: center;
+	white-space: nowrap;
+	color: var(--events-chart-muted);
+}
+
+/* Bars: a ranking */
+.events_chart_bar_list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: grid;
+	gap: 6px;
+}
+
+.events_chart_bar_row {
+	display: grid;
+	grid-template-columns: minmax(90px, 30%) 1fr;
+	align-items: center;
+	gap: 10px;
+}
+
+.events_chart_bar_label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	text-align: right;
+}
+
+/* The padding is where the value at the tip of the longest bar goes: a bar's width is a
+   share of the track's content box, which leaves the padding out. */
+.events_chart_bar_track {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	min-width: 0;
+	padding-right: 48px;
+}
+
+.events_chart_bar {
+	display: block;
+	height: 14px;
+	width: var(--events-chart-at);
+	flex: none;
+	min-width: 2px;
+	background: var(--events-chart-trooper);
+	border-radius: 0 4px 4px 0;
+}
+
+.events_chart_bar_value {
+	flex: none;
+	font-size: 12px;
+	font-variant-numeric: tabular-nums;
+	color: var(--events-chart-ink);
+}
+
+@media (max-width: 480px) {
+	.events_chart_bar_row { grid-template-columns: minmax(70px, 38%) 1fr; }
+	/* A dozen month names do not fit a phone's width; every other one does. */
+	.events_chart_column:nth-child(even) .events_chart_label { visibility: hidden; }
+}

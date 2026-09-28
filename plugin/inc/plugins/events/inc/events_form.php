@@ -24,6 +24,7 @@ if(!defined("IN_MYBB"))
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_thread.php";
+require_once MYBB_ROOT . "inc/plugins/events/inc/events_charts.php";
 
 /**
  * The statuses an event can be in, and how they read in a form.
@@ -79,14 +80,16 @@ function events_tag_field_assets($base)
  *
  * Same reasoning as the two above, minus the second root: these controls only exist in
  * the Admin CP, which is exactly the place MyBB loads no theme stylesheet - so there is
- * nowhere else for their styling to live.
+ * nowhere else for their styling to live. The Reports tab's charts come with it; their
+ * sheet is shared with the User CP (events_chart_assets()).
  *
  * @param string $base '../jscripts/events/' in the ACP
  * @return string
  */
 function events_admin_assets($base)
 {
-    return '<link rel="stylesheet" href="' . $base . 'events-admin.css" />';
+    return '<link rel="stylesheet" href="' . $base . 'events-admin.css" />'
+         . events_chart_assets($base);
 }
 
 /**

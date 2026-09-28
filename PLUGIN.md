@@ -23,6 +23,9 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 - **Attendance Sheets**: Generate print-friendly attendance sheets
 - **Troop Reports**: Automated troop report generation and posting
 - **Automated Reminders**: PM reminders for incomplete troop reports
+- **Troop Attendance**: Every posted troop report records who trooped and who wrangled,
+  and in what costume. The Admin CP ranks members, events, regions and costumes from it,
+  with charts, and each member sees their own history in the User CP
 - **Print Layouts**: Every page prints as a document - no board chrome, a compact masthead,
   and an attendance sheet built for a clipboard
 - **iCal Export**: Export events to calendar applications
@@ -538,6 +541,66 @@ GECs can manage events and RSVPs directly from the event page (no Admin CP acces
 4. Post to the designated forum
 5. The plugin automatically comments on the event's announcement thread and archives the event
 
+### Troop Attendance
+
+Posting a troop report records who was there: every member signed up to the event
+(attending or waitlisted) whom the report names is counted once for that event, in the
+role they signed up for, with the costumes their signup listed. The report is the record.
+Take somebody who didn't come out of the draft, or add somebody who came off the waitlist
+on the day, and the count follows it.
+
+A member is named when the report has:
+
+- **their username**, as a word of its own and in its own case. The draft writes usernames
+  exactly as they are stored, and a username that is an ordinary word ("Rex") would
+  otherwise be found in the write-up.
+- **and, for a trooper with a Legion ID on file, its number**, with or without the prefix -
+  `TK-12345`, `TK12345` and `12345` all count. A number on its own could be a postcode or a
+  head count, and a name on its own could be a mention of somebody who stayed home.
+
+Wranglers hold no Legion ID, so for them the username is enough, and so it is for a trooper
+with no ID recorded. The generated draft's roll call (`Ash - trooper1 - TK-20001`) meets
+the rule, so a report posted as drafted counts everyone it lists.
+
+Editing the report's first post - from the edit page or with quick edit - counts it again
+from scratch. Editing a reply in the report's thread does not. Only reports posted since
+this shipped are counted; older ones are left as they were.
+
+A deleted member's troops stay. They still count towards their events, regions and
+costumes, the reports list them as **[deleted user]**, and recounting a report keeps them.
+There is nothing left to recount them from, since their signup went with them. Deleting an
+event takes its attendance with it.
+
+### Reports
+
+Admin CP -> Event Management -> **Reports** is open to coordinators and administrators and
+has four views, each sortable most-first or least-first and filtered by date range, region
+and role. The filters are folded under a bar that says what they are set to ("Events, least
+first · From 2026-01-01 · Hunter · Any role"), and open when the bar is clicked:
+
+- **People** - troops per member, split trooper/wrangler, their most worn costume and their
+  last troop
+- **Events** - how many each event counted, against how many signed up
+- **Regions** - troops, events, the average per event and how many members
+- **Costumes** - how often each was worn, by how many members, and when it was last out
+
+Above each view are the headline numbers for the selection, a chart of troops per month
+(troopers and wranglers stacked), and the top ten of the view as bars. Only what has been
+counted is ranked, so "least first" starts with members who have trooped once, not with
+members who never have.
+
+### My Troops
+
+Each member's own figures are in the User CP under **My Troops**
+(`usercp.php?action=events_troops`): how many troops they have done and in which role,
+when they last trooped, their most worn costume, a chart of the last twelve months, the
+costumes they have worn, and every troop, newest first. It also says how many of the garrison they
+out-troop. That is the share of the garrison's members group, plus anyone else with a troop
+counted, who have trooped fewer events than they have.
+
+The page only ever shows the member viewing it. It takes no member to show, so there is no
+way to ask it for anybody else's.
+
 ## Calendar Subscription
 
 `calendar_feed.php` is where a member makes a private link; it is offered after signing
@@ -587,6 +650,7 @@ accordingly.
 /ical.php                         # iCal export of one event
 /ical_feed.php                    # A member's calendar subscription feed
 /calendar_feed.php                # Where a member makes, resets or turns off that link
+                                  # (My Troops is served from usercp.php)
 
 /inc/tasks/
   events_reminders.php            # Scheduled task entry point
@@ -603,6 +667,9 @@ accordingly.
       events_ical.php             # iCal rendering shared by the export and the feed
       events_feed.php             # Calendar subscription tokens
       events_thread.php           # Generating and maintaining event announcement threads
+      events_troop_report.php     # The troop report draft, and posting a report
+      events_attendance.php       # Troop attendance: counting it, and the statistics
+      events_charts.php           # The Reports tab's and My Troops' charts
       events_hooks.php            # Hook callbacks and the reminder job
       events_install.php          # Database installation
       events_templates.php        # Template installation
@@ -612,6 +679,7 @@ accordingly.
       events_admin.php            # Admin CP dispatcher
       events_admin_events.php     # Event CRUD
       events_admin_rsvps.php      # RSVP review
+      events_admin_reports.php    # Attendance reports
       events_admin_settings.php   # Plugin settings
       events_admin_regions.php    # The region list: renames, additions and deletions
       events_admin_support.php    # The Support tab: credit and licence
@@ -625,11 +693,14 @@ accordingly.
       events_rsvp_list.html
       events_attendance.html
       events_troop_report.html
+      events_usercp_troops.html
+    /upgrades/                    # Schema changes, one file each, run on activation
 
 /jscripts/events/                 # Assets the Admin CP and the front end share
   events-datepicker.css
   events-tags.css
   events-admin.css                # The Admin CP's own controls, which load no theme
+  events-charts.css               # The attendance charts, in the Admin CP and the User CP
   jquery-ui-datepicker.js
 
 /admin/modules/events/
@@ -705,6 +776,11 @@ All tables use the `mybb_event_plugin_` prefix:
   with no days, it has no claims and the row's status is the whole answer
 - `event_plugin_rsvp_costumes` - Costumes per RSVP
 - `event_plugin_troop_reports` - Troop report tracking
+- `event_plugin_attendance` - Who a posted troop report counts: one row per event,
+  member and role. The event's date and region are read from the event rather than
+  copied, so renaming a region carries the reports with it
+- `event_plugin_attendance_costumes` - The costumes each counted signup listed when the
+  report was counted
 - `event_plugin_user_prefs` - Per-member preferences; currently which view the events
   index opens in. A member with no row gets the default, so it only holds people who have
   actually used the toggle
@@ -717,12 +793,13 @@ re-activating the plugin converts them in place, data included.
 
 - **GEC (Garrison Event Coordinator)**: Can create and edit events, view and manage RSVPs
   for assigned events from the event page, and generate attendance sheets - all without
-  Admin CP access. Editing covers an event's status, so a coordinator takes their own
+  Admin CP access. With Admin CP access, also reads the attendance Reports. Editing covers an event's status, so a coordinator takes their own
   event live
 - **Admin**: Full access to all features, including the Admin CP event module, which is
   additionally the only place an event can be deleted
 - **Users**: Can view live events, sign up to attend (trooping and/or wrangling), update
-  their own signup while signups are open, create troop reports
+  their own signup while signups are open, create troop reports, and see their own troop
+  history (and only their own) in the User CP
 - **Wranglers**: No membership or TK ID required; may sign up to any event they can see, but
   may not author troop reports
 

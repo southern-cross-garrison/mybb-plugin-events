@@ -99,6 +99,9 @@ test.describe('runtime health', () => {
     await expectRenders(page, `/troop_report.php?id=${finished}`);
     await expect(page.locator('#troop_report_content')).toHaveCount(1);
 
+    // My Troops has nothing to show until a report counts somebody.
+    await expectRenders(page, '/usercp.php?action=events_troops');
+
     await expectRenders(page, '/usercp.php?action=events_calendar');
     await expectRenders(page, '/calendar_feed.php');
 
@@ -118,6 +121,14 @@ test.describe('runtime health', () => {
     await expectRenders(page, '/calendar_feed.php');
     await expectRenders(page, '/usercp.php?action=events_calendar');
 
+    // Posting the drafted report counts the trooper and the wrangler, which is what the
+    // Reports tab and My Troops are drawn from.
+    await page.goto(`/troop_report.php?id=${finished}`);
+    await page.locator('#troop_report_submit').click();
+    await page.waitForLoadState('domcontentloaded');
+    await expectRenders(page, '/usercp.php?action=events_troops');
+    await expect(page.locator('#events_troops_history')).toHaveCount(1);
+
     // Last, because loginAs() clears the Admin CP session along with everything else.
     await loginToAdminCp(page);
     for (const query of [
@@ -131,6 +142,12 @@ test.describe('runtime health', () => {
       '&action=rsvps',
       `&action=rsvps&event_id=${upcoming}`,
       `&action=rsvps&event_id=${finished}`,
+      '&action=reports',
+      '&action=reports&view=events&order=least',
+      '&action=reports&view=regions&region=Sydney',
+      '&action=reports&view=costumes&role=trooper&from=2020-01-01&to=2030-12-31',
+      // Nothing counted in the range: the empty report is a render of its own.
+      '&action=reports&from=1999-01-01&to=1999-12-31',
       '&action=settings',
       '&action=settings&region_action=add',
       // One region with events behind it (the confirmation asks where they go) and one

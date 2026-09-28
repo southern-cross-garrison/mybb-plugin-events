@@ -13,6 +13,7 @@ require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
 // Reading, validating and writing an event is shared with manage_event.php on the front
 // end, so the two forms cannot disagree about what is valid. This module only renders.
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_form.php";
+require_once MYBB_ROOT . "inc/plugins/events/inc/events_attendance.php";
 
 function events_admin_list_events()
 {
@@ -463,6 +464,9 @@ function events_admin_delete_event()
     $db->delete_query("event_plugin_event_days", "event_id = " . $event_id);
     $db->delete_query("event_plugin_event_exclusions", "event_id = " . $event_id);
     $db->delete_query("event_plugin_troop_reports", "event_id = " . $event_id);
+    // Its attendance goes too: the reports read an event's date and region off the event,
+    // so rows left behind would count a troop that no report can place anywhere.
+    events_delete_event_attendance($event_id);
     $db->delete_query("event_plugin_events", "id = " . $event_id);
 
     events_log_action('delete', array($event_id, $event['title']));

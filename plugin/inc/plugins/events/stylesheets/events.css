@@ -1251,3 +1251,28 @@ a.events_feed_split_main:hover, .events_feed_split_toggle:hover { filter: bright
 	}
 	.events_page_wrap table.tborder { border-collapse: collapse; width: 100%; }
 }
+
+/* ---------------------------------------------------------------------------
+ * My Troops (usercp.php?action=events_troops)
+ *
+ * The charts themselves are styled by jscripts/events/events-charts.css, which the Admin
+ * CP's Reports tab shares; this is only the page around them.
+ * ------------------------------------------------------------------------ */
+.events_troops_facts {
+	display: grid;
+	grid-template-columns: max-content 1fr;
+	gap: 4px 12px;
+	margin: 0 0 16px;
+}
+.events_troops_facts dt { font-weight: 600; }
+.events_troops_facts dd { margin: 0; }
+
+.events_troops_history { width: 100%; border-collapse: collapse; }
+.events_troops_history th { text-align: left; }
+.events_troops_history td { vertical-align: top; }
+
+/* The history is five narrow columns; below a phone's width the region and the costumes
+   are what give way, since the event and its date are what the row is. */
+@media (max-width: 480px) {
+	.events_troops_history :is(th, td):nth-child(3) { display: none; }
+}

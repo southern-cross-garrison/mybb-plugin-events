@@ -53,9 +53,10 @@ $page->output_header("Event Management");
 $page->output_nav_tabs(array(
     'events'   => array('title' => 'Events', 'link' => 'index.php?module=events', 'description' => 'Create and manage events'),
     'rsvps'    => array('title' => 'RSVPs', 'link' => 'index.php?module=events&amp;action=rsvps', 'description' => 'Review who is attending'),
+    'reports'  => array('title' => 'Reports', 'link' => 'index.php?module=events&amp;action=reports', 'description' => 'Who troops, what, and where'),
     'settings' => array('title' => 'Settings', 'link' => 'index.php?module=events&amp;action=settings', 'description' => 'Configure the plugin'),
     'support'  => array('title' => 'Support', 'link' => 'index.php?module=events&amp;action=support', 'description' => 'Who made the plugin and how it is licensed'),
-), in_array($events_action, array('rsvps', 'settings', 'support')) ? $events_action : 'events');
+), in_array($events_action, array('rsvps', 'reports', 'settings', 'support')) ? $events_action : 'events');
 
 switch($events_action)
 {
@@ -67,6 +68,11 @@ switch($events_action)
     case 'rsvps':
         require_once MYBB_ROOT . "inc/plugins/events/admin/events_admin_rsvps.php";
         events_admin_rsvps();
+        break;
+
+    case 'reports':
+        require_once MYBB_ROOT . "inc/plugins/events/admin/events_admin_reports.php";
+        events_admin_reports();
         break;
 
     case 'support':

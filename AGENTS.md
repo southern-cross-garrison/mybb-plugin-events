@@ -155,10 +155,11 @@ baseline picks the change up.
 - Forms use the plugin's own `.events_label` / `.events_input` / `.events_hint` /
   `.events_option` classes, never MyBB's `.form_row`, which puts the label, control and
   hint on one line and leaves the control unstyled.
-- The print ribbon's logo is the one place the plugin writes an inline `style` attribute,
-  and it is passing a value rather than styling: the URL goes over as a
-  `--events-print-logo` custom property and `events.css` paints it as a background image
-  inside `@media print`. An `<img>` would be fetched on every page view even though the
+- The print ribbon's logo and the attendance charts' marks are the only places the plugin
+  writes an inline `style` attribute, and both pass a value rather than styling: the logo URL
+  goes over as a `--events-print-logo` custom property and `events.css` paints it as a
+  background image inside `@media print`, and a chart mark's size goes over as
+  `--events-chart-at`, which `events-charts.css` turns into a height, width or position. An `<img>` would be fetched on every page view even though the
   ribbon is `display: none` on screen, `loading="lazy"` included.
 - Printing is handled entirely in `events.css`, and it works by keeping `.events_page_wrap`
   and the ancestors holding it in the document and hiding every other element. That is
@@ -425,6 +426,50 @@ baseline picks the change up.
   that the exclusion hooks therefore never hide). The body is `events_write_event_thread()`. `tests/helpers/double-submit.ts` fires overlapping submits from the page. The
   signup race only loses some of the time, so one passing run of a test like that proves
   little.
+- Troop attendance (`events_attendance.php`) is counted from the report's *first post*,
+  never from the form that posted it, so posting and editing reach it by the same path.
+  Posting is `events_post_troop_report()` (`events_troop_report.php`), which
+  `troop_report.php` and `scripts/seed-demo.php` both call. Do not post a report any other
+  way, or it counts nobody. Editing is `events_troop_report_edited()` on
+  `datahandler_post_update_end`. That hook sees every post edit, the plugin's own
+  announcement rewrites included, so it bails out on one indexed lookup unless the post is
+  the first post of a posted report's thread. It is registered at file level in
+  `events.php`, beside the member-deletion hook, rather than in `events_register_hooks()`.
+  Counting holds the report's lock (`'troop_report:'.id`), so the posting path calls
+  `events_write_troop_attendance()`, the unlocked body, because it already holds the lock.
+
+- A recount replaces the rows of members who still exist and keeps everybody else's. A
+  deleted member's signup is gone, so nothing could rebuild their row, and their troops
+  still happened. `events_delete_member_data()` deliberately leaves attendance alone, and
+  every statistic `LEFT JOIN`s `users` and names a missing member "[deleted user]". The
+  percentile on My Troops is the exception: it joins `users` and leaves them out.
+
+- The matching rule is `events_attendance_matches()` and nothing else. The username is
+  matched case-sensitively as a whole word, and a trooper with a Legion ID on file must
+  also have its digits appear as a standalone number. The report text is
+  `events_attendance_text()` - the parsed post with entities decoded - so a name inside
+  BBCode, or one the draft escaped with `&#91;`, still matches. A change to the draft's
+  roll call (`events_troop_report_roster_line()`) that drops the username or the ID stops
+  a drafted report counting anybody, and `troop-attendance.spec.ts` posts the draft as it
+  comes to catch exactly that. Costumes are a snapshot taken at count time; date and region
+  are joined from the event, so a region rename needs nothing here.
+
+- MyBB's Admin CP `generate_select_box()` writes each option's key into `value=""` as it
+  is, and compares the selection with the key as it is. A select whose keys are
+  board-supplied text - a region - needs its keys *and* its selected value passed through
+  `htmlspecialchars_uni()`. The event form's region select and the Reports filter both do
+  this. Escape only the labels and a quote in a region breaks out of the attribute; escape
+  the keys but not the selection and the filter silently shows "All regions" while
+  applying the region. `field-escaping.spec.ts` resubmits the Reports filter to catch both.
+
+- The attendance charts (`events_charts.php`) are HTML and CSS, not SVG and not a script:
+  they are drawn in the Admin CP and the User CP, read with the script off, and keep their
+  text at text size on a phone. Their sheet is `jscripts/events/events-charts.css`, linked
+  from both roots - through `events_admin_assets()` in the Admin CP and from the
+  `events_usercp_troops` template on the front end - and tinted from `--events-accent`
+  (troopers) and `--events-wrangle` (wranglers), the same pair the event card's turnout
+  dots use.
+
 - Maximum troopers and wranglers work on one rule: a *place* is a role on one day (or on
   the whole event, for an event with no days), its queue is every claim on it ordered by
   `claimed_at` (ties within the second by the claim's own `id`, never the signup's), and the first `max` of the queue are attending and the rest waitlisted.
