@@ -167,6 +167,69 @@ a.events_region_add:focus {
 	font-weight: bold;
 }
 
+/* ------------------------------------------------------------ the nudge ----- */
+
+/* Built from the Admin CP's own classes - a .border_wrapper with its blue title, a
+   form_container table, a form_button_wrapper of submit_buttons - so it looks like the
+   rest of the Admin CP. These rules only frame it the way MyBB's own jQuery dialogs
+   (modal.css) are framed, and size the fields to the dialog. */
+.events_nudge_dialog {
+	position: relative;
+	box-sizing: border-box;
+	width: 640px;
+	max-width: 100%;
+	max-height: calc(100vh - 32px);
+	overflow-y: auto;
+	padding: 10px;
+	background: #fff;
+	border-radius: 8px;
+	box-shadow: 0 0 10px #000;
+}
+
+#events_nudge_modal .events_modal_backdrop {
+	background-color: rgba(0, 0, 0, 0.75);
+}
+
+.events_nudge_dialog .border_wrapper {
+	margin-bottom: 0;
+}
+
+/* The table's cells are centred by table.general; a form row reads left to right. */
+.events_nudge_dialog table.general td {
+	text-align: left;
+}
+
+.events_nudge_dialog tr[hidden] {
+	display: none;
+}
+
+.events_nudge_dialog .alert {
+	margin: 4px 0;
+}
+
+.events_nudge_dialog input.submit_button:disabled {
+	opacity: 0.5;
+	cursor: not-allowed;
+}
+
+/* The Admin CP's flat 300px text box and 400px textarea, widened to the space they sit
+   in - on the page, a form row; in the dialog, the dialog. */
+.events_nudge_dialog input.text_input,
+input.events_nudge_subject,
+textarea.events_nudge_message {
+	box-sizing: border-box;
+	width: 100%;
+}
+
+textarea.events_nudge_message {
+	line-height: 1.45;
+	resize: vertical;
+}
+
+.events_nudge_dialog textarea.events_nudge_message {
+	max-height: 50vh;
+}
+
 /* ---------------------------------------------- the day-change warning ----- */
 
 /* The stand-in for the Save button, there only so that Enter in a field is not taken as

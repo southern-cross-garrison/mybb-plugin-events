@@ -300,13 +300,15 @@ function events_attendance_from()
 }
 
 /**
- * The headline numbers.
+ * The totals every view's headline is drawn from.
  *
  * A troop is one member at one event, so a member who both trooped and wrangled the same
- * event is one troop, not two.
+ * event is one troop, not two. A costume is counted once per signup that listed it - a
+ * member who brought two to one troop wore both.
  *
  * @param array $filters
- * @return array troops, events, members, costumes
+ * @return array troops, events, members, regions, costumes (distinct), worn (times),
+ *               costumed (members with a costume counted)
  */
 function events_attendance_summary(array $filters)
 {
@@ -317,69 +319,287 @@ function events_attendance_summary(array $filters)
     $row = $db->fetch_array($db->query("
         SELECT COUNT(DISTINCT a.event_id, a.user_id) AS troops,
                COUNT(DISTINCT a.event_id) AS events,
-               COUNT(DISTINCT a.user_id) AS members
+               COUNT(DISTINCT a.user_id) AS members,
+               COUNT(DISTINCT e.region) AS regions
         FROM " . events_attendance_from() . "
         WHERE {$where}
     "));
 
-    $costumes = $db->fetch_field($db->query("
-        SELECT COUNT(DISTINCT c.costume) AS costumes
+    $costumes = $db->fetch_array($db->query("
+        SELECT COUNT(DISTINCT c.costume) AS costumes, COUNT(*) AS worn, COUNT(DISTINCT a.user_id) AS costumed
         FROM " . events_attendance_from() . "
         INNER JOIN " . TABLE_PREFIX . "event_plugin_attendance_costumes c ON c.attendance_id = a.id
         WHERE {$where}
-    "), 'costumes');
+    "));
 
     return array(
         'troops'   => (int)$row['troops'],
         'events'   => (int)$row['events'],
         'members'  => (int)$row['members'],
-        'costumes' => (int)$costumes,
+        'regions'  => (int)$row['regions'],
+        'costumes' => (int)$costumes['costumes'],
+        'worn'     => (int)$costumes['worn'],
+        'costumed' => (int)$costumes['costumed'],
     );
 }
 
 /**
- * Attendance per calendar month, by role.
+ * The headline cards for a report view: what that view counts, how much of it there is,
+ * the average and the one at the top.
  *
- * Every month in the range is returned, empty ones included, so a chart of it has no
- * gaps to misread. The range is the filter's where it has one and the data's where it
- * does not, and is cut to the latest $max_months so a long history stays legible.
+ * "At the top" is always the most, whichever way round the view is sorted - it is the
+ * headline, and the least is the first row of the table anyway.
  *
+ * @param string $view people|events|regions|costumes
+ * @param array $filters
+ * @param array $summary from events_attendance_summary()
+ * @return array id => array(label, value, note), for events_chart_tiles()
+ */
+function events_attendance_headline($view, array $filters, array $summary)
+{
+    $top = events_attendance_report($view, $filters, false, 0, 1);
+    $top = $top ? $top[0] : null;
+
+    $average = function($of, $per)
+    {
+        return $per > 0 ? round($of / $per, 1) : 0;
+    };
+
+    switch($view)
+    {
+        case 'events':
+            return array(
+                'events'  => array('Events reported', $summary['events']),
+                'troops'  => array('Troops', $summary['troops']),
+                'average' => array('Average turnout', $average($summary['troops'], $summary['events']), 'per event'),
+                'top'     => array('Best attended', $top ? $top['title'] : '-', $top ? events_attendance_noun((int)$top['attended'], 'attended', 'attended') : ''),
+            );
+
+        case 'regions':
+            return array(
+                'regions' => array('Regions', $summary['regions']),
+                'events'  => array('Events reported', $summary['events']),
+                'troops'  => array('Troops', $summary['troops']),
+                'top'     => array('Busiest region', $top ? $top['region'] : '-', $top ? events_attendance_noun((int)$top['troops'], 'troop', 'troops') : ''),
+            );
+
+        case 'costumes':
+            return array(
+                'costumes' => array('Costumes worn', $summary['costumes']),
+                'worn'     => array('Times worn', $summary['worn']),
+                'members'  => array('Members in costume', $summary['costumed']),
+                'top'      => array('Most worn', $top ? $top['costume'] : '-', $top ? events_attendance_noun((int)$top['worn'], 'time', 'times') : ''),
+            );
+
+        default:
+            return array(
+                'members' => array('Members trooping', $summary['members']),
+                'troops'  => array('Troops', $summary['troops']),
+                'average' => array('Average', $average($summary['troops'], $summary['members']), 'troops per member'),
+                'top'     => array('Most active', $top ? (($top['username'] !== null && $top['username'] !== '') ? $top['username'] : '[deleted user]') : '-',
+                                   $top ? events_attendance_noun((int)$top['troops'], 'troop', 'troops') : ''),
+            );
+    }
+}
+
+/**
+ * "1 troop", "4 troops".
+ *
+ * @param int $count
+ * @param string $one
+ * @param string $many
+ * @return string
+ */
+function events_attendance_noun($count, $one, $many)
+{
+    return my_number_format($count) . ' ' . ($count === 1 ? $one : $many);
+}
+
+/**
+ * How many named series a stacked month chart carries before the rest fold into "Other".
+ * Five is as many as the chart palette separates on a stack.
+ */
+define('EVENTS_ATTENDANCE_CHART_SERIES', 5);
+
+/**
+ * A report view's month-by-month chart: what it stacks, and the counts.
+ *
+ * - people:   members trooping each month, one series
+ * - events:   troops each month, troopers under wranglers
+ * - regions:  troops each month, one series per region
+ * - costumes: costumes worn each month, one series per costume
+ *
+ * Every month in the range is returned, empty ones included, so the chart has no gaps
+ * to misread. The range is the filter's where it has one and the data's where it does
+ * not, cut to the latest $max_months so a long history stays legible.
+ *
+ * A series keeps its colour whatever the filter: regions are coloured in the order the
+ * region list has them, and costumes by how often each has been worn across everything
+ * counted - not by where they rank in the selection, which would repaint a costume when
+ * a filter took the one above it out. Past the first few, the rest share one series.
+ *
+ * @param string $view
  * @param array $filters
  * @param int $max_months
- * @return array 'Y-m' => array('trooper' => int, 'wrangler' => int), oldest first
+ * @return array title, keys (key => array(label, class)), series ('Y-m' => key => int)
  */
-function events_attendance_by_month(array $filters, $max_months = 24)
+function events_attendance_by_month($view, array $filters, $max_months = 24)
 {
     global $db;
 
+    $month = "DATE_FORMAT(e.start_date, '%Y-%m')";
+    $where = events_attendance_where($filters);
+    $from = events_attendance_from();
+
+    switch($view)
+    {
+        case 'people':
+            $title = 'Members trooping per month';
+            $keys = array('members' => array('Members', 'events_chart_trooper'));
+            $sql = "SELECT {$month} AS month, 'members' AS series, COUNT(DISTINCT a.user_id) AS n FROM {$from} WHERE {$where} GROUP BY {$month}";
+            $classify = null;
+            break;
+
+        case 'regions':
+            $title = 'Troops per month by region';
+            $keys = events_attendance_series_keys(events_regions(), 'Other regions');
+            $sql = "SELECT {$month} AS month, e.region AS series, COUNT(DISTINCT a.event_id, a.user_id) AS n FROM {$from} WHERE {$where} GROUP BY {$month}, e.region";
+            $named = array_slice(events_regions(), 0, EVENTS_ATTENDANCE_CHART_SERIES);
+            $classify = function($name) use ($named)
+            {
+                $index = array_search($name, $named, true);
+                return $index === false ? 'other' : 's' . ($index + 1);
+            };
+            break;
+
+        case 'costumes':
+            $title = 'Costumes worn per month';
+            $named = events_attendance_leading_costumes(EVENTS_ATTENDANCE_CHART_SERIES);
+            $keys = events_attendance_series_keys($named, 'Other costumes');
+            $sql = "SELECT {$month} AS month, c.costume AS series, COUNT(*) AS n FROM {$from}
+                INNER JOIN " . TABLE_PREFIX . "event_plugin_attendance_costumes c ON c.attendance_id = a.id
+                WHERE {$where} GROUP BY {$month}, c.costume";
+            // The costume column compares case-insensitively, so GROUP BY may hand back a
+            // different casing than the ranking did.
+            $lookup = array();
+            foreach($named as $index => $name)
+            {
+                $lookup[mb_strtolower($name)] = 's' . ($index + 1);
+            }
+            $classify = function($name) use ($lookup)
+            {
+                $name = mb_strtolower($name);
+                return isset($lookup[$name]) ? $lookup[$name] : 'other';
+            };
+            break;
+
+        default:
+            $title = 'Troops per month';
+            $keys = array(
+                'trooper'  => array('Troopers', 'events_chart_trooper'),
+                'wrangler' => array('Wranglers', 'events_chart_wrangler'),
+            );
+            $sql = "SELECT {$month} AS month, a.role AS series, COUNT(*) AS n FROM {$from} WHERE {$where} GROUP BY {$month}, a.role";
+            $classify = null;
+    }
+
     $counts = array();
-    $query = $db->query("
-        SELECT DATE_FORMAT(e.start_date, '%Y-%m') AS month, a.role, COUNT(*) AS n
-        FROM " . events_attendance_from() . "
-        WHERE " . events_attendance_where($filters) . "
-        GROUP BY DATE_FORMAT(e.start_date, '%Y-%m'), a.role
-    ");
+    $totals = array();
+    $query = $db->query($sql);
     while($row = $db->fetch_array($query))
     {
-        $counts[$row['month']][$row['role']] = (int)$row['n'];
+        $key = $classify ? $classify($row['series']) : $row['series'];
+        $counts[$row['month']][$key] = (isset($counts[$row['month']][$key]) ? $counts[$row['month']][$key] : 0) + (int)$row['n'];
+        $totals[$key] = (isset($totals[$key]) ? $totals[$key] : 0) + (int)$row['n'];
+    }
+
+    // A stacked series with nothing in the selection has no business in the legend. Its
+    // class stays with it, so the rest keep their colours.
+    if($classify)
+    {
+        foreach(array_keys($keys) as $key)
+        {
+            if(empty($totals[$key]))
+            {
+                unset($keys[$key]);
+            }
+        }
     }
 
     $first = !empty($filters['from']) ? substr($filters['from'], 0, 7) : ($counts ? min(array_keys($counts)) : '');
     $last = !empty($filters['to']) ? substr($filters['to'], 0, 7) : ($counts ? max(array_keys($counts)) : '');
 
-    return events_attendance_month_series($counts, $first, $last, $max_months);
+    return array(
+        'title'  => $title,
+        'keys'   => $keys,
+        'series' => events_attendance_month_series($counts, $first, $last, $max_months, array_keys($keys)),
+    );
 }
 
 /**
- * Fill in the months between two, oldest first.
+ * The series of a stacked chart: the named ones in the order given, each on its own
+ * palette slot, then the rest folded together.
  *
- * @param array $counts 'Y-m' => array(role => int)
+ * The fold is labelled with what it holds ("Other regions") rather than a bare "Other",
+ * because the default region list has a region called Other.
+ *
+ * @param string[] $names
+ * @param string $other_label
+ * @return array key => array(label, class)
+ */
+function events_attendance_series_keys(array $names, $other_label)
+{
+    $keys = array();
+    foreach(array_slice(array_values($names), 0, EVENTS_ATTENDANCE_CHART_SERIES) as $index => $name)
+    {
+        $keys['s' . ($index + 1)] = array($name, 'events_chart_series_' . ($index + 1));
+    }
+    $keys['other'] = array($other_label, 'events_chart_series_other');
+
+    return $keys;
+}
+
+/**
+ * The costumes worn most across everything counted, most first.
+ *
+ * Deliberately unfiltered: it decides which costumes get a colour of their own on the
+ * costume chart, and a colour that moved with the filter would say a different costume
+ * was the blue one from one selection to the next.
+ *
+ * @param int $limit
+ * @return string[]
+ */
+function events_attendance_leading_costumes($limit)
+{
+    global $db;
+
+    $names = array();
+    $query = $db->query("
+        SELECT c.costume, COUNT(*) AS worn
+        FROM " . TABLE_PREFIX . "event_plugin_attendance_costumes c
+        GROUP BY c.costume
+        ORDER BY worn DESC, c.costume ASC
+        LIMIT " . (int)$limit . "
+    ");
+    while($row = $db->fetch_array($query))
+    {
+        $names[] = $row['costume'];
+    }
+
+    return $names;
+}
+
+/**
+ * Fill in the months between two, oldest first, with a count for every series in each.
+ *
+ * @param array $counts 'Y-m' => array(series => int)
  * @param string $first Y-m
  * @param string $last Y-m
  * @param int $max_months
+ * @param string[] $keys The series each month carries
  * @return array
  */
-function events_attendance_month_series(array $counts, $first, $last, $max_months)
+function events_attendance_month_series(array $counts, $first, $last, $max_months, array $keys)
 {
     $series = array();
     if($first === '' || $last === '' || $first > $last)
@@ -397,10 +617,10 @@ function events_attendance_month_series(array $counts, $first, $last, $max_month
     while($month <= $end)
     {
         $key = $month->format('Y-m');
-        $series[$key] = array(
-            'trooper'  => isset($counts[$key]['trooper']) ? $counts[$key]['trooper'] : 0,
-            'wrangler' => isset($counts[$key]['wrangler']) ? $counts[$key]['wrangler'] : 0,
-        );
+        foreach($keys as $name)
+        {
+            $series[$key][$name] = isset($counts[$key][$name]) ? $counts[$key][$name] : 0;
+        }
         $month->modify('+1 month');
     }
 
@@ -697,7 +917,7 @@ function events_attendance_member($uid)
         'top_costumes' => $top,
         'costumes'     => $costumes,
         'history'      => array_values($history),
-        'months'       => events_attendance_month_series($by_month, $first->format('Y-m'), $this_month, 12),
+        'months'       => events_attendance_month_series($by_month, $first->format('Y-m'), $this_month, 12, array('trooper', 'wrangler')),
     );
 }
 
@@ -801,7 +1021,10 @@ function events_usercp_troops_body($uid)
     }
     $html .= '</dl>';
 
-    $html .= events_chart_months($member['months'], 'Troops in the last 12 months', 'events_chart_my_months');
+    $html .= events_chart_months($member['months'], array(
+        'trooper'  => array('Troopers', 'events_chart_trooper'),
+        'wrangler' => array('Wranglers', 'events_chart_wrangler'),
+    ), 'Troops in the last 12 months', 'events_chart_my_months');
 
     $bars = array();
     foreach(array_slice($member['costumes'], 0, 10, true) as $costume => $times)

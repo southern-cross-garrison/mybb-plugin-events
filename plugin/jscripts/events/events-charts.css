@@ -54,6 +54,16 @@
 	line-height: 1.2;
 }
 
+/* A headline that names something - the best attended event, the busiest region - can
+   run long; it wraps to two lines at most rather than stretching its card. */
+.events_stat_value {
+	overflow-wrap: anywhere;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+}
+
 /* Every chart */
 .events_chart {
 	margin: 0 0 20px;
@@ -89,6 +99,18 @@
 
 .events_chart_trooper { background: var(--events-chart-trooper); }
 .events_chart_wrangler { background: var(--events-chart-wrangler); }
+
+/* The stacked charts that split by region or by costume. Five named slots, in an order
+   whose neighbours stay apart under the common kinds of colour blindness, then a grey
+   "Other" for the rest. Three of the five are lighter than 3:1 against the page, which
+   is why these charts always carry a legend and sit above the table of the same numbers.
+   A theme can recolour any slot with --events-chart-series-N. */
+.events_chart_series_1 { background: var(--events-chart-series-1, #2a78d6); }
+.events_chart_series_2 { background: var(--events-chart-series-2, #eb6834); }
+.events_chart_series_3 { background: var(--events-chart-series-3, #1baf7a); }
+.events_chart_series_4 { background: var(--events-chart-series-4, #eda100); }
+.events_chart_series_5 { background: var(--events-chart-series-5, #e87ba4); }
+.events_chart_series_other { background: var(--events-chart-series-other, #b4b2ab); }
 
 /* Columns: troops per month */
 .events_chart_plot {

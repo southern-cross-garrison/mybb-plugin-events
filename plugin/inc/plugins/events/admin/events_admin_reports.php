@@ -17,6 +17,7 @@ require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_form.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_attendance.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_charts.php";
+require_once MYBB_ROOT . "inc/plugins/events/admin/events_admin_nudge.php";
 
 /**
  * @return array view => label
@@ -60,6 +61,12 @@ function events_admin_reports()
     $page_num = max(1, $mybb->get_input('page', MyBB::INPUT_INT));
     $start = ($page_num - 1) * $per_page;
 
+    // A nudge comes back to the report it was sent from, filtered and paged as it was.
+    if(events_admin_nudge_action(events_admin_report_url($view, $ascending, $filters, $page_num)))
+    {
+        return;
+    }
+
     // The filter form
     // MyBB's select box writes each key into value="" as it is and compares the selection
     // with it the same way, so the key is escaped here and so is what is selected - as the
@@ -101,17 +108,13 @@ function events_admin_reports()
     echo events_datepicker_assets('../jscripts/events/');
     echo events_datepicker_script();
 
-    // The headline numbers and the month-by-month shape cover the whole filter, whatever
-    // the view; the ranking chart and the table are the view's.
+    // The headline cards and the month-by-month chart are the view's own: the People
+    // view counts members, the Costumes view counts costumes. All of it covers the whole
+    // filter, not the page of the table below.
     $summary = events_attendance_summary($filters);
 
     echo '<div id="events_reports">';
-    echo events_chart_tiles(array(
-        'troops'   => array('Troops', $summary['troops']),
-        'events'   => array('Events reported', $summary['events']),
-        'members'  => array('Members trooping', $summary['members']),
-        'costumes' => array('Costumes worn', $summary['costumes']),
-    ));
+    echo events_chart_tiles(events_attendance_headline($view, $filters, $summary));
 
     if($summary['troops'] === 0)
     {
@@ -123,7 +126,8 @@ function events_admin_reports()
         return;
     }
 
-    echo events_chart_months(events_attendance_by_month($filters), 'Troops per month', 'events_chart_by_month');
+    $by_month = events_attendance_by_month($view, $filters);
+    echo events_chart_months($by_month['series'], $by_month['keys'], $by_month['title'], 'events_chart_by_month');
 
     $total = events_attendance_count($view, $filters);
     $rows = events_attendance_report($view, $filters, $ascending, $start, $per_page);
@@ -132,17 +136,36 @@ function events_admin_reports()
     echo events_admin_report_chart($view, $chart_rows, $ascending);
 
     $function = 'events_admin_report_table_' . $view;
-    $function($rows);
+    $function($rows, htmlspecialchars_uni(events_admin_report_url($view, $ascending, $filters, $page_num)));
 
+    echo draw_admin_pagination($page_num, $per_page, $total, htmlspecialchars_uni(events_admin_report_url($view, $ascending, $filters)) . "&amp;page=");
+    echo '</div>';
+}
+
+/**
+ * The report as it is filtered, for paging it and for coming back to it.
+ *
+ * @param string $view
+ * @param bool $ascending
+ * @param array $filters from events_attendance_filters()
+ * @param int $page_num 1 leaves the page off
+ * @return string Unescaped
+ */
+function events_admin_report_url($view, $ascending, array $filters, $page_num = 1)
+{
     $query = array('view' => $view, 'order' => $ascending ? 'least' : 'most') + array_filter($filters, 'strlen');
-    $url = "index.php?module=events&amp;action=reports";
-    foreach($query as $key => $value)
+    if($page_num > 1)
     {
-        $url .= "&amp;" . $key . "=" . urlencode($value);
+        $query['page'] = (int)$page_num;
     }
 
-    echo draw_admin_pagination($page_num, $per_page, $total, $url . "&amp;page=");
-    echo '</div>';
+    $url = "index.php?module=events&action=reports";
+    foreach($query as $key => $value)
+    {
+        $url .= "&" . $key . "=" . urlencode($value);
+    }
+
+    return $url;
 }
 
 /**
@@ -243,18 +266,22 @@ function events_admin_report_member_name(array $row)
 
 /**
  * @param array $rows
+ * @param string $report_url The report as it is filtered, escaped for HTML
  */
-function events_admin_report_table_people(array $rows)
+function events_admin_report_table_people(array $rows, $report_url)
 {
     global $mybb;
 
+    $nudges = events_admin_nudge_links($rows, $report_url);
+
     $table = new Table;
-    $table->construct_header("Member", array("width" => "22%"));
-    $table->construct_header("Troops", array("width" => "10%", "class" => "align_center"));
-    $table->construct_header("As Trooper", array("width" => "10%", "class" => "align_center"));
-    $table->construct_header("As Wrangler", array("width" => "10%", "class" => "align_center"));
-    $table->construct_header("Most Worn", array("width" => "22%"));
-    $table->construct_header("Last Troop", array("width" => "26%"));
+    $table->construct_header("Member", array("width" => "20%"));
+    $table->construct_header("Troops", array("width" => "9%", "class" => "align_center"));
+    $table->construct_header("As Trooper", array("width" => "9%", "class" => "align_center"));
+    $table->construct_header("As Wrangler", array("width" => "9%", "class" => "align_center"));
+    $table->construct_header("Most Worn", array("width" => "20%"));
+    $table->construct_header("Last Troop", array("width" => "25%"));
+    $table->construct_header("", array("width" => "8%", "class" => "align_center"));
 
     foreach($rows as $row)
     {
@@ -277,10 +304,16 @@ function events_admin_report_table_people(array $rows)
         $table->construct_cell((int)$row['as_wrangler'], array("class" => "align_center"));
         $table->construct_cell(htmlspecialchars_uni($row['top_costume']));
         $table->construct_cell($last);
+        $table->construct_cell(isset($nudges[(int)$row['user_id']]) ? $nudges[(int)$row['user_id']] : '', array("class" => "align_center"));
         $table->construct_row(array("class" => "events_report_row"));
     }
 
     $table->output("People");
+
+    if($nudges)
+    {
+        events_admin_output_nudge_modal($report_url);
+    }
 }
 
 /**

@@ -325,6 +325,28 @@ $handler->delete_user(array(${throwaway}));
       return (await page.locator('.events_report_row .events_report_member').allTextContents()).map((text) => text.trim());
     }
 
+    /** Each headline card's label, value and note, joined with " | ". */
+    async function headline(page: Page): Promise<string[]> {
+      return page.locator('.events_stat_tile').evaluateAll((tiles) =>
+        tiles.map((tile) =>
+          [...tile.children].map((part) => (part.textContent ?? '').trim()).join(' | '),
+        ),
+      );
+    }
+
+    /** The month chart: its title, its legend, and the sum of every column. */
+    async function monthChart(page: Page): Promise<{ title: string; legend: string[]; total: number }> {
+      const chart = page.locator('#events_chart_by_month');
+      const title = ((await chart.locator('.events_chart_title').textContent()) ?? '').trim();
+      const legend = (await chart.locator('.events_chart_key').allTextContents()).map((text) => text.trim());
+      const tips = await chart.locator('.events_chart_column').evaluateAll((columns) => columns.map((column) => column.getAttribute('title') ?? ''));
+      // "Sep 2026: TK - Stormtrooper 2, TD - Sandtrooper 1", or "Sep 2026: 3" for one series.
+      const total = tips
+        .flatMap((tip) => [...tip.replace(/^[A-Z][a-z]{2} \d{4}:/, '').matchAll(/(\d+)(?:,|$)/g)].map((match) => Number(match[1])))
+        .reduce((sum, n) => sum + n, 0);
+      return { title, legend, total };
+    }
+
     async function counts(page: Page): Promise<string[]> {
       return (await page.locator('.events_report_row .events_report_count').allTextContents()).map((text) => text.trim());
     }
@@ -332,12 +354,17 @@ $handler->delete_user(array(${throwaway}));
     test('rank people, events, regions and costumes, most and least first', async ({ page }) => {
       await loginToAdminCp(page);
 
+      // Each view's cards and month chart count what that view is about.
       await gotoEventsAdmin(page, '&action=reports');
-      await expect(page.locator('#events_stat_troops .events_stat_value')).toHaveText('7');
-      await expect(page.locator('#events_stat_events .events_stat_value')).toHaveText('3');
-      await expect(page.locator('#events_stat_members .events_stat_value')).toHaveText('4');
-      await expect(page.locator('#events_stat_costumes .events_stat_value')).toHaveText('3');
-      await expect(page.locator('#events_chart_by_month')).toBeVisible();
+      expect(await headline(page)).toEqual([
+        'Members trooping | 4',
+        'Troops | 7',
+        'Average | 1.8 | troops per member',
+        'Most active | trooper1 | 3 troops',
+      ]);
+      // One series, so no legend: the title says what it is. Four members in the first
+      // month, two in the second, one in the third.
+      expect(await monthChart(page)).toEqual({ title: 'Members trooping per month', legend: [], total: 7 });
 
       expect((await column(page)).slice(0, 2)).toEqual(['trooper1', 'gec']);
       expect(await counts(page)).toEqual(['3', '2', '1', '1']);
@@ -347,6 +374,13 @@ $handler->delete_user(array(${throwaway}));
       expect(await counts(page)).toEqual(['1', '1', '2', '3']);
 
       await gotoEventsAdmin(page, '&action=reports&view=events');
+      expect(await headline(page)).toEqual([
+        'Events reported | 3',
+        'Troops | 7',
+        'Average turnout | 2.3 | per event',
+        'Best attended | Report Sydney Parade | 4 attended',
+      ]);
+      expect(await monthChart(page)).toEqual({ title: 'Troops per month', legend: ['Troopers', 'Wranglers'], total: 7 });
       expect(await column(page)).toEqual(['Report Sydney Parade', 'Report Hunter Fete', 'Report Sydney Hospital']);
       expect(await counts(page)).toEqual(['4', '2', '1']);
 
@@ -354,12 +388,47 @@ $handler->delete_user(array(${throwaway}));
       expect(await column(page)).toEqual(['Report Sydney Hospital', 'Report Hunter Fete', 'Report Sydney Parade']);
 
       await gotoEventsAdmin(page, '&action=reports&view=regions');
+      expect(await headline(page)).toEqual([
+        'Regions | 2',
+        'Events reported | 3',
+        'Troops | 7',
+        'Busiest region | Sydney | 5 troops',
+      ]);
+      // Coloured in region-list order, and only the regions with troops in the legend.
+      expect(await monthChart(page)).toEqual({ title: 'Troops per month by region', legend: ['Sydney', 'Hunter'], total: 7 });
+      await expect(page.locator('#events_chart_by_month .events_chart_key .events_chart_series_1')).toHaveCount(1);
       expect(await column(page)).toEqual(['Sydney', 'Hunter']);
       expect(await counts(page)).toEqual(['5', '2']);
 
       await gotoEventsAdmin(page, '&action=reports&view=costumes');
+      expect(await headline(page)).toEqual([
+        'Costumes worn | 3',
+        'Times worn | 6',
+        'Members in costume | 3',
+        `Most worn | ${TK} | 4 times`,
+      ]);
+      const costumes = await monthChart(page);
+      expect(costumes.title).toBe('Costumes worn per month');
+      expect(costumes.legend[0]).toBe(TK);
+      expect([...costumes.legend].sort()).toEqual([TK, TD, TB].sort());
+      expect(costumes.total).toBe(6);
       expect((await column(page))[0]).toBe(TK);
       expect(await counts(page)).toEqual(['4', '1', '1']);
+    });
+
+    test('a costume keeps its colour when a filter takes the costume above it out', async ({ page }) => {
+      await loginToAdminCp(page);
+
+      // Across everything TK is the most worn, so it is the first colour...
+      await gotoEventsAdmin(page, '&action=reports&view=costumes');
+      const slotOf = (costume: string) =>
+        page.locator('#events_chart_by_month .events_chart_key', { hasText: costume }).locator('.events_chart_swatch').getAttribute('class');
+      const tbSlot = await slotOf(TB);
+
+      // ...and in the Hunter fete, where TB was worn, TB keeps the colour it had.
+      await gotoEventsAdmin(page, '&action=reports&view=costumes&region=Hunter&role=trooper');
+      expect(await slotOf(TB)).toBe(tbSlot);
+      await expect(page.locator('#events_chart_by_month .events_chart_key')).toHaveCount(2);
     });
 
     test('filter by region, role and date', async ({ page }) => {
@@ -471,7 +540,7 @@ $handler->delete_user(array(${throwaway}));
     await expect(page.locator('#events_stat_troops .events_stat_value')).toHaveText('1');
     await expect(page.locator('#events_stat_members .events_stat_value')).toHaveText('1');
     const row = page.locator('.events_report_row', { hasText: 'trooper1' });
-    await expect(row.locator('td')).toHaveText(['trooper1', '1', '1', '1', TK, /Both Roles Troop/]);
+    await expect(row.locator('td')).toHaveText(['trooper1', '1', '1', '1', TK, /Both Roles Troop/, 'Nudge…']);
 
     await gotoEventsAdmin(page, '&action=reports&view=events');
     await expect(page.locator('.events_report_row .events_report_count')).toHaveText(['1']);

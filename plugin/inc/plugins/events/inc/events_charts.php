@@ -81,14 +81,20 @@ function events_chart_tiles(array $tiles)
 }
 
 /**
- * Troops per month, as columns stacked trooper under wrangler.
+ * A count per month, as columns stacked in the order the series are given - the first at
+ * the base.
  *
- * @param array $series 'Y-m' => array('trooper' => int, 'wrangler' => int), oldest first
+ * A single series needs no legend, since the title already says what it is; two or more
+ * always get one, so no series is told apart by its colour alone.
+ *
+ * @param array $series 'Y-m' => array(key => int), oldest first
+ * @param array $keys key => array(label, class), in stacking order - the class is the
+ *                    series' colour (events_chart_trooper, events_chart_series_1, ...)
  * @param string $title
  * @param string $id
  * @return string HTML, empty when there is nothing to chart
  */
-function events_chart_months(array $series, $title, $id)
+function events_chart_months(array $series, array $keys, $title, $id)
 {
     if(empty($series))
     {
@@ -99,8 +105,8 @@ function events_chart_months(array $series, $title, $id)
     $total = 0;
     foreach($series as $counts)
     {
-        $max = max($max, $counts['trooper'] + $counts['wrangler']);
-        $total += $counts['trooper'] + $counts['wrangler'];
+        $max = max($max, array_sum($counts));
+        $total += array_sum($counts);
     }
 
     if($total === 0)
@@ -128,15 +134,36 @@ function events_chart_months(array $series, $title, $id)
         $date = DateTime::createFromFormat('!Y-m', $month);
         $name = $date->format('M Y');
 
-        $tip = $name . ': ' . events_chart_count($counts['trooper'], 'trooper') . ', ' . events_chart_count($counts['wrangler'], 'wrangler');
-
+        // The tooltip names every series with anything in it, biggest first.
+        $parts = array();
         $segments = '';
-        foreach(array('trooper', 'wrangler') as $role)
+        foreach($keys as $key => $series_key)
         {
-            if($counts[$role] > 0)
+            $count = isset($counts[$key]) ? (int)$counts[$key] : 0;
+            if($count > 0)
             {
-                $segments .= '<span class="events_chart_segment events_chart_' . $role . '" style="--events-chart-at: ' . round($counts[$role] / $top * 100, 3) . '%"></span>';
+                $parts[$series_key[0]] = $count;
+                $segments .= '<span class="events_chart_segment ' . $series_key[1] . '" style="--events-chart-at: ' . round($count / $top * 100, 3) . '%"></span>';
             }
+        }
+        arsort($parts);
+        $tip = $name . ': ';
+        if(count($keys) === 1)
+        {
+            $tip .= my_number_format(array_sum($counts));
+        }
+        elseif($parts)
+        {
+            $described = array();
+            foreach($parts as $label => $count)
+            {
+                $described[] = $label . ' ' . my_number_format($count);
+            }
+            $tip .= implode(', ', $described);
+        }
+        else
+        {
+            $tip .= 'none';
         }
 
         $label = '';
@@ -157,10 +184,16 @@ function events_chart_months(array $series, $title, $id)
         $index++;
     }
 
-    $legend = '<div class="events_chart_legend">'
-        . '<span class="events_chart_key"><span class="events_chart_swatch events_chart_trooper"></span>Troopers</span>'
-        . '<span class="events_chart_key"><span class="events_chart_swatch events_chart_wrangler"></span>Wranglers</span>'
-        . '</div>';
+    $legend = '';
+    if(count($keys) > 1)
+    {
+        $legend = '<div class="events_chart_legend">';
+        foreach($keys as $series_key)
+        {
+            $legend .= '<span class="events_chart_key"><span class="events_chart_swatch ' . $series_key[1] . '"></span>' . htmlspecialchars_uni($series_key[0]) . '</span>';
+        }
+        $legend .= '</div>';
+    }
 
     return '<figure class="events_chart events_chart_months" id="' . htmlspecialchars_uni($id) . '">'
         . '<figcaption class="events_chart_title">' . htmlspecialchars_uni($title) . '</figcaption>'
@@ -216,16 +249,4 @@ function events_chart_bars(array $rows, $title, $id)
         . '<figcaption class="events_chart_title">' . htmlspecialchars_uni($title) . '</figcaption>'
         . '<ol class="events_chart_bar_list">' . $bars . '</ol>'
         . '</figure>';
-}
-
-/**
- * "3 troopers", "1 wrangler".
- *
- * @param int $count
- * @param string $role
- * @return string
- */
-function events_chart_count($count, $role)
-{
-    return my_number_format($count) . ' ' . $role . ($count === 1 ? '' : 's');
 }
