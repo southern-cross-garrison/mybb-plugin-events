@@ -435,8 +435,11 @@ An event's type is a troop unless the form says otherwise. A social event - a di
 barbecue, a movie night - is a plain signup sheet:
 
 - **One role.** Members sign up as attendees. There is no trooping or wrangling to choose
-  between, no costume step, and a multi-day social event still lets a member pick the days
-  they are coming.
+  between and no costume step, so a first signup to a one-day social event skips the
+  "are you attending?" question and opens on the confirmation (after asking for anything
+  missing), which says when and where. The question comes back when editing, where "Not
+  attending" is the other answer, and a multi-day social event still asks it, to let a
+  member pick the days they are coming.
 - **Nothing asked for but a name.** The signup asks for a preferred name (and the WWCC,
   if the event requires one). It does not ask for a mobile number, an emergency contact, a
   Legion ID or a costume.

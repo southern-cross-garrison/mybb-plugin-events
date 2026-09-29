@@ -315,6 +315,16 @@ $render = 'attendance';
 $missing = $withdrawing ? array() : events_check_prerequisites($event, null, $roles);
 $steps = events_signup_steps($roles, $missing, $costume_choice);
 
+// A first signup to a social event of one day has one answer to the attendance step -
+// "Attending" - so the wizard opens on whatever follows it instead, and the confirm step
+// says when and where. It is still asked when editing, where "Not attending" makes it a
+// question, and on a social event of several days, where the days are.
+$skip_attendance = $is_social && !$is_update && count($event_days) <= 1;
+if($skip_attendance)
+{
+    $render = events_signup_next_step('attendance', $roles, $missing, $costume_choice);
+}
+
 if($mybb->request_method === 'post')
 {
     verify_post_check($mybb->get_input('my_post_key'));
@@ -861,8 +871,26 @@ elseif($rsvp_step === 'confirm')
         )[$waitlist_extent];
     }
 
-    $rsvp_body = '<p><strong>Event:</strong> <span id="confirm_event">' . $event_title . '</span></p>'
-        . events_signup_summary_html($event_days, $role_days, 'confirm')
+    $rsvp_body = '<p><strong>Event:</strong> <span id="confirm_event">' . $event_title . '</span></p>';
+
+    // The attendance step is where when and where are said, so with it skipped they are
+    // said here instead.
+    if($skip_attendance)
+    {
+        $event_when = $event_days ? events_day_label(reset($event_days)) : events_format_when($event['start_date']);
+        if($event_when !== '')
+        {
+            $rsvp_body .= '<p><strong>When:</strong> <span id="confirm_when">' . $event_when . '</span></p>';
+        }
+
+        $address_link = events_address_link($event['address'], 'confirm_address_link');
+        if($address_link !== '')
+        {
+            $rsvp_body .= '<p><strong>Address:</strong> ' . $address_link . '</p>';
+        }
+    }
+
+    $rsvp_body .= events_signup_summary_html($event_days, $role_days, 'confirm')
         . events_signup_waitlist_html($event_days, $outcomes, 'confirm');
 
     if(!empty($selected_costumes))

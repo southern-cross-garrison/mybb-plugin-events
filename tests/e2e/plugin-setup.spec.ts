@@ -163,8 +163,15 @@ update_theme_stylesheet_list(${tid}, false, true);
     // thing that silently breaks every wrangler test. Assert it directly.
     const columns = await query(`SHOW COLUMNS FROM ${T('event_plugin_rsvps')} LIKE 'role'`);
     expect(columns).toHaveLength(1);
-    expect(String((columns[0] as any).Type)).toBe("enum('trooper','wrangler')");
+    // attendee is a social event's one role (upgrade 0002).
+    expect(String((columns[0] as any).Type)).toBe("enum('trooper','wrangler','attendee')");
     expect(String((columns[0] as any).Default)).toBe('trooper');
+
+    const type = await query(`SHOW COLUMNS FROM ${T('event_plugin_events')} WHERE Field IN ('event_type', 'max_attendees')`);
+    expect(type.map((row: any) => [row.Field, String(row.Type), String(row.Default)])).toEqual([
+      ['event_type', "enum('troop','social')", 'troop'],
+      ['max_attendees', 'int(10) unsigned', '0'],
+    ]);
 
     const index = await query(`SHOW INDEX FROM ${T('event_plugin_rsvps')} WHERE Key_name = 'event_user_role'`);
     expect(index.map((row: any) => row.Column_name)).toEqual(['event_id', 'user_id', 'role']);

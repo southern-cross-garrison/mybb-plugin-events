@@ -24,24 +24,6 @@ import {
  * so nobody is credited with trooping it.
  */
 
-/** Walk a social event's wizard to its confirmation and confirm. */
-async function attend(page: Page, eventId: number, prerequisites: Record<string, string> = {}) {
-  await page.goto(`/rsvp.php?id=${eventId}`);
-  await page.locator('#signup_role_attendee').check();
-  await page.locator('#rsvp_submit').click();
-
-  if ((await page.locator('#rsvp_page[data-rsvp-step="prerequisites"]').count()) > 0) {
-    for (const [field, value] of Object.entries(prerequisites)) {
-      await page.locator(`#prereq_${field}`).fill(value);
-    }
-    await page.locator('#rsvp_submit').click();
-  }
-
-  await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'confirm');
-  await page.locator('#rsvp_submit').click();
-  await expect(page.locator('#rsvp_success_message')).toBeVisible();
-}
-
 async function fillDateTime(page: Page, id: string, value: string) {
   const [date, time] = value.split(' ');
   await page.locator(`#${id}`).fill(date ?? '');
@@ -53,16 +35,9 @@ test.describe('signing up to a social event', () => {
     const eventId = await createEvent({ title: 'Garrison Barbecue', eventType: 'social' });
 
     // newbie has a costume on file and nothing else: no name, no numbers, no Legion ID.
+    // There is nothing to answer about attending, so the wizard opens on what is missing.
     await loginAs(page, 'newbie');
     await page.goto(`/rsvp.php?id=${eventId}`);
-
-    await expect(page.locator('#signup_role_label')).toHaveText('Are you attending?');
-    await expect(page.locator('input[name="signup_role"]')).toHaveCount(1);
-    await expect(page.locator('#signup_role_trooper')).toHaveCount(0);
-    await expect(page.locator('#signup_role_wrangler')).toHaveCount(0);
-
-    await page.locator('#signup_role_attendee').check();
-    await page.locator('#rsvp_submit').click();
 
     await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
     await expect(page.locator('#prereq_preferred_name')).toBeVisible();
@@ -87,6 +62,37 @@ test.describe('signing up to a social event', () => {
     expect(await getUserField('newbie', 'mobile')).toBe('');
   });
 
+  test('a first signup opens on the confirmation, which says when and where', async ({ page }) => {
+    const eventId = await createEvent({
+      title: 'Bowling Night',
+      eventType: 'social',
+      start: '2026-10-09 19:00:00',
+      end: '2026-10-09 22:00:00',
+      address: '1 Alley Rd, Sydney NSW 2000',
+    });
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'confirm');
+    await expect(page.locator('input[name="signup_role"][type="radio"]')).toHaveCount(0);
+    await expect(page.locator('#confirm_event')).toHaveText('Bowling Night');
+    await expect(page.locator('#confirm_when')).toContainText('9');
+    await expect(page.locator('.confirm_address_link')).toHaveText('1 Alley Rd, Sydney NSW 2000');
+    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_success_message')).toContainText('signed up to attend');
+    expect(await getSignupRoles(eventId, 'trooper1')).toEqual(['attendee']);
+
+    // Editing is where attending becomes a question: the answer can now be no.
+    await page.goto(`/rsvp.php?id=${eventId}`);
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'attendance');
+    await expect(page.locator('#signup_role_label')).toHaveText('Are you attending?');
+    await expect(page.locator('input[name="signup_role"]')).toHaveCount(2);
+    await expect(page.locator('#signup_role_attendee')).toBeChecked();
+    await expect(page.locator('#signup_role_none')).toBeVisible();
+    await expect(page.locator('#signup_role_trooper')).toHaveCount(0);
+  });
+
   test('a troop role cannot be posted to a social event', async ({ page }) => {
     const eventId = await createEvent({ title: 'Trivia Night', eventType: 'social' });
 
@@ -107,9 +113,11 @@ test.describe('signing up to a social event', () => {
     });
     await page.waitForLoadState();
 
-    // Read as the event's one role, which is all a social event can hold.
-    expect(await getSignupRoles(eventId, 'trooper1')).toEqual(['attendee']);
-    expect(await getRsvpCostumes(eventId, 'trooper1', 'attendee')).toEqual([]);
+    // A role the event does not take is no answer at all: nothing is saved, and the
+    // member is sent back to the question.
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'attendance');
+    await expect(page.locator('#rsvp_errors')).toContainText('Please choose how you will be attending.');
+    expect(await getSignupRoles(eventId, 'trooper1')).toEqual([]);
   });
 
   test('offers per-day attendance on an event of several days', async ({ page }) => {
@@ -156,9 +164,8 @@ test.describe('a social event with a cap', () => {
     await expect(page.locator('#event_capacity')).toHaveText('1 attendee');
 
     await page.goto(`/rsvp.php?id=${eventId}`);
-    await expect(page.locator('label:has(#signup_role_attendee)')).toContainText('full - join the waitlist');
-    await page.locator('#signup_role_attendee').check();
-    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'confirm');
+    await expect(page.locator('#confirm_waitlist')).toContainText('number 1 on the waitlist');
     await expect(page.locator('#rsvp_submit')).toHaveValue('Join the Waitlist');
     await page.locator('#rsvp_submit').click();
     await expect(page.locator('#rsvp_success')).toHaveAttribute('data-signup-mode', 'waitlist');
