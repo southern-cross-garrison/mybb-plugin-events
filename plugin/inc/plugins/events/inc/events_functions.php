@@ -495,23 +495,76 @@ function events_is_event_gec($event_id, $user_id = null)
 }
 
 /**
- * The two ways to sign up to an event.
+ * The kinds of event, token => label.
+ *
+ * A troop is what the plugin was built for: troopers in costume, wranglers helping, a
+ * troop report afterwards that is what credits everybody with the troop. A social event
+ * is a plain signup sheet - one list of attendees, who are asked for nothing a troop
+ * needs on the day, and no report, so nobody is credited with trooping it.
+ *
+ * @return array
+ */
+function events_event_types()
+{
+    return array('troop' => 'Troop', 'social' => 'Social');
+}
+
+/**
+ * An event's type. Read defensively: files deployed ahead of the activation that adds
+ * the column leave every row without the key, and every one of those is a troop.
+ *
+ * @param array $event
+ * @return string troop|social
+ */
+function events_event_type($event)
+{
+    return (is_array($event) && isset($event['event_type']) && $event['event_type'] === 'social') ? 'social' : 'troop';
+}
+
+/**
+ * @param array $event
+ * @return bool
+ */
+function events_is_social($event)
+{
+    return events_event_type($event) === 'social';
+}
+
+/**
+ * Every role a signup can be held in, whatever the event.
  *
  * A trooper turns out in costume. A wrangler is a non-costumed helper, who is not
- * required to be a full member and so has no Legion ID.
+ * required to be a full member and so has no Legion ID. An attendee is somebody coming
+ * to a social event, which has no roles to choose between.
+ *
+ * This is the list for anything that reads or clears signups whatever the event is (the
+ * queues, the rewrite of a signup). What one event can be signed up to is
+ * events_event_roles().
  *
  * @return array
  */
 function events_rsvp_roles()
 {
-    return array('trooper', 'wrangler');
+    return array('trooper', 'wrangler', 'attendee');
+}
+
+/**
+ * The roles one event takes signups in, in the order they are offered.
+ *
+ * @param array $event
+ * @return array
+ */
+function events_event_roles($event)
+{
+    return events_is_social($event) ? array('attendee') : array('trooper', 'wrangler');
 }
 
 /**
  * Normalise untrusted input to exactly one of the role tokens.
  *
  * Everything that reaches a query or a hidden input goes through here, so a role is
- * always provably one of two literals.
+ * always provably one of the literals. It says nothing about whether an event takes that
+ * role - see events_event_roles().
  *
  * @param string $input
  * @return string
@@ -527,7 +580,9 @@ function events_rsvp_role($input)
  */
 function events_role_label($role)
 {
-    return $role === 'wrangler' ? 'Wrangler' : 'Trooper';
+    $labels = array('trooper' => 'Trooper', 'wrangler' => 'Wrangler', 'attendee' => 'Attendee');
+
+    return isset($labels[$role]) ? $labels[$role] : 'Trooper';
 }
 
 /**
@@ -1251,6 +1306,36 @@ function events_rsvp_count($event_id, $role = 'trooper')
 }
 
 /**
+ * How many people hold a place in each role the event takes.
+ *
+ * @param array $event
+ * @return array role => count, in events_event_roles() order
+ */
+function events_signup_role_counts(array $event)
+{
+    $counts = array();
+    foreach(events_event_roles($event) as $role)
+    {
+        $counts[$role] = events_rsvp_count($event['id'], $role);
+    }
+
+    return $counts;
+}
+
+/**
+ * Does anybody hold a signup to this event, confirmed or waitlisted?
+ *
+ * @param int $event_id
+ * @return bool
+ */
+function events_event_has_signups($event_id)
+{
+    global $db;
+
+    return $db->num_rows($db->simple_select("event_plugin_rsvps", "id", "event_id = " . (int)$event_id, array('limit' => 1))) > 0;
+}
+
+/**
  * The whole of one member's signup to an event, keyed by role.
  *
  * A signup is up to two rows in event_plugin_rsvps - one per role - because a member can
@@ -1502,6 +1587,11 @@ function events_write_signup($event_id, $user_id, array $role_days, array $costu
     $queues = events_signup_queues($event_id);
     $now = $db->escape_string(events_date('Y-m-d H:i:s'));
 
+    // A role the event does not take is never written: a troop has no attendees and a
+    // social event no troopers. Left out of the intent, a role is dropped below like any
+    // other, so a signup can only ever end up holding what the event offers.
+    $role_days = $event ? array_intersect_key($role_days, array_flip(events_event_roles($event))) : array();
+
     foreach(events_rsvp_roles() as $role)
     {
         $held = isset($existing[$role]) ? $existing[$role] : null;
@@ -1587,7 +1677,8 @@ function events_write_signup($event_id, $user_id, array $role_days, array $costu
  */
 function events_event_cap(array $event, $role)
 {
-    $column = events_rsvp_role($role) === 'wrangler' ? 'max_wranglers' : 'max_troopers';
+    $columns = array('trooper' => 'max_troopers', 'wrangler' => 'max_wranglers', 'attendee' => 'max_attendees');
+    $column = $columns[events_rsvp_role($role)];
 
     return isset($event[$column]) ? max(0, (int)$event[$column]) : 0;
 }
@@ -1728,7 +1819,7 @@ function events_full_roles(array $event, $queues = null)
     }
 
     $full = array();
-    foreach(events_rsvp_roles() as $role)
+    foreach(events_event_roles($event) as $role)
     {
         $cap = events_event_cap($event, $role);
         if($cap === 0)
@@ -2185,7 +2276,10 @@ function events_check_prerequisites($event, $user_id = null, $roles = 'trooper')
     // Asked of a wrangler as well as a trooper: the username on the sheet is a forum
     // handle, and a coordinator calling the roll at a staging area needs the name the
     // person actually answers to.
-    $required = array('preferred_name', 'mobile', 'emergency_contact');
+    //
+    // A social event keeps only that. Nobody is on duty at one, so there is nobody who
+    // has to be reached on the day or whose next of kin a coordinator is answerable for.
+    $required = events_is_social($event) ? array('preferred_name') : array('preferred_name', 'mobile', 'emergency_contact');
     if(in_array('trooper', $roles, true))
     {
         // Costumes belong here for the same reason the Legion ID does: they are asked of
@@ -2676,7 +2770,8 @@ function events_get_troop_report($event_id)
  */
 function events_needs_troop_report($event)
 {
-    if(empty($event) || $event['status'] !== 'live' || !events_has_ended($event))
+    // A social event has no report to wait on.
+    if(empty($event) || events_is_social($event) || $event['status'] !== 'live' || !events_has_ended($event))
     {
         return false;
     }
@@ -2694,8 +2789,9 @@ function events_needs_troop_report($event)
 /**
  * May this user draft/post the troop report for the event?
  *
- * The event must have ended, the user must have attended as a trooper, and no report
- * may have been posted yet. Wranglers do not write troop reports.
+ * The event must be a troop that has ended, the user must have attended as a trooper,
+ * and no report may have been posted yet. Wranglers do not write troop reports, and
+ * nobody writes one for a social event.
  *
  * @param array $event
  * @param int|null $user_id
@@ -2703,7 +2799,7 @@ function events_needs_troop_report($event)
  */
 function events_can_create_troop_report($event, $user_id = null)
 {
-    if(!events_has_ended($event))
+    if(events_is_social($event) || !events_has_ended($event))
     {
         return false;
     }

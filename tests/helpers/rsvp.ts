@@ -1,6 +1,6 @@
 import { Page, expect } from '@playwright/test';
 
-export type SignupRole = 'trooper' | 'wrangler';
+export type SignupRole = 'trooper' | 'wrangler' | 'attendee';
 
 /**
  * Wait for a submitted step to land before the step probes below read the page.

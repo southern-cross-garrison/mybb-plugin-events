@@ -480,6 +480,18 @@ baseline picks the change up.
   rather than deleting and re-inserting them. Re-inserting on every save would send a member
   to the back of the waitlist for changing their costume.
 
+- An event is a troop or a social event (`event_type`), and the roles it takes follow from
+  that: `events_event_roles($event)` is trooper and wrangler for a troop and `attendee` alone
+  for a social event. `events_rsvp_roles()` is every role that exists, for code that reads or
+  clears signups whatever the event is (the queues, `events_write_signup()`), and
+  `events_rsvp_role()` only proves a value is *a* role, not one the event takes. Anything
+  that lists, counts or offers roles for one event iterates `events_event_roles()` - iterate
+  the other and a troop grows an Attendees count, or a social event a Troopers one. A social
+  event never has a troop report, so everything downstream of one (reminders, attendance,
+  the Reports tab, My Troops, the nudge) is a troop's alone; `events_is_social()` guards the
+  entry points. The type cannot change once an event has signups, since every signup would
+  be left in a role the event no longer takes.
+
 - On an event with days, a signup's own `rsvps.status` is kept in step with its claims
   (attending if any claim is), so every `status = 'attending'` read elsewhere means "going,
   at least in part" and needed no change. Anything that lists *days*, though, has to look at

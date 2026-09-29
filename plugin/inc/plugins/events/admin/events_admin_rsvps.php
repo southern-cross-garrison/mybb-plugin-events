@@ -66,90 +66,89 @@ function events_admin_rsvps()
         return;
     }
 
-    $attendees = array_merge(
-        events_get_attendees($event_id, array('costume' => $filter_costume, 'day' => $filter_day, 'role' => 'trooper')),
-        events_get_attendees($event_id, array('costume' => $filter_costume, 'day' => $filter_day, 'role' => 'wrangler'))
-    );
-
-    $table = new Table;
-    $table->construct_header("User", array("width" => "16%"));
-    $table->construct_header("Role", array("width" => "8%"));
-    $table->construct_header("Legion ID", array("width" => "12%"));
-    $table->construct_header("Costumes", array("width" => "26%"));
-    $table->construct_header("Days Attending", array("width" => "18%"));
-    $table->construct_header("Mobile", array("width" => "12%"));
-    $table->construct_header("RSVPed", array("width" => "12%"));
-
-    foreach($attendees as $attendee)
+    // Nobody at a social event is in costume, so there the costume filter would only ever
+    // empty the list, and the Legion ID and costume columns would only ever be blank.
+    $is_social = events_is_social($event);
+    if($is_social)
     {
-        $attended_day_ids = array();
-        foreach($attendee['days'] as $day)
-        {
-            $attended_day_ids[] = (int)$day['id'];
-        }
-        $days = events_day_labels($event_days, $attended_day_ids, 'short');
-
-        $table->construct_cell("<a href=\"index.php?module=user-users&amp;action=edit&amp;uid=" . $attendee['uid'] . "\">" . htmlspecialchars_uni($attendee['username']) . "</a>");
-        $table->construct_cell(events_role_label($attendee['role']));
-        $table->construct_cell(htmlspecialchars_uni($attendee['tk_id']));
-        $table->construct_cell(htmlspecialchars_uni(implode(', ', $attendee['costumes'])));
-        $table->construct_cell(htmlspecialchars_uni(implode(', ', $days)));
-        $table->construct_cell(htmlspecialchars_uni($attendee['mobile']));
-        $table->construct_cell(events_format_date($attendee['rsvp_date']));
-        $table->construct_row();
+        $filter_costume = '';
     }
 
-    if($table->num_rows() == 0)
+    $attendees = array();
+    $waiting = array();
+    foreach(events_event_roles($event) as $role)
     {
-        $table->construct_cell("No RSVPs found.", array("colspan" => 7));
-        $table->construct_row();
+        $filters = array('costume' => $filter_costume, 'day' => $filter_day, 'role' => $role);
+        $attendees = array_merge($attendees, events_get_attendees($event_id, $filters));
+        $waiting = array_merge($waiting, events_get_attendees($event_id, $filters + array('status' => 'waitlisted')));
     }
-
-    $table->output("RSVPs for: " . htmlspecialchars_uni($event['title']) . " (" . count($attendees) . ")");
 
     // The waitlist, in the order its places will be given out rather than by name.
-    $waiting = array();
-    foreach(events_rsvp_roles() as $role)
-    {
-        $waiting = array_merge($waiting, events_get_attendees($event_id, array(
-            'costume' => $filter_costume, 'day' => $filter_day, 'role' => $role, 'status' => 'waitlisted',
-        )));
-    }
     usort($waiting, function($a, $b) {
         $compared = strcmp($a['queued_at'], $b['queued_at']);
         return $compared !== 0 ? $compared : $a['rsvp_id'] - $b['rsvp_id'];
     });
 
-    if(!empty($waiting))
-    {
-        $waitlist = new Table;
-        $waitlist->construct_header("User", array("width" => "16%"));
-        $waitlist->construct_header("Role", array("width" => "8%"));
-        $waitlist->construct_header("Legion ID", array("width" => "12%"));
-        $waitlist->construct_header("Costumes", array("width" => "26%"));
-        $waitlist->construct_header("Days Waiting For", array("width" => "18%"));
-        $waitlist->construct_header("Mobile", array("width" => "12%"));
-        $waitlist->construct_header("Joined Waitlist", array("width" => "12%"));
-
-        foreach($waiting as $member)
-        {
-            $waiting_day_ids = array();
+    // One table for each list, the same columns in both. Each column is a header, its
+    // width, and what it says about one signup.
+    $columns = array(
+        'user'     => array("User", 16, function($member) {
+            return "<a href=\"index.php?module=user-users&amp;action=edit&amp;uid=" . $member['uid'] . "\">" . htmlspecialchars_uni($member['username']) . "</a>";
+        }),
+        'role'     => array("Role", 8, function($member) { return events_role_label($member['role']); }),
+        'tk_id'    => array("Legion ID", 12, function($member) { return htmlspecialchars_uni($member['tk_id']); }),
+        'costumes' => array("Costumes", 26, function($member) { return htmlspecialchars_uni(implode(', ', $member['costumes'])); }),
+        'days'     => array("Days Attending", 18, function($member) use ($event_days) {
+            $day_ids = array();
             foreach($member['days'] as $day)
             {
-                $waiting_day_ids[] = (int)$day['id'];
+                $day_ids[] = (int)$day['id'];
             }
+            return htmlspecialchars_uni(implode(', ', events_day_labels($event_days, $day_ids, 'short')));
+        }),
+        'mobile'   => array("Mobile", 12, function($member) { return htmlspecialchars_uni($member['mobile']); }),
+        'date'     => array("RSVPed", 12, function($member) { return events_format_date($member['rsvp_date']); }),
+    );
+    if($is_social)
+    {
+        unset($columns['tk_id'], $columns['costumes']);
+        $columns['user'][1] = 30;
+        $columns['days'][1] = 26;
+    }
 
-            $waitlist->construct_cell("<a href=\"index.php?module=user-users&amp;action=edit&amp;uid=" . $member['uid'] . "\">" . htmlspecialchars_uni($member['username']) . "</a>");
-            $waitlist->construct_cell(events_role_label($member['role']));
-            $waitlist->construct_cell(htmlspecialchars_uni($member['tk_id']));
-            $waitlist->construct_cell(htmlspecialchars_uni(implode(', ', $member['costumes'])));
-            $waitlist->construct_cell(htmlspecialchars_uni(implode(', ', events_day_labels($event_days, $waiting_day_ids, 'short'))));
-            $waitlist->construct_cell(htmlspecialchars_uni($member['mobile']));
-            $waitlist->construct_cell(events_format_date($member['queued_at']));
-            $waitlist->construct_row(array('class' => 'events_admin_waitlist_row'));
+    $render = function(array $members, $title, array $columns, array $row_options) {
+        $table = new Table;
+        foreach($columns as $column)
+        {
+            $table->construct_header($column[0], array("width" => $column[1] . "%"));
         }
 
-        $waitlist->output("Waitlist (" . count($waiting) . ")");
+        foreach($members as $member)
+        {
+            foreach($columns as $column)
+            {
+                $table->construct_cell($column[2]($member));
+            }
+            $table->construct_row($row_options);
+        }
+
+        if($table->num_rows() == 0)
+        {
+            $table->construct_cell("No RSVPs found.", array("colspan" => count($columns)));
+            $table->construct_row();
+        }
+
+        $table->output($title);
+    };
+
+    $render($attendees, "RSVPs for: " . htmlspecialchars_uni($event['title']) . " (" . count($attendees) . ")", $columns, array());
+
+    if(!empty($waiting))
+    {
+        $columns['days'][0] = "Days Waiting For";
+        $columns['date'] = array("Joined Waitlist", 12, function($member) { return events_format_date($member['queued_at']); });
+
+        $render($waiting, "Waitlist (" . count($waiting) . ")", $columns, array('class' => 'events_admin_waitlist_row'));
     }
 
     echo "<br /><a href=\"" . $mybb->settings['bburl'] . "/event.php?id=" . $event_id . "&amp;action=attendance\" class=\"button\" id=\"admin_attendance_link\">View Attendance Sheet</a>";

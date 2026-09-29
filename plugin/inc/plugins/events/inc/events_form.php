@@ -665,6 +665,7 @@ function events_event_form_values(array $event = array())
     {
         return array(
             'title'         => '',
+            'event_type'    => 'troop',
             'description'   => '',
             'status'        => 'pending',
             'region'        => 'Sydney',
@@ -677,6 +678,7 @@ function events_event_form_values(array $event = array())
             'poc_user_id'   => 0,
             'max_troopers'  => '',
             'max_wranglers' => '',
+            'max_attendees' => '',
             'days'          => array(),
             'exclusions'    => '',
         );
@@ -704,6 +706,7 @@ function events_event_form_values(array $event = array())
 
     return array(
         'title'         => $event['title'],
+        'event_type'    => events_event_type($event),
         'description'   => $event['description'],
         'status'        => $event['status'],
         'region'        => $event['region'],
@@ -721,6 +724,7 @@ function events_event_form_values(array $event = array())
         // to leave it as.
         'max_troopers'  => events_event_cap($event, 'trooper') ? (string)events_event_cap($event, 'trooper') : '',
         'max_wranglers' => events_event_cap($event, 'wrangler') ? (string)events_event_cap($event, 'wrangler') : '',
+        'max_attendees' => events_event_cap($event, 'attendee') ? (string)events_event_cap($event, 'attendee') : '',
         'days'          => $days,
         'exclusions'    => implode(', ', events_get_event_exclusion_names($event_id)),
     );
@@ -761,6 +765,7 @@ function events_event_form_input()
 
     return array(
         'title'         => trim($mybb->get_input('title')),
+        'event_type'    => $mybb->get_input('event_type'),
         'description'   => $mybb->get_input('description'),
         'status'        => $mybb->get_input('status'),
         'region'        => $mybb->get_input('region'),
@@ -773,6 +778,7 @@ function events_event_form_input()
         'poc_user_id'   => $mybb->get_input('poc_user_id', MyBB::INPUT_INT),
         'max_troopers'  => trim($mybb->get_input('max_troopers')),
         'max_wranglers' => trim($mybb->get_input('max_wranglers')),
+        'max_attendees' => trim($mybb->get_input('max_attendees')),
         'days'          => $days,
         'exclusions'    => $mybb->get_input('exclusions'),
     );
@@ -871,6 +877,19 @@ function events_validate_event_input(array $input, array $event = array())
     {
         $errors[] = "Invalid status.";
     }
+
+    $types = events_event_types();
+    if(!isset($types[$input['event_type']]))
+    {
+        $errors[] = "Invalid event type.";
+    }
+    // A troop's signups are troopers and wranglers and a social event's are attendees, so
+    // changing the type would leave every signup in a role the event no longer takes.
+    elseif(!empty($event['id']) && $input['event_type'] !== events_event_type($event)
+        && events_event_has_signups($event['id']))
+    {
+        $errors[] = "The event type cannot be changed once members have signed up.";
+    }
     if(!in_array($input['region'], events_regions(), true))
     {
         $errors[] = "Invalid region.";
@@ -906,7 +925,7 @@ function events_validate_event_input(array $input, array $event = array())
     }
 
     // A maximum is a count of people, so a whole number; empty is no limit, and so is 0.
-    foreach(array('max_troopers' => 'maximum number of troopers', 'max_wranglers' => 'maximum number of wranglers') as $field => $label)
+    foreach(array('max_troopers' => 'maximum number of troopers', 'max_wranglers' => 'maximum number of wranglers', 'max_attendees' => 'maximum number of attendees') as $field => $label)
     {
         if($input[$field] !== '' && (!ctype_digit($input[$field]) || (int)$input[$field] > EVENTS_MAX_PLACES))
         {
@@ -1338,7 +1357,7 @@ function events_cap_change_demotions($event_id, array $input, array $removed_day
     }
 
     $moves = events_waitlist_moves($event,
-        array('trooper' => (int)$input['max_troopers'], 'wrangler' => (int)$input['max_wranglers']),
+        events_event_input_caps($input),
         array('uids' => $dropped_uids, 'days' => array_map(function($day) { return (int)$day['id']; }, $removed_days)));
 
     $day_labels = array();
@@ -1382,6 +1401,30 @@ function events_cap_change_demotions($event_id, array $input, array $removed_day
     uasort($demoted, function($a, $b) { return strcasecmp($a['username'], $b['username']); });
 
     return $demoted;
+}
+
+/**
+ * The maximums a validated form asks for, by role.
+ *
+ * Only the roles the chosen type takes: both forms post all three boxes, and the ones for
+ * the other type are hidden rather than removed, so whatever they still hold is saved as
+ * no limit instead of lingering as a maximum nothing reads.
+ *
+ * @param array $input From events_event_form_input(), already validated
+ * @return array role => maximum, 0 for no limit
+ */
+function events_event_input_caps(array $input)
+{
+    $fields = array('trooper' => 'max_troopers', 'wrangler' => 'max_wranglers', 'attendee' => 'max_attendees');
+    $roles = events_event_roles(array('event_type' => $input['event_type']));
+
+    $caps = array();
+    foreach($fields as $role => $field)
+    {
+        $caps[$role] = in_array($role, $roles, true) ? (int)$input[$field] : 0;
+    }
+
+    return $caps;
 }
 
 /**
@@ -1606,8 +1649,11 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
     $event_id = (int)$event_id;
     $is_edit = $event_id > 0;
 
+    $caps = events_event_input_caps($input);
+
     $data = array(
         'title'         => $db->escape_string($input['title']),
+        'event_type'    => $input['event_type'] === 'social' ? 'social' : 'troop',
         'description'   => $db->escape_string($input['description']),
         'status'        => $db->escape_string($input['status']),
         'region'        => $db->escape_string($input['region']),
@@ -1617,8 +1663,9 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
         'requires_wwcc' => $input['requires_wwcc'] ? 1 : 0,
         'gec_user_id'   => (int)$input['gec_user_id'],
         'poc_user_id'   => (int)$input['poc_user_id'],
-        'max_troopers'  => (int)$input['max_troopers'],
-        'max_wranglers' => (int)$input['max_wranglers'],
+        'max_troopers'  => $caps['trooper'],
+        'max_wranglers' => $caps['wrangler'],
+        'max_attendees' => $caps['attendee'],
         'updated_at'    => $db->escape_string(events_date('Y-m-d H:i:s')),
     );
 
@@ -1756,6 +1803,7 @@ function events_event_log_state($event_id)
 
     $columns = array(
         'title'         => 'Title',
+        'event_type'    => 'Type',
         'description'   => 'Description',
         'status'        => 'Status',
         'region'        => 'Region',
@@ -1765,10 +1813,15 @@ function events_event_log_state($event_id)
         'signup_cutoff' => 'Signup Cutoff',
         'max_troopers'  => 'Maximum Troopers',
         'max_wranglers' => 'Maximum Wranglers',
+        'max_attendees' => 'Maximum Attendees',
         'requires_wwcc' => 'Requires ' . events_wwcc_name(),
         'gec_user_id'   => 'Coordinator',
         'poc_user_id'   => 'Point of Contact',
     );
+
+    // Read defensively: a board that has not run the upgrade adding the type has neither
+    // column, and every one of its events is a troop with no attendee maximum.
+    $event += array('event_type' => 'troop', 'max_attendees' => 0);
 
     $state = array();
     foreach($columns as $column => $label)

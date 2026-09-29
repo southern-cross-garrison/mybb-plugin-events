@@ -40,6 +40,11 @@ if(!events_can_view_event($event))
     error_no_permission();
 }
 
+if(events_is_social($event))
+{
+    error("Social events do not have troop reports.");
+}
+
 if(!events_has_ended($event))
 {
     error("This event has not ended yet.");

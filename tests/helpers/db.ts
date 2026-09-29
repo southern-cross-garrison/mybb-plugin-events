@@ -238,6 +238,9 @@ export interface EventInput {
   /** Places per role (per day, on a multi-day event); 0 or omitted is no limit. */
   maxTroopers?: number;
   maxWranglers?: number;
+  maxAttendees?: number;
+  /** A troop unless told otherwise. */
+  eventType?: 'troop' | 'social';
 }
 
 const toDateTime = (
@@ -260,11 +263,12 @@ export async function createEvent(input: EventInput): Promise<number> {
 
   const result = await execute(
     `INSERT INTO ${T('event_plugin_events')}
-       (title, description, status, region, address, start_date, end_date, signup_cutoff,
-        requires_wwcc, gec_user_id, poc_user_id, max_troopers, max_wranglers, created_by, thread_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (title, event_type, description, status, region, address, start_date, end_date, signup_cutoff,
+        requires_wwcc, gec_user_id, poc_user_id, max_troopers, max_wranglers, max_attendees, created_by, thread_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.title,
+      input.eventType ?? 'troop',
       input.description ?? `${input.title} description`,
       input.status ?? 'live',
       input.region ?? 'Sydney',
@@ -277,6 +281,7 @@ export async function createEvent(input: EventInput): Promise<number> {
       input.pointOfContact ? uid(input.pointOfContact) : 0,
       input.maxTroopers ?? 0,
       input.maxWranglers ?? 0,
+      input.maxAttendees ?? 0,
       uid('gec'),
       input.threadId ?? null,
       now,
@@ -316,7 +321,7 @@ export async function getEventDays(eventId: number): Promise<RowDataPacket[]> {
 }
 
 /** Record an RSVP without walking the wizard, for tests that only need the end state. */
-export type SignupRole = 'trooper' | 'wrangler';
+export type SignupRole = 'trooper' | 'wrangler' | 'attendee';
 export type SignupStatus = 'attending' | 'waitlisted';
 
 /**
@@ -341,8 +346,8 @@ export async function createRsvp(
 
   const rsvpId = result.insertId;
 
-  // Wranglers are never costumed, so they get no costume rows even by default.
-  const costumes = role === 'wrangler' ? [] : options.costumes ?? [fixtures().costumeOptions[0]];
+  // Only troopers are costumed, so nobody else gets costume rows even by default.
+  const costumes = role !== 'trooper' ? [] : options.costumes ?? [fixtures().costumeOptions[0]];
   for (const costume of costumes) {
     await execute(`INSERT INTO ${T('event_plugin_rsvp_costumes')} (rsvp_id, costume) VALUES (?, ?)`, [rsvpId, costume]);
   }

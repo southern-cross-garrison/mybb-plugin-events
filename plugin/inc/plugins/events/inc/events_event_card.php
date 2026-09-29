@@ -34,6 +34,8 @@ function events_render_event_card(array $event, $thread_id = 0)
 
     $event_id = (int)$event['id'];
     $thread_id = (int)$thread_id;
+    $event_roles = events_event_roles($event);
+    $is_social = events_is_social($event);
     $is_gec = events_is_event_gec($event_id);
     $event_days = events_get_event_days($event_id);
 
@@ -69,8 +71,9 @@ function events_render_event_card(array $event, $thread_id = 0)
     $event_start_date = events_format_long_date($event['start_date']);
     $event_end_date = events_format_long_date($event['end_date']);
     $event_description = events_parse_description($event['description']);
-    $rsvp_count = events_rsvp_count($event_id, 'trooper');
-    $wrangler_count = events_rsvp_count($event_id, 'wrangler');
+    $event_type = events_event_type($event);
+    $event_types = events_event_types();
+    $event_type_label = $event_types[$event_type];
 
     // Built here rather than sat in the template, because an event with no address has no
     // row at all and a MyBB template cannot ask.
@@ -109,7 +112,7 @@ function events_render_event_card(array $event, $thread_id = 0)
     // here and placed by the template outside the table, because it is positioned against
     // the card rather than against a cell - see .event_counts_tab in the stylesheet.
     $event_counts_row = '<div id="event_signup_counts" class="event_counts event_counts_tab">'
-        . events_signup_counts($rsvp_count, $wrangler_count, true, true)
+        . events_signup_counts(events_signup_role_counts($event), true, true)
         . '</div>';
 
     $event_capacity_row = '';
@@ -220,7 +223,8 @@ function events_render_event_card(array $event, $thread_id = 0)
         // A full event is still one to sign up to - the waitlist is how its places are
         // given out again - but the button has to say that is what it does. "Sign Up to
         // Attend" on an event with no room left reads as a promise of a place. One full
-        // role is enough: the wizard still offers a place in the other.
+        // role is enough: the wizard still offers a place in the other. A social event has
+        // only the one.
         if(!empty(events_full_roles($event, $queues)))
         {
             $event_actions .= '<a class="event_action event_action_primary event_action_waitlist" href="rsvp.php?id=' . $event_id . '" id="event_signup" data-waitlist="1">Join Waitlist</a>';
@@ -280,11 +284,18 @@ function events_render_event_card(array $event, $thread_id = 0)
     // emergency contact live on the attendance sheet, which stays behind
     // events_is_event_gec().
     // The costume filter can only ever match troopers, so wranglers drop out of a
-    // filtered list by definition. That is intended, not an oversight.
-    $attendees = array_merge(
-        events_get_attendees($event_id, array('costume' => $filter_costume, 'day' => $filter_day, 'role' => 'trooper')),
-        events_get_attendees($event_id, array('costume' => $filter_costume, 'day' => $filter_day, 'role' => 'wrangler'))
-    );
+    // filtered list by definition. That is intended, not an oversight. Nobody at a social
+    // event is in costume, so there it is not offered at all.
+    if($is_social)
+    {
+        $filter_costume = '';
+    }
+
+    $attendees = array();
+    foreach($event_roles as $role)
+    {
+        $attendees = array_merge($attendees, events_get_attendees($event_id, array('costume' => $filter_costume, 'day' => $filter_day, 'role' => $role)));
+    }
 
     $filter_day_select = '';
     if(!empty($event_days))
@@ -311,8 +322,10 @@ function events_render_event_card(array $event, $thread_id = 0)
         // Only the parts a person actually has. A wrangler carries no Legion ID and no
         // costume, and an event with no days has no days to name - an empty span each time
         // would leave the separator dots hanging off the end of the line.
+        // The Legion ID comes off the profile, so an attendee at a social event would carry
+        // one too; it says nothing about who is coming to a barbecue.
         $details = array(
-            'rsvp_tkid'     => htmlspecialchars_uni($attendee['tk_id']),
+            'rsvp_tkid'     => $is_social ? '' : htmlspecialchars_uni($attendee['tk_id']),
             'rsvp_costumes' => htmlspecialchars_uni(implode(', ', $attendee['costumes'])),
             'rsvp_days'     => htmlspecialchars_uni(implode(', ', $day_labels)),
             'rsvp_date'     => events_format_date($attendee['rsvp_date']),
@@ -347,9 +360,14 @@ function events_render_event_card(array $event, $thread_id = 0)
     // the panel that explains why it is short is already open above it.
     $rsvp_filter_open = ($filter_costume !== '' || $filter_day) ? ' open' : '';
 
-    $rsvp_waitlist = events_render_card_waitlist($event_id, $event_days, $filter_costume, $filter_day);
+    $filter_costume_field = $is_social ? '' : '<label>Costume: <input type="text" class="textbox" name="filter_costume" id="filter_costume" value="'
+        . htmlspecialchars_uni($filter_costume) . '" /></label>';
 
-    $filter_costume = htmlspecialchars_uni($filter_costume);
+    // A social event of one day has nothing left to filter by, and the stylesheet puts the
+    // panel's toggle away.
+    $rsvp_filter_empty = ($filter_costume_field === '' && $filter_day_select === '') ? ' data-empty="1"' : '';
+
+    $rsvp_waitlist = events_render_card_waitlist($event_id, $event_days, $filter_costume, $filter_day);
 
     eval("\$rsvp_list = \"" . $templates->get("events_rsvp_list") . "\";");
 

@@ -44,9 +44,7 @@ function events_ical_day_roles(array $roles, $day_id)
  */
 function events_ical_summary(array $roles, $title, $day_id)
 {
-    $doing = array_map(function($role) {
-        return $role === 'wrangler' ? 'Wrangling' : 'Trooping';
-    }, events_ical_day_roles($roles, $day_id));
+    $doing = array_map('events_role_verb', events_ical_day_roles($roles, $day_id));
 
     return $doing ? implode(' and ', $doing) . ': ' . $title : $title;
 }
@@ -73,9 +71,9 @@ function events_ical_signup_line(array $roles, array $signup, $day_id, $multi_da
     $doing = array();
     foreach(events_ical_day_roles($roles, $day_id) as $role)
     {
-        if($role === 'wrangler')
+        if($role !== 'trooper')
         {
-            $doing[] = 'wrangling';
+            $doing[] = strtolower(events_role_verb($role));
         }
         else
         {

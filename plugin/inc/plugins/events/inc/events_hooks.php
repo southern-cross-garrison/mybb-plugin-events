@@ -1504,7 +1504,7 @@ function events_send_reminders(&$failures = array())
     $resend_before = $resend_day->format('Y-m-d 00:00:00');
 
     $query = $db->query("
-        SELECT e.id, e.title, tr.id AS report_id, tr.last_reminder_sent
+        SELECT e.*, tr.id AS report_id, tr.last_reminder_sent
         FROM " . TABLE_PREFIX . "event_plugin_events e
         LEFT JOIN " . TABLE_PREFIX . "event_plugin_troop_reports tr ON e.id = tr.event_id
         WHERE e.status = 'live'
@@ -1513,10 +1513,16 @@ function events_send_reminders(&$failures = array())
           AND (tr.last_reminder_sent IS NULL OR tr.last_reminder_sent < '" . $db->escape_string($resend_before) . "')
     ");
 
+    // A social event has no report to be reminded about. Filtered here rather than in
+    // the query, which has to keep working on files deployed ahead of the activation
+    // that adds the column.
     $events = array();
     while($row = $db->fetch_array($query))
     {
-        $events[] = $row;
+        if(!events_is_social($row))
+        {
+            $events[] = $row;
+        }
     }
 
     $failures = array();

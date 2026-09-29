@@ -46,7 +46,8 @@ function events_admin_list_events()
     $query = $db->query("
         SELECT e.*, u.username AS gec_username,
                (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.role = 'trooper' AND r.status = 'attending') AS rsvp_count,
-           (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.role = 'wrangler' AND r.status = 'attending') AS wrangler_count
+           (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.role = 'wrangler' AND r.status = 'attending') AS wrangler_count,
+           (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.role = 'attendee' AND r.status = 'attending') AS attendee_count
         FROM " . TABLE_PREFIX . "event_plugin_events e
         LEFT JOIN " . TABLE_PREFIX . "users u ON e.gec_user_id = u.uid
         WHERE {$where}
@@ -55,23 +56,34 @@ function events_admin_list_events()
     ");
 
     $table = new Table;
-    $table->construct_header("Title", array("width" => "28%"));
-    $table->construct_header("Status", array("width" => "10%"));
-    $table->construct_header("Region", array("width" => "10%"));
-    $table->construct_header("Starts", array("width" => "15%"));
+    $table->construct_header("Title", array("width" => "24%"));
+    $table->construct_header("Status", array("width" => "8%"));
+    $table->construct_header("Type", array("width" => "7%"));
+    $table->construct_header("Region", array("width" => "9%"));
+    $table->construct_header("Starts", array("width" => "13%"));
     $table->construct_header("Troopers", array("width" => "7%"));
     $table->construct_header("Wranglers", array("width" => "7%"));
-    $table->construct_header("Coordinator", array("width" => "12%"));
-    $table->construct_header("Actions", array("width" => "15%", "class" => "align_center"));
+    $table->construct_header("Attendees", array("width" => "7%"));
+    $table->construct_header("Coordinator", array("width" => "10%"));
+    $table->construct_header("Actions", array("width" => "8%", "class" => "align_center"));
+
+    $types = events_event_types();
 
     while($event = $db->fetch_array($query))
     {
         $table->construct_cell("<a href=\"" . $mybb->settings['bburl'] . "/event.php?id=" . (int)$event['id'] . "\">" . htmlspecialchars_uni($event['title']) . "</a>");
         $table->construct_cell("<span class=\"event_status_" . htmlspecialchars_uni($event['status']) . "\">" . ucfirst($event['status']) . "</span>");
+        $table->construct_cell($types[events_event_type($event)]);
         $table->construct_cell(htmlspecialchars_uni($event['region']));
         $table->construct_cell(events_format_date($event['start_date']));
-        $table->construct_cell((int)$event['rsvp_count']);
-        $table->construct_cell((int)$event['wrangler_count']);
+
+        // A count for a role the event does not take would read as nobody having signed up
+        // to it, rather than as a role it does not have.
+        $roles = events_event_roles($event);
+        foreach(array('trooper' => 'rsvp_count', 'wrangler' => 'wrangler_count', 'attendee' => 'attendee_count') as $role => $column)
+        {
+            $table->construct_cell(in_array($role, $roles, true) ? (int)$event[$column] : '-');
+        }
         $table->construct_cell(htmlspecialchars_uni((string)$event['gec_username']));
 
         $popup = new PopupMenu("event_" . $event['id'], "Actions");
@@ -99,7 +111,7 @@ function events_admin_list_events()
 
     if($table->num_rows() == 0)
     {
-        $table->construct_cell("No events found.", array("colspan" => 8));
+        $table->construct_cell("No events found.", array("colspan" => 10));
         $table->construct_row();
     }
 
@@ -244,6 +256,9 @@ function events_admin_edit_event()
         )) . events_description_editor("description"),
         "description"
     );
+    // The maximums below are for one type or the other, and events-admin.css hides the
+    // other type's off this select - see the events_type_* row classes.
+    $container->output_row("Type", "", $form->generate_select_box("event_type", events_event_types(), $values['event_type'], array("id" => "event_type")), "event_type");
     $container->output_row("Status", "Pending events are only visible to coordinators; setting an event live posts its announcement thread", $form->generate_select_box("status", events_event_statuses(), $values['status'], array("id" => "status")), "status");
     // generate_select_box() interpolates both the value and the label straight into the
     // markup, and a region name is free text. It matches the selected value against the
@@ -264,8 +279,9 @@ function events_admin_edit_event()
     $container->output_row("End Date", "When it finishes. Signups close here when no cutoff is set below.", events_datetime_field("end_date", "end_date", $values['end_date'], $date_options + array("required" => true, "time_required" => true, "label" => "End")), "end_date");
     $container->output_row("Signup Cutoff", "Optional. RSVPs close at this time; leave blank to keep them open until the event ends.", events_datetime_field("signup_cutoff", "signup_cutoff", $values['signup_cutoff'], $date_options + array("label" => "Signup cutoff")), "signup_cutoff");
     $max_hint = "Optional. Leave empty for no limit. On an event of several days it applies to each day. Once it is reached, new signups join a waitlist and are given places in signup order as they free up.";
-    $container->output_row("Maximum Troopers", $max_hint, $form->generate_text_box("max_troopers", $values['max_troopers'], array("id" => "max_troopers")), "max_troopers");
-    $container->output_row("Maximum Wranglers", $max_hint, $form->generate_text_box("max_wranglers", $values['max_wranglers'], array("id" => "max_wranglers")), "max_wranglers");
+    $container->output_row("Maximum Troopers", $max_hint, $form->generate_text_box("max_troopers", $values['max_troopers'], array("id" => "max_troopers")), "max_troopers", array(), array("class" => "events_type_troop"));
+    $container->output_row("Maximum Wranglers", $max_hint, $form->generate_text_box("max_wranglers", $values['max_wranglers'], array("id" => "max_wranglers")), "max_wranglers", array(), array("class" => "events_type_troop"));
+    $container->output_row("Maximum Attendees", $max_hint, $form->generate_text_box("max_attendees", $values['max_attendees'], array("id" => "max_attendees")), "max_attendees", array(), array("class" => "events_type_social"));
     if(events_wwcc_enabled())
     {
         $wwcc_name = htmlspecialchars_uni(events_wwcc_name());

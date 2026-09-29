@@ -171,6 +171,16 @@ $manage_details .= events_form_field(
         . ' the same way they do in a post.'
 );
 
+// The maximums further down are for one type or the other, and the stylesheet hides the
+// other type's off this select - see the events_type_* wrappers.
+$manage_details .= events_form_field(
+    'event_form_event_type',
+    'Type',
+    events_form_select('event_type', 'event_form_event_type', events_event_types(), $values['event_type']),
+    '',
+    true
+);
+
 $manage_details .= events_form_field(
     'event_form_status',
     'Status',
@@ -226,15 +236,20 @@ $manage_details .= events_form_field(
 
 // Numeric keypad rather than type="number", which would let the browser refuse or quietly
 // reshape what was typed before the server could say what was wrong with it.
-foreach(array('max_troopers' => 'Maximum Troopers', 'max_wranglers' => 'Maximum Wranglers') as $field => $label)
+$caps = array(
+    'max_troopers'  => array('label' => 'Maximum Troopers', 'type' => 'troop'),
+    'max_wranglers' => array('label' => 'Maximum Wranglers', 'type' => 'troop'),
+    'max_attendees' => array('label' => 'Maximum Attendees', 'type' => 'social'),
+);
+foreach($caps as $field => $cap)
 {
-    $manage_details .= events_form_field(
+    $manage_details .= '<div class="events_type_' . $cap['type'] . '">' . events_form_field(
         'event_form_' . $field,
-        $label,
+        $cap['label'],
         events_form_text($field, 'event_form_' . $field, $values[$field], array('inputmode' => 'numeric', 'size' => 5), true),
         'Optional. Leave empty for no limit. On an event of several days it applies to each day.'
             . ' Once it is reached, new signups join a waitlist and are given places in signup order as they free up.'
-    );
+    ) . '</div>';
 }
 
 // A board that does not use working with children checks is not asked about them.

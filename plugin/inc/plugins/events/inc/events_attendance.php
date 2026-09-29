@@ -112,6 +112,13 @@ function events_write_troop_attendance($event_id)
         return 0;
     }
 
+    // Trooping credit is a troop's alone. A social event cannot have a report posted, so
+    // this only matters for one whose report was somehow left behind.
+    if(events_is_social(events_get_event($event_id)))
+    {
+        return 0;
+    }
+
     $report = events_get_troop_report($event_id);
     if(!$report || empty($report['posted_at']) || empty($report['thread_id']))
     {

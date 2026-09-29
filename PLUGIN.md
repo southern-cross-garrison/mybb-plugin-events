@@ -10,6 +10,8 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 - **Signup System**: One "Sign Up to Attend" flow with prerequisite validation
 - **Per-day Roles**: Troop some days and wrangle others in a single signup
 - **Wrangler Signups**: Non-costumed helpers can sign up without being full members
+- **Social Events**: A plain signup sheet for events that are not troops - one list of
+  attendees, no costumes or contact details asked for, and no troop report
 - **Maximums and a Waitlist**: Cap how many troopers and wranglers an event takes; once
   it is full, signups join a waitlist that hands places out in signup order as they free up
 - **Prerequisites**: TK ID, WWCC, preferred name, mobile number, and emergency contact validation
@@ -187,9 +189,11 @@ Either way the details are:
 - Start and end dates. Both need a time as well as a date - there is no default, since
   midnight would put the end at the *start* of the last day - and the end has to be later
   than the start
+- Type - a troop (the default) or a social event. See [Social Events](#social-events)
 - Signup cutoff (optional - with none, signups stay open until the event ends)
-- Maximum troopers and maximum wranglers (optional - empty is no limit). On an event of
-  several days each is a limit per day. See [Maximums and the Waitlist](#maximums-and-the-waitlist)
+- Maximum troopers and maximum wranglers, or for a social event maximum attendees
+  (optional - empty is no limit). On an event of several days each is a limit per day.
+  The form shows only the chosen type's. See [Maximums and the Waitlist](#maximums-and-the-waitlist)
 - WWCC requirement
 - GEC assignment - see below
 - Event days - the hours the event runs on each of its days. The rows follow the start
@@ -425,9 +429,39 @@ troopers and wranglers, so an event with helpers but no costumed attendance read
 are not sent troop report reminders, and cannot author a troop report - that is troopers
 only, since the report records costumed attendance.
 
+### Social Events
+
+An event's type is a troop unless the form says otherwise. A social event - a dinner, a
+barbecue, a movie night - is a plain signup sheet:
+
+- **One role.** Members sign up as attendees. There is no trooping or wrangling to choose
+  between, no costume step, and a multi-day social event still lets a member pick the days
+  they are coming.
+- **Nothing asked for but a name.** The signup asks for a preferred name (and the WWCC,
+  if the event requires one). It does not ask for a mobile number, an emergency contact, a
+  Legion ID or a costume.
+- **A cap and a waitlist if you want one.** Maximum attendees works exactly as the troop
+  maximums do - see below.
+- **No troop report.** A finished social event reads as Complete rather than Needs Troop
+  Report, offers no report to write, sends no reminders, and `troop_report.php` refuses it.
+  Nobody is credited with trooping it, so it appears nowhere in Troop Attendance, Reports
+  or My Troops, and the Reports tab's Nudge never suggests one.
+- **The attendance sheet stays.** The point of contact, the coordinator and admins still
+  get the sheet and the Admin CP signup list. It leaves out the Legion ID and costume
+  columns, and still shows any mobile number or emergency contact a member has on file.
+
+The listing marks a social event with a **Social** pill and counts its attendees as "A";
+the event page and the announcement thread both name the type.
+
+An event's type cannot be changed once anybody has signed up to it: a troop's signups are
+troopers and wranglers and a social event's are attendees, so the change would leave every
+signup in a role the event no longer takes. Withdraw the signups first, or create a new
+event.
+
 ### Maximums and the Waitlist
 
-An event can be given a maximum number of troopers and of wranglers. Once one is reached,
+An event can be given a maximum number of troopers and of wranglers - or, for a social
+event, of attendees. Once one is reached,
 the event is still open to sign up to, but anybody who signs up for that role joins a
 waitlist instead of getting a place. Every step says so: the event page's button reads
 **Join Waitlist** once either role is full,
@@ -780,7 +814,8 @@ All tables use the `mybb_event_plugin_` prefix:
 - `event_plugin_events` - Main events table
 - `event_plugin_event_days` - Multi-day event support
 - `event_plugin_event_exclusions` - Users excluded from RSVPing
-- `event_plugin_rsvps` - Signup records; `role` is `trooper` or `wrangler`, unique per
+- `event_plugin_rsvps` - Signup records; `role` is `trooper` or `wrangler` on a troop and
+  `attendee` on a social event (the event's `event_type`), unique per
   `(event_id, user_id, role)` so a member can hold both - one signup covering a mix of
   trooping and wrangling days is two rows
 - `event_plugin_rsvp_days` - Which days user is attending, one claim per day. Each claim

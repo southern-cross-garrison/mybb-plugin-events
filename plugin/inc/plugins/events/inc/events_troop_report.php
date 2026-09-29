@@ -39,6 +39,12 @@ function events_post_troop_report(array $event, array $author, $content, &$error
     $error = '';
     $event_id = (int)$event['id'];
 
+    if(events_is_social($event))
+    {
+        $error = "Social events do not have troop reports.";
+        return 0;
+    }
+
     $forum_id = (int)events_get_setting('troop_report_forum');
     if(!$forum_id)
     {

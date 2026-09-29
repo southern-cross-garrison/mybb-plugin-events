@@ -171,6 +171,9 @@ function events_event_post_content(array $event)
     }
     $content .= "\n";
 
+    $types = events_event_types();
+    $content .= "[b]Type:[/b] " . $types[events_event_type($event)] . "\n";
+
     // The region links back to the listing filtered to it: the reader of a Canberra
     // thread is the reader most likely to want the rest of the Canberra schedule.
     $content .= "[b]Region:[/b] [url=" . $mybb->settings['bburl'] . "/events.php?region="

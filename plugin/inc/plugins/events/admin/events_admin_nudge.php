@@ -134,7 +134,11 @@ function events_nudge_open_events($limit = 10)
         array('order_by' => 'start_date', 'order_dir' => 'ASC', 'limit' => (int)$limit));
     while($event = $db->fetch_array($query))
     {
-        $events[] = $event;
+        // A nudge is a call back out trooping, and a social event is not a troop.
+        if(!events_is_social($event))
+        {
+            $events[] = $event;
+        }
     }
 
     return $events;

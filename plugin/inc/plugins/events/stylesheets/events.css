@@ -409,6 +409,12 @@ textarea.events_input { resize: vertical; }
 #field_event_form_description { max-width: none; }
 #event_form_days_hint { margin: 0 0 4px; }
 
+/* A troop's maximums and a social event's are both on the form, and the one for the other
+   type is put away off the Type select, script or not. A browser without :has() shows
+   all three, and the save only keeps the ones the chosen type takes. */
+#manage_event_form:has(#event_form_event_type option[value="social"]:checked) .events_type_troop,
+#manage_event_form:has(#event_form_event_type option[value="troop"]:checked) .events_type_social { display: none; }
+
 /* The day-change warning's stand-in for the Save button, there only so that Enter in a
    field is not taken as agreeing to the warning - see events_day_change_warning(). Off
    screen rather than display: none, which some browsers take as no default button. */
@@ -419,7 +425,8 @@ textarea.events_input { resize: vertical; }
  * ------------------------------------------------------------------------ */
 .event_count { display: inline-block; margin-right: 10px; white-space: nowrap; }
 .event_count_dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: baseline; }
-.event_count_trooper .event_count_dot { background: var(--events-accent, #2f6f9f); }
+.event_count_trooper .event_count_dot,
+.event_count_attendee .event_count_dot { background: var(--events-accent, #2f6f9f); }
 .event_count_wrangler .event_count_dot { background: var(--events-wrangle, #c77700); }
 .event_count_key { font-size: 0.85em; opacity: 0.7; margin-left: 2px; }
 
@@ -550,8 +557,12 @@ a.event_action_secondary:hover, a.event_action_secondary:focus { color: #333; }
 	display: inline-block; padding: 4px 10px; border-radius: 999px;
 	font-size: 0.85em; font-weight: 600; border: 1px solid; white-space: nowrap;
 }
-.event_pill_trooper { background: #eaf2f8; border-color: #b8d4e8; color: #1f4e6e; }
+/* A social event's attendees wear the trooper's colours: it is the event's one role, and
+   the accent is what the plugin spends on "going". */
+.event_pill_trooper,
+.event_pill_attendee { background: #eaf2f8; border-color: #b8d4e8; color: #1f4e6e; }
 .event_pill_wrangler { background: #fdf3e3; border-color: #f0d5a8; color: #8a5300; }
+.event_pill_social { background: #eef6ee; border-color: #bcd9bc; color: #2f5f2f; font-weight: normal; margin-left: 6px; }
 .event_pill_locked { background: #f2f2f2; border-color: #dedede; color: #767676; font-weight: normal; }
 /* Dashed, not just recoloured: a place in the queue must never pass for a place, and a
    dashed outline still says so printed in black and white or to somebody who cannot tell
@@ -751,7 +762,8 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 	display: inline-block; padding: 7px 13px; border-radius: 999px;
 	font-size: 0.9em; font-weight: 600; border: 1px solid;
 }
-.event_action_status_trooper { background: #eaf2f8; border-color: #b8d4e8; color: #1f4e6e; }
+.event_action_status_trooper,
+.event_action_status_attendee { background: #eaf2f8; border-color: #b8d4e8; color: #1f4e6e; }
 .event_action_status_wrangler { background: #fdf3e3; border-color: #f0d5a8; color: #8a5300; }
 .event_action_status_waitlisted { background: #f6f2fa; border-color: #a58dbd; border-style: dashed; color: #5b3f78; }
 
@@ -817,6 +829,10 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 #rsvp_filter[open] .rsvp_filter_funnel { opacity: 1; }
 
 #rsvp_filter_form { margin: 10px 0 0; }
+/* Nothing to filter by - a social event of one day - so there is no panel to open. */
+#rsvp_filter[data-empty] .rsvp_filter_funnel,
+#rsvp_filter[data-empty] #rsvp_filter_form { display: none; }
+#rsvp_filter[data-empty] #rsvp_filter_toggle { cursor: default; pointer-events: none; }
 #rsvp_rows { margin: 14px 0 0; padding-left: 22px; }
 #rsvp_rows li { margin: 0 0 5px; line-height: 1.8; }
 #rsvp_list_empty { list-style: none; margin-left: -22px; opacity: 0.75; }
@@ -991,6 +1007,15 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 :is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_tkid { width: 15%; }
 :is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_days { width: 22%; }
 :is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_attended { width: 10%; }
+
+/* A social event's sheet has no Legion ID column, and gives its share to the names. */
+:is(#attendance_table, .attendance_waitlist_table).is_social .attendance_identity_head .attendee_preferred_name { width: 32%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social .attendance_identity_head .attendee_username { width: 30%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social .attendance_identity_head .attendee_role { width: 23%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days .attendance_identity_head .attendee_preferred_name { width: 22%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days .attendance_identity_head .attendee_username { width: 20%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days .attendance_identity_head .attendee_role { width: 18%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days .attendance_identity_head .attendee_days { width: 26%; }
 
 /* Where one person ends and the next begins. Without it the sheet reads as twice as many
    people, half of them nameless. The rule goes along the bottom of the pair, which means

@@ -313,6 +313,7 @@ function demo_event(array $spec)
         'event_plugin_events', 'id', "title = '" . $db->escape_string($spec['title']) . "'"));
 
     $input = array_merge(array(
+        'event_type'    => 'troop',
         'description'   => '',
         'status'        => 'live',
         'region'        => 'Sydney',
@@ -322,6 +323,7 @@ function demo_event(array $spec)
         // 0 is no limit, which is what every event without a waitlist to show wants.
         'max_troopers'  => 0,
         'max_wranglers' => 0,
+        'max_attendees' => 0,
         'gec_user_id'   => demo_uid('gec'),
         'days'          => array(),
         'exclusions'    => '',
@@ -1382,6 +1384,36 @@ foreach(array('BriannaKade', 'GusHolloway', 'PiaSolano') as $username)
     demo_signup($id, $username);
 }
 note('3/4 troopers - one place left before the waitlist', $id);
+
+// 19. A social event: one list of attendees, a cap, and nothing asked of them beyond a
+//     name to call them by. No costumes, and no troop report once it is over.
+$id = demo_event(array(
+    'title'         => 'End of Year Garrison Dinner',
+    'event_type'    => 'social',
+    'region'        => 'Sydney',
+    'address'       => 'The Grand Hotel, 30 Hunter St, Sydney NSW 2000',
+    'description'   => <<<'TXT'
+Our end of year get-together - no armour, no sweat, just dinner with the people you have spent the year trooping beside. Partners and families are welcome; each guest who is not a member needs a signup from the member bringing them.
+
+[b]On the night[/b]
+[list]
+[*]18:30 - Drinks in the upstairs bar
+[*]19:15 - Dinner, three courses, set menu (tell the coordinator about dietary requirements)
+[*]20:30 - Garrison awards and the year in photos
+[/list]
+
+The function room holds [b]forty[/b], so once it is full further signups go on the waitlist.
+TXT
+    ,
+    'start_date'    => demo_at(24, '18:30:00'),
+    'end_date'      => demo_at(24, '22:30:00'),
+    'max_attendees' => 40,
+));
+foreach(array('AlexVoss', 'BriannaKade', 'GusHolloway', 'TeganMoss', 'wrangler') as $username)
+{
+    demo_signup($id, $username, array('roles' => array('attendee')));
+}
+note('social event - attendees only, capped at 40', $id);
 
 // ---------------------------------------------------------------------------
 // Troop history

@@ -365,27 +365,28 @@ function events_address_link($address, $class = 'events_address_link')
  * spend, so it spells them out - which is where a member learns what the T and the W on
  * the listing meant, and why the colours have to match.
  *
- * @param int $trooper_count
- * @param int $wrangler_count
+ * A social event has one role and so one lozenge, an "A" for its attendees.
+ *
+ * @param array $counts role => count, for the roles the event takes (events_event_roles())
  * @param bool $spell_out Names the roles in full instead of abbreviating to T / W
  * @param bool $with_ids Adds the ids the event page addresses its own counts by; the
  *                       listing repeats the pair once per row and so cannot have them
  * @return string
  */
-function events_signup_counts($trooper_count, $wrangler_count, $spell_out = false, $with_ids = false)
+function events_signup_counts(array $counts, $spell_out = false, $with_ids = false)
 {
-    $counts = array(
-        'trooper' => (int)$trooper_count,
-        'wrangler' => (int)$wrangler_count,
-    );
-    $ids = array(
-        'trooper' => 'event_rsvp_count',
+    // The number's class, and its id where the page asks for one.
+    $names = array(
+        'trooper'  => 'event_rsvp_count',
         'wrangler' => 'event_wrangler_count',
+        'attendee' => 'event_attendee_count',
     );
 
     $out = '';
     foreach($counts as $role => $count)
     {
+        $role = events_rsvp_role($role);
+        $count = (int)$count;
         $label = events_role_label($role);
         // Plural only where the word is spelled out: "1 Troopers" is a typo the eye
         // catches, and the initials are a key rather than a noun to be agreed with.
@@ -397,11 +398,11 @@ function events_signup_counts($trooper_count, $wrangler_count, $spell_out = fals
         // A tooltip repeating a word already on the page is noise, so it is only there
         // to explain the initials.
         $title = $spell_out ? '' : ' title="' . $label . 's"';
-        $id = $with_ids ? ' id="' . $ids[$role] . '"' : '';
+        $id = $with_ids ? ' id="' . $names[$role] . '"' : '';
 
         $out .= '<span class="event_count event_count_' . $role . '"' . $title . '>'
               . '<span class="event_count_dot"></span>'
-              . '<span' . $id . ' class="event_' . ($role === 'trooper' ? 'rsvp' : 'wrangler') . '_count">' . $count . '</span>'
+              . '<span' . $id . ' class="' . $names[$role] . '">' . $count . '</span>'
               . $named
               . '</span>';
     }
@@ -803,7 +804,7 @@ function events_signup_next_step($step, array $roles, array $missing, $costume_c
 function events_capacity_text(array $event, $has_days)
 {
     $parts = array();
-    foreach(events_rsvp_roles() as $role)
+    foreach(events_event_roles($event) as $role)
     {
         $cap = events_event_cap($event, $role);
         if($cap > 0)
@@ -828,12 +829,11 @@ function events_capacity_text(array $event, $has_days)
  */
 function events_role_verb($role, $past = false)
 {
-    if($past)
-    {
-        return $role === 'wrangler' ? 'Wrangled' : 'Trooped';
-    }
+    $verbs = $past
+        ? array('trooper' => 'Trooped', 'wrangler' => 'Wrangled', 'attendee' => 'Attended')
+        : array('trooper' => 'Trooping', 'wrangler' => 'Wrangling', 'attendee' => 'Attending');
 
-    return $role === 'wrangler' ? 'Wrangling' : 'Trooping';
+    return isset($verbs[$role]) ? $verbs[$role] : $verbs['trooper'];
 }
 
 /**
@@ -1113,7 +1113,9 @@ function events_signup_summary_html(array $event_days, array $role_days, $id_pre
         }
     }
 
-    $html = '<p><strong>Attending as:</strong> <span id="' . $id_prefix . '_roles">'
+    // A social event has only the one way to attend, so there is no role to name - just
+    // the days, where the event has them.
+    $html = $roles === array('attendee') ? '' : '<p><strong>Attending as:</strong> <span id="' . $id_prefix . '_roles">'
           . htmlspecialchars_uni(implode(', ', array_map('events_role_label', $roles))) . '</span></p>';
 
     if(empty($event_days))

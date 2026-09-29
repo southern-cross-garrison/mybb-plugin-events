@@ -61,10 +61,12 @@ if($action === 'attendance')
     // declaration ordinal, which only matches alphabetical order here by coincidence.
     // The order the two come back in does not matter here - the sheet is sorted by name
     // below, once the two roles have been folded into one row per person.
-    $signups = array_merge(
-        events_get_attendees($event_id, array('day' => $filter_day, 'role' => 'trooper')),
-        events_get_attendees($event_id, array('day' => $filter_day, 'role' => 'wrangler'))
-    );
+    $is_social = events_is_social($event);
+    $signups = array();
+    foreach(events_event_roles($event) as $role)
+    {
+        $signups = array_merge($signups, events_get_attendees($event_id, array('day' => $filter_day, 'role' => $role)));
+    }
 
     // One line per person rather than per role. Somebody trooping the Saturday and
     // wrangling the Sunday is one human to tick off on the day, and it is their day list
@@ -142,12 +144,19 @@ if($action === 'attendance')
     //
     // The Days column only exists for an event that has days to list, so the header is
     // built here rather than sitting static in the template.
+    //
+    // A social event has no costumes and nobody's Legion ID matters at one, so both columns
+    // go. The contact details stay: nobody was asked for them, but a point of contact who
+    // has them on file for somebody is still better off with them on the sheet.
     $attendance_identity_columns = array(
         'attendee_preferred_name' => 'Preferred Name',
         'attendee_username'       => 'Username',
         'attendee_role'           => 'Role',
-        'attendee_tkid'           => 'Legion ID',
     );
+    if(!$is_social)
+    {
+        $attendance_identity_columns['attendee_tkid'] = 'Legion ID';
+    }
 
     if(!empty($event_days))
     {
@@ -157,11 +166,15 @@ if($action === 'attendance')
     // The second row says the same three things whatever the event, so it is laid over the
     // first row's columns rather than having any of its own: costumes take two of them,
     // the mobile one, and the emergency contact whatever is left - which is one column
-    // more on an event that has a Days column to absorb.
-    $attendance_contact_columns = array(
-        'attendee_costumes'  => array('label' => 'Costumes', 'span' => 2),
-        'attendee_mobile'    => array('label' => 'Mobile', 'span' => 1),
-        'attendee_emergency' => array('label' => 'Emergency Contact', 'span' => count($attendance_identity_columns) - 3),
+    // more on an event that has a Days column to absorb. A social event's has no costumes
+    // to give room to.
+    $attendance_contact_columns = $is_social
+        ? array()
+        : array('attendee_costumes' => array('label' => 'Costumes', 'span' => 2));
+    $attendance_contact_columns['attendee_mobile'] = array('label' => 'Mobile', 'span' => 1);
+    $attendance_contact_columns['attendee_emergency'] = array(
+        'label' => 'Emergency Contact',
+        'span'  => count($attendance_identity_columns) - ($is_social ? 1 : 3),
     );
 
     $attendance_headers = '<tr class="attendance_identity_head">'
@@ -182,13 +195,13 @@ if($action === 'attendance')
     // The number and the tick box either side of the identity columns.
     $attendance_colspan = count($attendance_identity_columns) + 2;
     // Drives the column widths, which differ by one column between the two layouts.
-    $attendance_table_class = !empty($event_days) ? 'has_days' : '';
+    $attendance_table_class = trim((!empty($event_days) ? 'has_days' : '') . ($is_social ? ' is_social' : ''));
 
     // One renderer for both tables, so the waitlist cannot drift from the sheet it sits
     // under: the same columns, the same contact details - those are what a point of
     // contact needs to call somebody in off it - and the same tick box, since somebody
     // pulled in off the waitlist on the day is ticked off like anybody else.
-    $render_attendee_rows = function(array $attendees, $waitlisted) use ($event, $event_days, $filter_day, $attendance_contact_columns)
+    $render_attendee_rows = function(array $attendees, $waitlisted) use ($event, $event_days, $filter_day, $attendance_identity_columns, $attendance_contact_columns)
     {
         $attendees_rows = '';
         $position = 0;
@@ -221,7 +234,10 @@ if($action === 'attendance')
                 $attendee_role .= ' - waitlisted';
             }
             $attendees_rows .= '<td class="attendee_role">' . htmlspecialchars_uni($attendee_role) . '</td>';
-            $attendees_rows .= '<td class="attendee_tkid">' . htmlspecialchars_uni($attendee['tk_id']) . '</td>';
+            if(isset($attendance_identity_columns['attendee_tkid']))
+            {
+                $attendees_rows .= '<td class="attendee_tkid">' . htmlspecialchars_uni($attendee['tk_id']) . '</td>';
+            }
 
             if(!empty($event_days))
             {
@@ -265,7 +281,7 @@ if($action === 'attendance')
             );
 
             $attendees_rows .= '<tr class="attendee_row_contact">';
-            foreach($contact_cells as $class => $value)
+            foreach(array_intersect_key($contact_cells, $attendance_contact_columns) as $class => $value)
             {
                 $attendees_rows .= '<td class="' . $class . '" colspan="' . $attendance_contact_columns[$class]['span'] . '">'
                     . htmlspecialchars_uni($value) . '</td>';
@@ -319,7 +335,7 @@ if($action === 'attendance')
     foreach($waitlist_places as $place)
     {
         $waiting = array();
-        foreach(events_rsvp_roles() as $role)
+        foreach(events_event_roles($event) as $role)
         {
             foreach(events_get_attendees($event_id, array('day' => $place, 'role' => $role, 'status' => 'waitlisted')) as $row)
             {

@@ -1,4 +1,4 @@
-<div id="event_page" class="events_page_wrap" data-event-id="{$event_id}" data-event-status="{$event_status}">
+<div id="event_page" class="events_page_wrap" data-event-id="{$event_id}" data-event-status="{$event_status}" data-event-type="{$event_type}">
 {$events_print_header}
 <div id="event_card" class="event_card">
 {$event_counts_row}
@@ -6,6 +6,7 @@
 <tr><td class="trow1">
 <div id="event_meta">
 <p><strong>Status:</strong> <span id="event_status" class="{$event_status_class}">{$event_status_label}</span></p>
+<p><strong>Type:</strong> <span id="event_type">{$event_type_label}</span></p>
 <p><strong>Region:</strong> <span id="event_region">{$event_region}</span></p>
 {$event_address_row}
 <p><strong>Starts:</strong> <span id="event_start">{$event_start_date}</span></p>

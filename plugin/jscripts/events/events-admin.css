@@ -356,3 +356,9 @@ textarea.events_admin_description {
 	margin: 0;
 	border-radius: 0 0 6px 6px;
 }
+
+/* The event form's maximums: a troop's and a social event's are both rows of the form, and
+   the other type's are put away off the Type select, script or not. A browser without
+   :has() shows all three, and the save only keeps the ones the chosen type takes. */
+body:has(#event_type option[value="social"]:checked) tr.events_type_troop,
+body:has(#event_type option[value="troop"]:checked) tr.events_type_social { display: none; }

@@ -109,7 +109,8 @@ $query = $db->query("
     SELECT e.*,
            tr.posted_at AS report_posted_at,
            (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.role = 'trooper' AND r.status = 'attending') AS rsvp_count,
-           (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.role = 'wrangler' AND r.status = 'attending') AS wrangler_count
+           (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.role = 'wrangler' AND r.status = 'attending') AS wrangler_count,
+           (SELECT COUNT(*) FROM " . TABLE_PREFIX . "event_plugin_rsvps r WHERE r.event_id = e.id AND r.role = 'attendee' AND r.status = 'attending') AS attendee_count
     FROM " . TABLE_PREFIX . "event_plugin_events e
     LEFT JOIN " . TABLE_PREFIX . "event_plugin_troop_reports tr ON tr.event_id = e.id
     WHERE {$where}
@@ -192,7 +193,7 @@ foreach($events as $event)
     if(!empty($signed_up_as))
     {
         $you = '';
-        foreach(events_rsvp_roles() as $role)
+        foreach(events_event_roles($event) as $role)
         {
             if(in_array($role, $signed_up_as, true))
             {
@@ -231,16 +232,20 @@ foreach($events as $event)
     $address_link = events_address_link(isset($event['address']) ? $event['address'] : '', 'event_address_link');
     $address_line = $address_link === '' ? '' : '<span class="event_address">' . $address_link . '</span>';
 
+    // A troop is what the listing is mostly made of, so only the exception is marked.
+    $type_pill = events_is_social($event) ? ' <span class="event_pill event_pill_social event_type_social">Social</span>' : '';
+
     $events_rows .= '<td class="trow1 event_title"><a class="event_link" href="' . events_event_url($event) . '">'
-        . htmlspecialchars_uni($event['title']) . '</a>' . $address_line . '</td>';
+        . htmlspecialchars_uni($event['title']) . '</a>' . $type_pill . $address_line . '</td>';
     $events_rows .= '<td class="trow1 event_region">' . htmlspecialchars_uni($event['region']) . '</td>';
     $events_rows .= '<td class="trow1 event_start">'
         . events_format_list_date($event['start_date'], isset($event['end_date']) ? $event['end_date'] : null) . '</td>';
-    // Abbreviated to T / W here: the column is narrow and the pair repeats once per row.
-    // The event page shows the same lozenges with the words spelled out - see
-    // events_signup_counts().
+    // Abbreviated to T / W here (A for a social event's attendees): the column is narrow
+    // and the pair repeats once per row. The event page shows the same lozenges with the
+    // words spelled out - see events_signup_counts().
+    $role_counts = array('trooper' => $event['rsvp_count'], 'wrangler' => $event['wrangler_count'], 'attendee' => $event['attendee_count']);
     $events_rows .= '<td class="trow1 event_counts">'
-        . events_signup_counts($event['rsvp_count'], $event['wrangler_count'])
+        . events_signup_counts(array_intersect_key($role_counts, array_flip(events_event_roles($event))))
         . '</td>';
     // events_status_label() owns what this reads, including the "Needs Troop Report" a
     // finished event with no posted report shows instead of "Live". The class is what

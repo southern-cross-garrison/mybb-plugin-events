@@ -61,6 +61,11 @@ if($lock_reason !== null)
 }
 
 $event_title = htmlspecialchars_uni($event['title']);
+// A troop is trooped or wrangled; a social event is attended, and there is nothing else
+// to choose. Everything below asks about these roles rather than about the two a troop
+// has, so the one wizard serves both.
+$event_roles = events_event_roles($event);
+$is_social = events_is_social($event);
 $event_days = events_get_event_days($event_id);
 $has_days = !empty($event_days);
 $valid_day_ids = array();
@@ -96,8 +101,8 @@ $user_costumes = events_get_user_costumes($mybb->user['uid']);
 // costume on file. An explicitly requested role beats an existing signup's selections,
 // because asking for that link is the member saying they want the other role.
 $requested_role = $mybb->get_input('role');
-$role_requested = in_array($requested_role, events_rsvp_roles(), true);
-$preferred_role = $role_requested ? $requested_role : 'trooper';
+$role_requested = in_array($requested_role, $event_roles, true);
+$preferred_role = $role_requested ? $requested_role : $event_roles[0];
 
 $submitted_step = ($mybb->request_method === 'post') ? $mybb->get_input('step') : '';
 
@@ -134,7 +139,7 @@ $solo_role = '';
 
 if($attendance_posted)
 {
-    $signup_role = $withdraw_chosen ? 'none' : events_rsvp_role($posted_solo_role);
+    $signup_role = $withdraw_chosen ? 'none' : (in_array($posted_solo_role, $event_roles, true) ? $posted_solo_role : $event_roles[0]);
     $per_day = $mybb->get_input('per_day', MyBB::INPUT_INT) === 1;
 
     foreach($valid_day_ids as $day_id)
@@ -151,7 +156,7 @@ if($attendance_posted)
         {
             $day_choices[$day_id] = 'none';
         }
-        elseif(in_array($value, events_rsvp_roles(), true))
+        elseif(in_array($value, $event_roles, true))
         {
             $day_choices[$day_id] = $value;
         }
@@ -163,7 +168,7 @@ if($attendance_posted)
         }
     }
 
-    $solo_role = in_array($posted_solo_role, events_rsvp_roles(), true) ? $posted_solo_role : '';
+    $solo_role = in_array($posted_solo_role, $event_roles, true) ? $posted_solo_role : '';
 }
 elseif($is_update && !$role_requested)
 {
@@ -228,7 +233,7 @@ else
 // next render would show anyway, which is what keeps the two honest with each other.)
 $day_values = array_values($day_choices);
 $uniform_choice = (count($day_values) > 0 && count(array_unique($day_values)) === 1) ? $day_values[0] : '';
-$primary_choices = $is_update ? array_merge(events_rsvp_roles(), array('none')) : events_rsvp_roles();
+$primary_choices = $is_update ? array_merge($event_roles, array('none')) : $event_roles;
 $primary_choice = $per_day
     ? (in_array($uniform_choice, $primary_choices, true) ? $uniform_choice : '')
     : ($withdraw_chosen ? 'none' : $solo_role);
@@ -651,13 +656,15 @@ if($rsvp_step === 'attendance')
     //
     // Someone editing a signup can also answer that they are not coming after all. A first
     // signup is not offered it: there is nothing yet to withdraw.
-    $primary_labels = array('trooper' => 'Trooping', 'wrangler' => 'Wrangling');
+    $primary_labels = $is_social
+        ? array('attendee' => 'Attending')
+        : array('trooper' => 'Trooping', 'wrangler' => 'Wrangling');
 
     // A role with no room says so on the choice itself, before anybody picks it, so
     // nobody arrives at the confirm step to find they were only ever joining a queue.
     $place_ids = $has_days ? $valid_day_ids : array(0);
     $full_days = array();
-    foreach(events_rsvp_roles() as $role)
+    foreach($event_roles as $role)
     {
         $full_days[$role] = array();
         foreach($place_ids as $place_id)
@@ -685,7 +692,7 @@ if($rsvp_step === 'attendance')
     }
 
     $rsvp_body .= '<div class="signup_primary" role="radiogroup" aria-labelledby="signup_role_label">'
-                . '<span class="signup_primary_label" id="signup_role_label">How are you attending?</span>'
+                . '<span class="signup_primary_label" id="signup_role_label">' . ($is_social ? 'Are you attending?' : 'How are you attending?') . '</span>'
                 . events_signup_choices(
                     'signup_role',
                     $primary_labels,
@@ -704,7 +711,8 @@ if($rsvp_step === 'attendance')
         // tells the POST handler to read the grid rather than the answer above.
         $rsvp_body .= '<input type="checkbox" class="signup_per_day" id="signup_per_day" name="per_day" value="1"'
                     . ($per_day ? ' checked="checked"' : '') . ' aria-controls="signup_days" />'
-                    . '<label class="signup_per_day_label" for="signup_per_day">I am not doing the same thing every day</label>';
+                    . '<label class="signup_per_day_label" for="signup_per_day">'
+                    . ($is_social ? 'I am not coming every day' : 'I am not doing the same thing every day') . '</label>';
 
         $rsvp_body .= '<div class="signup_days" id="signup_days">'
                     . '<p class="signup_days_hint">Set how you are attending on each day.</p>';
@@ -713,11 +721,10 @@ if($rsvp_step === 'attendance')
         // defers to the question above: two controls for one answer is what made the step
         // hard to read, because the chip above and the chips below could each be showing
         // something the other contradicted.
-        $choices = array(
-            'trooper'  => 'Trooping',
-            'wrangler' => 'Wrangling',
-            'none'     => 'Not attending',
-        );
+        $choices = $is_social
+            ? array('attendee' => 'Attending')
+            : array('trooper' => 'Trooping', 'wrangler' => 'Wrangling');
+        $choices['none'] = 'Not attending';
 
         foreach($event_days as $day)
         {
@@ -725,7 +732,7 @@ if($rsvp_step === 'attendance')
             $current = isset($day_choices[$day_id]) ? $day_choices[$day_id] : $signup_role;
 
             $day_labels = $choices;
-            foreach(events_rsvp_roles() as $role)
+            foreach($event_roles as $role)
             {
                 if(in_array($day_id, $full_days[$role], true))
                 {
