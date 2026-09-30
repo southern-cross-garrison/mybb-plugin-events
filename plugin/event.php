@@ -158,6 +158,15 @@ if($action === 'attendance')
         $attendance_identity_columns['attendee_tkid'] = 'Legion ID';
     }
 
+    // Beside the Legion ID, since it is the other number a coordinator checks a card
+    // against. Asked of everybody on an event that requires it, wranglers included, so
+    // every row carries one. A field that is not mapped would only be a column of blanks.
+    $show_wwcc = events_event_requires_wwcc($event) && events_get_setting('wwcc_field');
+    if($show_wwcc)
+    {
+        $attendance_identity_columns['attendee_wwcc'] = htmlspecialchars_uni(events_wwcc_name());
+    }
+
     if(!empty($event_days))
     {
         $attendance_identity_columns['attendee_days'] = 'Days';
@@ -166,7 +175,7 @@ if($action === 'attendance')
     // The second row says the same three things whatever the event, so it is laid over the
     // first row's columns rather than having any of its own: costumes take two of them,
     // the mobile one, and the emergency contact whatever is left - which is one column
-    // more on an event that has a Days column to absorb. A social event's has no costumes
+    // more for each of a Days or a WWCC column to absorb. A social event's has no costumes
     // to give room to.
     $attendance_contact_columns = $is_social
         ? array()
@@ -195,7 +204,7 @@ if($action === 'attendance')
     // The number and the tick box either side of the identity columns.
     $attendance_colspan = count($attendance_identity_columns) + 2;
     // Drives the column widths, which differ by one column between the two layouts.
-    $attendance_table_class = trim((!empty($event_days) ? 'has_days' : '') . ($is_social ? ' is_social' : ''));
+    $attendance_table_class = trim((!empty($event_days) ? 'has_days' : '') . ($is_social ? ' is_social' : '') . ($show_wwcc ? ' has_wwcc' : ''));
 
     // One renderer for both tables, so the waitlist cannot drift from the sheet it sits
     // under: the same columns, the same contact details - those are what a point of
@@ -237,6 +246,11 @@ if($action === 'attendance')
             if(isset($attendance_identity_columns['attendee_tkid']))
             {
                 $attendees_rows .= '<td class="attendee_tkid">' . htmlspecialchars_uni($attendee['tk_id']) . '</td>';
+            }
+
+            if(isset($attendance_identity_columns['attendee_wwcc']))
+            {
+                $attendees_rows .= '<td class="attendee_wwcc">' . htmlspecialchars_uni($attendee['wwcc']) . '</td>';
             }
 
             if(!empty($event_days))

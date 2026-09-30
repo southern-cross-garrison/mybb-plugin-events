@@ -194,6 +194,36 @@ test.describe('attendance sheet days', () => {
     await expect(role('trooper2')).toHaveText('Trooper');
   });
 
+  test('lists everybody\'s WWCC on an event that requires one, and only then', async ({ page }) => {
+    const required = await createEvent({ title: 'WWCC Sheet Troop', requiresWwcc: true });
+    await createRsvp(required, 'trooper1');
+    await createRsvp(required, 'trooper2', { role: 'wrangler' });
+    const plain = await createEvent({ title: 'No WWCC Sheet Troop' });
+    await createRsvp(plain, 'trooper1');
+
+    await loginAs(page, 'gec');
+    await page.goto(`/event.php?id=${required}&action=attendance`);
+
+    await expect(page.locator('.attendance_identity_head th.attendee_wwcc')).toHaveText('WWCC');
+    const wwcc = (username: string) =>
+      page.locator(`tr.attendee_row:has(.attendee_username:text-is("${username}")) .attendee_wwcc`);
+    // Asked of a wrangler as well, so a wrangler's row carries one too.
+    await expect(wwcc('trooper1')).toHaveText('WWCC-2001');
+    await expect(wwcc('trooper2')).toHaveText('WWCC-2002');
+
+    // The contact row is laid over the identity row's columns, so the extra column has to
+    // be absorbed there or the two halves stop lining up.
+    const grid = await page.locator('#attendance_table thead').evaluate((head) => {
+      const spans = (selector: string) =>
+        Array.from(head.querySelectorAll<HTMLTableCellElement>(selector)).reduce((sum, cell) => sum + cell.colSpan, 0);
+      return { identity: spans('.attendance_identity_head th:not([rowspan])'), contact: spans('.attendance_contact_head th') };
+    });
+    expect(grid.contact).toBe(grid.identity);
+
+    await page.goto(`/event.php?id=${plain}&action=attendance`);
+    await expect(page.locator('#attendance_table .attendee_wwcc')).toHaveCount(0);
+  });
+
   test('answers the day filter with that day, not the rest of the signup', async ({ page }) => {
     const { eventId, saturday, sunday } = await weekend();
     await createRsvp(eventId, 'trooper1', { dayIds: [saturday, sunday] });

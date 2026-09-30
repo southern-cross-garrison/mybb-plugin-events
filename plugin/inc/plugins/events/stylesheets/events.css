@@ -1017,6 +1017,38 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 :is(#attendance_table, .attendance_waitlist_table).is_social.has_days .attendance_identity_head .attendee_role { width: 18%; }
 :is(#attendance_table, .attendance_waitlist_table).is_social.has_days .attendance_identity_head .attendee_days { width: 26%; }
 
+/* A WWCC column beside the Legion ID, on an event that requires one: each layout gives
+   it room from the names and the role. Every column is restated so no combination of
+   the three classes is left adding to more than 100. */
+:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_num { width: 5%; }
+:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_preferred_name { width: 20%; }
+:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_username { width: 18%; }
+:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_role { width: 15%; }
+:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_tkid { width: 14%; }
+:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_wwcc { width: 18%; }
+:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_attended { width: 10%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_num { width: 4%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_preferred_name { width: 14%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_username { width: 13%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_role { width: 13%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_tkid { width: 12%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_wwcc { width: 14%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_days { width: 20%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_attended { width: 10%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc .attendance_identity_head .attendee_num { width: 5%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc .attendance_identity_head .attendee_preferred_name { width: 26%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc .attendance_identity_head .attendee_username { width: 24%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc .attendance_identity_head .attendee_role { width: 18%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc .attendance_identity_head .attendee_wwcc { width: 17%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc .attendance_identity_head .attendee_attended { width: 10%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc .attendance_identity_head .attendee_num { width: 4%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc .attendance_identity_head .attendee_preferred_name { width: 18%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc .attendance_identity_head .attendee_username { width: 16%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc .attendance_identity_head .attendee_role { width: 14%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc .attendance_identity_head .attendee_wwcc { width: 16%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc .attendance_identity_head .attendee_days { width: 22%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc .attendance_identity_head .attendee_attended { width: 10%; }
+
 /* Where one person ends and the next begins. Without it the sheet reads as twice as many
    people, half of them nameless. The rule goes along the bottom of the pair, which means
    the contact row's cells *and* the two that span both rows - they end at the same line. */
