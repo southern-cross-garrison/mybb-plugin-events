@@ -28,16 +28,16 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v7
+      # Reads the pnpm version from `packageManager` in package.json, installs the Node
+      # version its `devEngines.runtime` names, and runs `pnpm install --frozen-lockfile` -
+      # the same setup as the docs workflow.
+      - uses: pnpm/setup@v3
         with:
-          node-version: 20
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
+          cache: true
+          require-lockfile: true
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps chromium
 
       # scripts/fetch-theme.sh and scripts/install-smartlink.sh clone two private sibling
       # repos. The GITHUB_TOKEN actions/checkout installs is scoped to this repo alone, so
@@ -78,7 +78,7 @@ jobs:
             -c 'find plugin scripts -name "*.php" -print0 | xargs -0 -n1 php -d display_errors=stderr -l >/dev/null'
 
       - name: Run the suite
-        run: npx playwright test
+        run: pnpm exec playwright test
 
       - name: Collect container logs
         if: failure()

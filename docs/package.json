@@ -4,6 +4,13 @@
   "description": "User guide for the MyBB Event Management plugin, published to GitHub Pages",
   "type": "module",
   "packageManager": "pnpm@12.8.1",
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "^24.0.0",
+      "onFail": "download"
+    }
+  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",

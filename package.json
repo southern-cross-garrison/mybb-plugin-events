@@ -1,6 +1,14 @@
 {
   "name": "mybb-plugin-events-e2e",
   "private": true,
+  "packageManager": "pnpm@12.8.1",
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": "^24.0.0",
+      "onFail": "download"
+    }
+  },
   "description": "End-to-end test suite for the MyBB Event Management plugin",
   "scripts": {
     "bootstrap": "./scripts/bootstrap.sh",
@@ -15,7 +23,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
-    "@types/node": "^22.10.0",
+    "@types/node": "^24.19.1",
     "mysql2": "^3.11.5"
   }
 }

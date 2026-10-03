@@ -35,13 +35,12 @@ jobs:
           fetch-depth: 0
 
       # pnpm/setup is the successor to pnpm/action-setup for pnpm 11 and newer. It reads
-      # the pnpm version from `packageManager` in docs/package.json, installs Node, and
-      # runs `pnpm install --frozen-lockfile` in docs/ - not at the repo root, which is
-      # the npm-managed test suite.
+      # the pnpm version from `packageManager` in docs/package.json, installs the Node
+      # version its `devEngines.runtime` names, and runs `pnpm install --frozen-lockfile` in docs/ - not at the repo root, which is
+      # the test suite's own package.
       - uses: pnpm/setup@v3
         with:
           working-directory: docs
-          runtime: node@22
           cache: true
           require-lockfile: true
 

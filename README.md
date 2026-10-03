@@ -6,7 +6,7 @@ for what the plugin does; this file covers the development environment and the t
 
 ## Quick start
 
-Requires Docker and Node 20+.
+Requires Docker and pnpm 12+, which fetches the Node version the project pins.
 
 ```bash
 ./scripts/bootstrap.sh     # ~2 minutes on a cold start
