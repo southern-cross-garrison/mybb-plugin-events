@@ -53,7 +53,7 @@ function events_info()
         "website"       => "https://github.com/southern-cross-garrison/mybb-plugin-events",
         "author"        => "Kevin Brown (TK-33151)",
         "authorsite"    => "https://www.501scg.org/",
-        "version"       => "1.2",
+        "version"       => "1.2.1",
         "guid"          => "aa8e5870-f198-467f-a67a-0726e9690efc",
         "codename"      => "events",
         "compatibility" => "18*"
