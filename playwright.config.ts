@@ -33,6 +33,11 @@ export default defineConfig({
     screenshot: 'only-on-failure',
     video: 'off',
     actionTimeout: 10_000,
+    // The garrison theme's Bootstrap turns on `scroll-behavior: smooth` unless reduced
+    // motion is asked for, which animates the scroll Playwright does before a click: the
+    // target is still off screen when it is checked, and the click can stall until it
+    // times out. Seen on the no-script removal page, whose submit sits at the fold.
+    reducedMotion: 'reduce',
   },
 
   projects: [
