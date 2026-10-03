@@ -1,0 +1,85 @@
+---
+title: Finding events
+description: Browse events in a list or calendar, filter by region, and see who's going.
+sidebar:
+  order: 1
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+
+import eventsList from '../../../assets/screenshots/members/events-list-overview.png';
+import filters from '../../../assets/screenshots/members/events-filters.png';
+import calendar from '../../../assets/screenshots/members/events-calendar.png';
+import whoIsAttending from '../../../assets/screenshots/members/who-is-attending.png';
+
+To view events, click **Events** in the top right.
+
+<Image src={eventsList} alt="The Events page in list view" />
+
+## The events list
+
+| Column | Shows |
+| --- | --- |
+| **Event** | Name and address. Click the address for Google Maps. Social events are marked **Social**. |
+| **Region** | Where it is. |
+| **When** | Start date, and end date for multi-day events. |
+| **Signups** | **T** troopers, **W** wranglers, **A** attendees (social events). |
+| **Status** | See below. |
+| **You** | **Trooping**, **Wrangling** or **Waitlisted** if you're signed up. Otherwise **Sign Up**, **Join Waitlist** or **Closed**. |
+
+### Status
+
+| Status | Meaning |
+| --- | --- |
+| **Live** | Upcoming and taking signups. |
+| **Needs Troop Report** | Finished, with no troop report yet. If you trooped it, [write one](../troop-reports/). |
+| **Complete** | Finished and reported. |
+| **Archived** | Closed out. Hidden unless you [show past events](#show-past-events). |
+
+## Switch to the calendar
+
+Click **Calendar** at the right of the toolbar. Click **List** to switch back. The forum
+remembers your choice.
+
+<Image src={calendar} alt="The calendar view, with the List button circled" />
+
+Use the arrows beside the month to change months.
+
+## Filter by region
+
+<Steps>
+
+1. Click **Filter**.
+
+   <Image src={filters} alt="The Filter button and region list circled" />
+
+2. Choose a region. The list updates straight away.
+
+</Steps>
+
+Choose **All Regions** to clear the filter.
+
+## Show past events
+
+Click **Filter** and tick **Show archived**. This resets when you leave the page.
+
+## Open an event
+
+Click the event's name. The event details are at the top of its forum thread, with the
+discussion underneath. Reply there to ask the coordinator a question.
+
+## See who's going
+
+**Who is Attending** lists everyone signed up, with the [waitlist](../waitlists/) in queue
+order underneath.
+
+<Image src={whoIsAttending} alt="The Who is Attending list on an event" />
+
+To narrow the list by costume or day, click **Filter** beside the heading. **Reset**
+clears it.
+
+<Aside type="tip" title="Can't find an event?">
+  Check the region filter, and tick **Show archived** if it's already happened. Events
+  aren't listed until they open for signups.
+</Aside>

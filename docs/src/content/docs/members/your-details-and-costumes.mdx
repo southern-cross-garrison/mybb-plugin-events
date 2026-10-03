@@ -1,0 +1,78 @@
+---
+title: Your details and costumes
+description: The profile details you're asked for when signing up, where your costume list comes from, and preapproved costumes.
+sidebar:
+  order: 3
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+
+import prerequisites from '../../../assets/screenshots/members/prerequisites-step.png';
+import preapproval from '../../../assets/screenshots/members/preapproval.png';
+
+When you sign up, you're asked for any of these that aren't on your profile yet. They're
+saved, so you only enter them once.
+
+<Image src={prerequisites} alt="The Signup Prerequisites step" />
+
+## What you're asked for
+
+| Detail | Asked of | Notes |
+| --- | --- | --- |
+| **Legion ID** | Troopers | Just the number: for TK-12345, type `12345`. |
+| **Preferred Name** | Everyone | What to call you on the day. |
+| **Mobile Number** | Troopers and wranglers | [Why we ask](../contact-details/) |
+| **Emergency Contact** | Troopers and wranglers | A name and number. [Why we ask](../contact-details/) |
+| **WWCC Number** | Events that need one | Working With Children Check. |
+
+Social events only ask for your preferred name, and a WWCC if needed.
+
+When you type your Legion ID, the form shows whose record it is so you can check it.
+
+<Aside>
+  Only coordinators and admins can see your mobile number and emergency contact. See
+  [Why we ask for contact details](../contact-details/).
+</Aside>
+
+## Your costume list
+
+Your costumes come from your 501st Legion record, fetched each time you sign up to troop.
+Newly approved costumes appear automatically.
+
+If the Legion's records can't be reached or yours is private, your saved costumes are
+used instead. If you have none saved, you're asked to type them, one per line.
+
+### If your costumes are wrong
+
+<Steps>
+
+1. Check the costume is approved on your 501st Legion profile.
+
+2. Check your Legion ID in **User CP** > **Edit Profile**.
+
+3. Sign up again, or click **Update Your Signup**.
+
+</Steps>
+
+## Preapproved costumes
+
+If enabled, you can troop in a preapproved costume that isn't on your Legion record yet.
+
+<Steps>
+
+1. On the costume step, type the costume in the **Preapproval:** box.
+
+   <Image src={preapproval} alt="The Preapproval box circled" />
+
+2. If instructions are shown, follow them and tick the box to confirm your preapproval.
+
+3. Click **Continue**.
+
+</Steps>
+
+It's listed as `Preapproval: <costume>`. You confirm again each time you use it.
+
+## Change your details
+
+Go to **User CP** > **Edit Profile**. Changes apply to your next signup.

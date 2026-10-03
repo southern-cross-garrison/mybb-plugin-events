@@ -1,0 +1,119 @@
+---
+title: Signing up for an event
+description: Sign up to troop or wrangle, change your signup, or pull out.
+sidebar:
+  order: 2
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+
+import eventsList from '../../../assets/screenshots/members/events-list.png';
+import eventSignup from '../../../assets/screenshots/members/event-signup-button.png';
+import attendance from '../../../assets/screenshots/members/attendance-step.png';
+import perDay from '../../../assets/screenshots/members/attendance-per-day.png';
+import costumes from '../../../assets/screenshots/members/costumes-step.png';
+import confirm from '../../../assets/screenshots/members/confirm-step.png';
+import updateSignup from '../../../assets/screenshots/members/update-signup-button.png';
+import notAttending from '../../../assets/screenshots/members/not-attending.png';
+
+## Sign up to troop
+
+<Steps>
+
+1. Click **Events** in the top right, then click the event's name.
+
+   <Image src={eventsList} alt="The Events page with an event name circled" />
+
+2. Click **Sign Up to Attend**. If it says **Join Waitlist**, the event is full: see
+   [Waitlists](../waitlists/).
+
+   <Image src={eventSignup} alt="The Sign Up to Attend button circled" />
+
+3. Leave **Trooping** selected and click **Continue**.
+
+   <Image src={attendance} alt="Trooping and the Continue button circled" />
+
+4. If you're asked for details like your Legion ID or mobile number, fill them in and click
+   **Save and Continue**. You're only asked once. See
+   [Your details and costumes](../your-details-and-costumes/).
+
+5. Tick the costumes you're bringing and click **Continue**.
+
+   <Image src={costumes} alt="A costume checkbox circled" />
+
+6. Click **Confirm Signup**.
+
+   <Image src={confirm} alt="The Confirm Signup button circled" />
+
+</Steps>
+
+<Aside type="tip">
+  **Sign Up** in the events list skips to step 3.
+</Aside>
+
+## Sign up to wrangle
+
+Wranglers help out of costume. You don't need to be a full member, and aren't asked for a
+Legion ID or costume.
+
+Follow the steps above, choosing **Wrangling** at step 3.
+
+## Multi-day events
+
+To troop some days and wrangle or skip others:
+
+<Steps>
+
+1. At step 3, tick **I am not doing the same thing every day**.
+
+2. Choose **Trooping**, **Wrangling** or **Not attending** for each day.
+
+   <Image src={perDay} alt="A different choice for each day" />
+
+3. Click **Continue**.
+
+</Steps>
+
+## Change your signup
+
+<Steps>
+
+1. Open the event and click **Update Your Signup**.
+
+   <Image src={updateSignup} alt="The Update Your Signup button circled" />
+
+2. Make your changes, click **Continue** through the steps, then click **Save Changes**.
+
+</Steps>
+
+You keep your place in the queue for any role you already had.
+
+## Pull out of an event
+
+<Steps>
+
+1. Open the event and click **Update Your Signup**.
+
+2. Choose **Not attending** and click **Continue**.
+
+   <Image src={notAttending} alt="Not attending circled" />
+
+3. Click **Withdraw Signup**.
+
+</Steps>
+
+If there's a waitlist, the next person gets your place.
+
+## When you can't sign up
+
+| Message | Meaning |
+| --- | --- |
+| **Signups for this event have closed.** | The cutoff has passed. |
+| **This event has finished, so signups have closed.** | The event is over. |
+| **This event is not open for signups.** | It isn't open yet. |
+| **You must be logged in to sign up.** | Log in first. |
+
+<Aside type="caution" title="After signups close">
+  You can't change or withdraw your signup. Message the coordinator instead.
+</Aside>

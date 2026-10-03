@@ -1,0 +1,74 @@
+---
+title: Add events to your calendar
+description: Subscribe so every event you sign up for appears in your calendar, or add a single event.
+sidebar:
+  label: Adding events to your calendar
+  order: 7
+---
+
+import { Aside, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+
+import addToCalendar from '../../../assets/screenshots/members/add-to-calendar.png';
+import feedCreate from '../../../assets/screenshots/members/calendar-feed-create.png';
+import feedSubscribe from '../../../assets/screenshots/members/calendar-feed-subscribe.png';
+
+- **Subscribe** (recommended): every event you sign up for appears in your calendar and
+  stays up to date.
+- **Add one event**: a one-off copy that doesn't update.
+
+## Subscribe
+
+<Steps>
+
+1. Go to **User CP** > **Calendar Subscription**.
+
+2. Click **Make my subscription link**.
+
+   <Image src={feedCreate} alt="Make my subscription link circled" />
+
+3. Add it to your calendar:
+
+   <Tabs>
+   <TabItem label="iPhone, Mac, Outlook">
+
+   Click **Subscribe in my calendar app** and confirm in your calendar app.
+
+   <Image src={feedSubscribe} alt="Subscribe in my calendar app circled" />
+
+   </TabItem>
+   <TabItem label="Google Calendar">
+
+   1. Click the arrow beside **Subscribe in my calendar app**, choose **Copy calendar
+      URL**, and copy the link.
+   2. In Google Calendar on a computer, click **+** beside **Other calendars** >
+      **From URL**.
+   3. Paste the link and click **Add calendar**.
+
+   </TabItem>
+   </Tabs>
+
+</Steps>
+
+<Aside type="caution" title="The link is only shown once">
+  Subscribe or copy it straight away. If you lose it, make a new one.
+</Aside>
+
+Entries show your role, such as **Trooping: Supanova Sydney**. Changes can take up to a day
+to appear in Google Calendar; Apple and Outlook update more often.
+
+### Keep your link private
+
+Anyone with the link can see your signups. If it's been shared, click **Make a new link**
+on the Calendar Subscription page: the old one stops working. Click **Turn off** to stop
+the subscription.
+
+## Add one event
+
+On an event you've signed up for, click **Add to Calendar** and open the downloaded file.
+
+<Image src={addToCalendar} alt="Add to Calendar circled" />
+
+<Aside>
+  This copy doesn't update if the event or your signup changes.
+</Aside>

@@ -1,0 +1,51 @@
+---
+title: Waitlists
+description: Joining a waitlist when an event is full, and how places are handed out.
+sidebar:
+  order: 5
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+
+import joinWaitlist from '../../../assets/screenshots/members/join-waitlist-button.png';
+import waitlisted from '../../../assets/screenshots/members/waitlisted-status.png';
+
+## Join a waitlist
+
+When an event is full, click **Join Waitlist** and sign up as usual. The last button reads
+**Join the Waitlist**.
+
+<Image src={joinWaitlist} alt="The Join Waitlist button circled" />
+
+If only one role is full, you can take a place in the other straight away.
+
+## Your place in the queue
+
+The event shows **Waitlisted** and your position, such as `#2`. The queue is also listed
+under **Who is Attending**.
+
+<Image src={waitlisted} alt="Waitlisted: Trooping (#1)" />
+
+## Getting a place
+
+Places go in signup order. When someone pulls out or the limit is raised, the next person
+gets the place and is sent a private message.
+
+If the limit is lowered, the latest signups move back to the front of the waitlist and are
+messaged too.
+
+<Aside type="caution">
+  You don't have a place until you're told so. If you're still waitlisted close to the
+  day, check with the coordinator.
+</Aside>
+
+## Multi-day events
+
+Each day has its own queue, so you can have a place one day and be waiting for another.
+
+## Leave the waitlist
+
+Click **Update Your Signup**, choose **Not attending**, and click **Withdraw Signup**.
+
+Waitlisted days aren't added to [your calendar](../calendar/) until you get a place.

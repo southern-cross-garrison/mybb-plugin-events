@@ -1,0 +1,59 @@
+---
+title: Writing a troop report
+description: Post the troop report after an event you trooped.
+sidebar:
+  order: 8
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+
+import createButton from '../../../assets/screenshots/members/create-troop-report-button.png';
+import reportForm from '../../../assets/screenshots/members/troop-report-form.png';
+
+One troop report is needed per troop, and anyone who trooped can post it. It's what counts
+the troop towards everyone's [My Troops](../my-troops/).
+
+## Post the report
+
+<Steps>
+
+1. After the event, open it and click **Create Troop Report**.
+
+   <Image src={createButton} alt="Create Troop Report circled" />
+
+2. Check the list of people against who came. Remove anyone who didn't, and add anyone who
+   came off the waitlist.
+
+   <Image src={reportForm} alt="The draft troop report" />
+
+3. Fill in the weather, **Mission Report**, **Mission Status** and photographer.
+
+4. Click **Post Troop Report**.
+
+</Steps>
+
+The report is posted to the troop reports forum, linked from the event's thread, and the
+event is archived.
+
+## Keep the roll call format
+
+Leave each person's line as it is:
+
+```
+Ash - trooper1 - TK-20001
+```
+
+The username and Legion ID are how the troop is counted. If they're changed or removed,
+that person isn't credited.
+
+<Aside type="tip" title="Made a mistake?">
+  Edit the report's first post. The troop is recounted from the edited version.
+</Aside>
+
+## Reminders
+
+Until the report is posted, everyone who trooped gets a weekly **Troop Report Needed**
+message.
+
+Wranglers and waitlisted members can't post reports and don't get reminders.

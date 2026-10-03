@@ -1,0 +1,52 @@
+@import '@fontsource-variable/plus-jakarta-sans';
+
+:root {
+  --sl-font: 'Plus Jakarta Sans Variable', system-ui, sans-serif;
+}
+
+.sl-markdown-content :is(h1, h2, h3),
+h1#_top {
+  letter-spacing: -0.02em;
+}
+
+/*
+ * Colours. The Vintage theme derives its whole palette (backgrounds, borders, the
+ * sidebar highlight) from one hue: 258 is a dark navy blue in place of its purple.
+ * The accent is the site title, link hover and the "you are here" bar.
+ */
+:root,
+::backdrop {
+  --sl-vintage-hue-base: 258;
+  --sl-hue-blue: 250;
+  --sl-color-accent: oklch(0.92 0.02 250); /* silver-white, on the dark background */
+}
+
+:root[data-theme='light'],
+[data-theme='light'] ::backdrop {
+  --sl-color-accent: oklch(0.35 0.08 258); /* deep navy, readable on white */
+  --sl-vintage-ui-accent-alt-color: oklch(0.35 0.08 258);
+}
+
+/* Screenshots get a hairline border so a white page doesn't melt into the background. */
+.sl-markdown-content img {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.375rem;
+}
+
+/* Inside <Steps>, keep screenshots a readable size rather than full column width. */
+.sl-steps img {
+  max-width: min(100%, 44rem);
+  margin-block: 0.75rem;
+}
+
+/* On phones the logo and title share the header with search and the menu button. */
+@media (max-width: 50em) {
+  .site-title {
+    font-size: var(--sl-text-xl);
+    gap: 0.5rem;
+  }
+
+  .site-title img {
+    height: 2.75rem;
+  }
+}
