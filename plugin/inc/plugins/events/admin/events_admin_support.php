@@ -24,6 +24,8 @@ define('EVENTS_SUPPORT_MYCODE', <<<'MYCODE'
 
 Created by [url=https://www.501st.com/member/33151/][b]Kevin Brown (TK-33151)[/b][/url] of the [url=https://www.501scg.org/]Southern Cross Garrison[/url], 501st Legion.
 
+[size=medium][b]Documentation:[/b] [url=https://events-guide.501scg.org/]events-guide.501scg.org[/url][/size]
+
 [b]Found a bug or have an idea?[/b] [url=https://github.com/southern-cross-garrison/mybb-plugin-events/issues]Open an issue on GitHub[/url].
 [b]Source code:[/b] [url=https://github.com/southern-cross-garrison/mybb-plugin-events]github.com/southern-cross-garrison/mybb-plugin-events[/url]
 MYCODE

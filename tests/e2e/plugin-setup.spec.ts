@@ -318,6 +318,7 @@ test.describe('admin module', () => {
     const support = page.locator('.events_support');
     await expect(support.locator('a[href="https://www.501st.com/member/33151/"]')).toHaveText('Kevin Brown (TK-33151)');
     await expect(support.locator('a[href="https://www.501scg.org/"]')).toHaveText('Southern Cross Garrison');
+    await expect(support.locator('a[href="https://events-guide.501scg.org/"]')).toBeVisible();
     await expect(
       support.locator('a[href="https://github.com/southern-cross-garrison/mybb-plugin-events/issues"]'),
     ).toBeVisible();
