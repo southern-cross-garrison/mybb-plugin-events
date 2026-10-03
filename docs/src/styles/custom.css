@@ -71,6 +71,11 @@ h1#_top {
  * image's own background, so the picture covers them as it paints; the head script in
  * astro.config.mjs adds .loaded when it finishes, which stops the animation. Without
  * script nothing is shown, rather than dots animating forever behind every image.
+ *
+ * Browsers draw the alt text in the box until the image arrives, over the dots, so it is
+ * made transparent meanwhile. Screen readers read the attribute, not the pixels, so this
+ * changes nothing for them, and an image that fails to load is marked .loaded too, which
+ * brings the text back where it is the only thing left to see.
  */
 @property --img-dot-1 {
 	syntax: '<percentage>';
@@ -92,6 +97,7 @@ h1#_top {
 
 .img-loading .sl-markdown-content img:not(.loaded) {
 	--img-dot: var(--sl-color-gray-3);
+	color: transparent;
 	background:
 		radial-gradient(
 				circle closest-side,
