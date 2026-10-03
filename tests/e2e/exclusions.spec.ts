@@ -1098,15 +1098,13 @@ $cache->update_most_viewed_threads();
 
 		const prefix = await getSetting('cookieprefix');
 		const quoteBoth = async (): Promise<void> => {
-			await page
-				.context()
-				.addCookies([
-					{
-						name: `${prefix}multiquote`,
-						value: `${hiddenPostId}|${visiblePostId}`,
-						url: new URL(page.url()).origin,
-					},
-				]);
+			await page.context().addCookies([
+				{
+					name: `${prefix}multiquote`,
+					value: `${hiddenPostId}|${visiblePostId}`,
+					url: new URL(page.url()).origin,
+				},
+			]);
 		};
 
 		const urls = [

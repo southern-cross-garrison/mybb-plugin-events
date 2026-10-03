@@ -125,6 +125,12 @@ test.describe('coordinator controls on the event page', () => {
 		// itself and the way to undo it is in reach.
 		await expect(page.locator('#rsvp_filter_form')).toBeVisible();
 
+		// A filter that matches nobody says so, rather than claiming nobody signed up.
+		await page.locator('#filter_costume').fill('Snowtrooper');
+		await page.locator('#rsvp_filter_form input[value="Filter"]').click();
+		await expect(page.locator('li.rsvp_row')).toHaveCount(0);
+		await expect(page.locator('#rsvp_list_empty')).toHaveText('Nobody matches these filters.');
+
 		await page.locator('#rsvp_filter_reset').click();
 		await expect(page.locator('li.rsvp_row')).toHaveCount(2);
 		await expect(page.locator('#rsvp_filter_form')).not.toBeVisible();

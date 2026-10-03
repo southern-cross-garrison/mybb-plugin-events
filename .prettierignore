@@ -10,3 +10,6 @@ plugin/**/*.html
 
 # Vendored.
 plugin/jscripts/events/jquery-ui-datepicker.js
+
+# Prettier's MDX support breaks JSX nested in list items (<Steps>, <Tabs> inside steps).
+*.mdx

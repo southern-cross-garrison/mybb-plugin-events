@@ -376,14 +376,16 @@ function events_render_event_card(array $event, $thread_id = 0)
 
     $rsvp_list_count = count($attendees);
 
-    if($rsvp_rows === '')
-    {
-        $rsvp_rows = '<li id="rsvp_list_empty">Nobody has signed up yet.</li>';
-    }
-
     // A filter that is doing something stays on show, so a short list is never a mystery:
     // the panel that explains why it is short is already open above it.
-    $rsvp_filter_open = ($filter_costume !== '' || $filter_day) ? ' open' : '';
+    $rsvp_filtered = ($filter_costume !== '' || $filter_day);
+    $rsvp_filter_open = $rsvp_filtered ? ' open' : '';
+
+    if($rsvp_rows === '')
+    {
+        $rsvp_empty = ($rsvp_filtered && events_rsvp_count($event_id, null) > 0) ? 'Nobody matches these filters.' : 'Nobody has signed up yet.';
+        $rsvp_rows = '<li id="rsvp_list_empty">' . $rsvp_empty . '</li>';
+    }
 
     $filter_costume_field = $is_social ? '' : '<label>Costume: <input type="text" class="textbox" name="filter_costume" id="filter_costume" value="'
         . htmlspecialchars_uni($filter_costume) . '" /></label>';
