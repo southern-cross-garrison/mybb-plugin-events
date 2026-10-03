@@ -728,7 +728,10 @@ $rsvp_carried_state = '';
 $rsvp_submit_label = 'Continue';
 $rsvp_page_title = ($is_update ? 'Update Signup: ' : 'Sign Up: ') . $event_title;
 
-$rsvp_intro .= events_form_errors($errors, 'rsvp_errors');
+// Above the button rather than at the top of the form: a step can run long - the
+// preapproval requirements do - and an error at the top is off screen from the button
+// the member just pressed.
+$rsvp_errors = events_form_errors($errors, 'rsvp_errors');
 
 /**
  * Everything selected so far is re-posted with each step.
@@ -1021,6 +1024,7 @@ elseif($rsvp_step === 'costumes')
     // The text box sits inside the row's label, where clicking it focuses it rather than
     // toggling the box; the script ticks the box once something is typed, so nobody has
     // to do both. With the script off the box is ticked by hand and nothing is lost.
+    $preapproval_after = '';
     if($preapproval_enabled)
     {
         $rsvp_body .= '<label class="events_option costume_option costume_preapproval_option">'
@@ -1031,11 +1035,13 @@ elseif($rsvp_step === 'costumes')
             . '</label>';
 
         // The requirements read like terms to accept: the post in a box of its own, and
-        // the box to tick under it. The script shows them only once a preapproval is
-        // chosen; without it they are always there, and asked about only for one.
+        // the box to tick under it. They go under the costume list rather than in it, at
+        // the page's full width, since the post can run long. The script shows them only
+        // once a preapproval is chosen; without it they are always there, and asked about
+        // only for one.
         if($preapproval_requirements)
         {
-            $rsvp_body .= '<div id="costume_preapproval_requirements">'
+            $preapproval_after .= '<div id="costume_preapproval_requirements">'
                 . '<div class="events_terms" id="costume_preapproval_terms">'
                 . '<h3 class="events_terms_title"><a href="' . get_post_link((int)$preapproval_requirements['pid'], (int)$preapproval_requirements['tid']) . '#pid' . (int)$preapproval_requirements['pid'] . '">'
                 . htmlspecialchars_uni($preapproval_requirements['thread_subject']) . '</a></h3>'
@@ -1047,7 +1053,7 @@ elseif($rsvp_step === 'costumes')
                 . '</div>';
         }
 
-        $rsvp_body .= <<<'SCRIPT'
+        $preapproval_after .= <<<'SCRIPT'
 <script type="text/javascript">
 (function() {
 	var box = document.getElementById('costume_preapproval');
@@ -1064,7 +1070,7 @@ elseif($rsvp_step === 'costumes')
 SCRIPT;
     }
 
-    $rsvp_body .= '</div>' . (empty($user_costumes) ? '' : $costumes_from_api_notice);
+    $rsvp_body .= '</div>' . (empty($user_costumes) ? '' : $costumes_from_api_notice) . $preapproval_after;
 }
 elseif($rsvp_step === 'confirm' && $withdrawing)
 {
