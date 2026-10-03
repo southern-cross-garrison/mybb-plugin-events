@@ -1,0 +1,12 @@
+# Environment and build output.
+test-forum/
+.devenv/
+dist/
+.astro/
+pnpm-lock.yaml
+
+# MyBB templates are eval'd PHP strings synced into the database, not HTML documents.
+plugin/**/*.html
+
+# Vendored.
+plugin/jscripts/events/jquery-ui-datepicker.js

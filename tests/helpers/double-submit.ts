@@ -15,34 +15,34 @@ import { Page } from '@playwright/test';
  * Returns each response's body, in the order the requests were started.
  */
 export async function submitFormAtOnce(
-  page: Page,
-  formSelector: string,
-  { times = 2, overrides = {} }: { times?: number; overrides?: Record<string, string> } = {},
+	page: Page,
+	formSelector: string,
+	{ times = 2, overrides = {} }: { times?: number; overrides?: Record<string, string> } = {}
 ): Promise<string[]> {
-  return page.evaluate(
-    async ({ formSelector, times, overrides }) => {
-      const form = document.querySelector<HTMLFormElement>(formSelector);
-      if (!form) {
-        throw new Error(`No form matches ${formSelector}`);
-      }
+	return page.evaluate(
+		async ({ formSelector, times, overrides }) => {
+			const form = document.querySelector<HTMLFormElement>(formSelector);
+			if (!form) {
+				throw new Error(`No form matches ${formSelector}`);
+			}
 
-      const data = new FormData(form);
-      for (const [name, value] of Object.entries(overrides)) {
-        data.set(name, value);
-      }
+			const data = new FormData(form);
+			for (const [name, value] of Object.entries(overrides)) {
+				data.set(name, value);
+			}
 
-      // Not form.action: a form with an input named "action" (the troop report's has one)
-      // answers that with the input.
-      const url = new URL(form.getAttribute('action') ?? '', document.baseURI).href;
+			// Not form.action: a form with an input named "action" (the troop report's has one)
+			// answers that with the input.
+			const url = new URL(form.getAttribute('action') ?? '', document.baseURI).href;
 
-      const responses = await Promise.all(
-        Array.from({ length: times }, () =>
-          fetch(url, { method: 'POST', body: data, credentials: 'same-origin' }),
-        ),
-      );
+			const responses = await Promise.all(
+				Array.from({ length: times }, () =>
+					fetch(url, { method: 'POST', body: data, credentials: 'same-origin' })
+				)
+			);
 
-      return Promise.all(responses.map((response) => response.text()));
-    },
-    { formSelector, times, overrides },
-  );
+			return Promise.all(responses.map((response) => response.text()));
+		},
+		{ formSelector, times, overrides }
+	);
 }

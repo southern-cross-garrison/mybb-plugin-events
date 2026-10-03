@@ -19,32 +19,32 @@ const [TK, TD] = [0, 1].map((index) => fixtures().costumeOptions[index]);
  * from its backup before each test, so the delete does not leak.
  */
 test('a member with no userfields row can still complete a signup', async ({ page }) => {
-  const eventId = await createEvent({ title: 'No Userfields Row Troop' });
+	const eventId = await createEvent({ title: 'No Userfields Row Troop' });
 
-  await execute(`DELETE FROM ${T('userfields')} WHERE ufid = ?`, [uid('newbie')]);
+	await execute(`DELETE FROM ${T('userfields')} WHERE ufid = ?`, [uid('newbie')]);
 
-  await loginAs(page, 'newbie');
-  await page.goto(`/rsvp.php?id=${eventId}`);
-  await page.locator('#rsvp_submit').click();
+	await loginAs(page, 'newbie');
+	await page.goto(`/rsvp.php?id=${eventId}`);
+	await page.locator('#rsvp_submit').click();
 
-  await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
-  await page.locator('#prereq_legion_id').fill('12345');
-  await page.locator('#prereq_preferred_name').fill('Newt');
-  await page.locator('#prereq_mobile').fill('0400 111 222');
-  await page.locator('#prereq_emergency_contact').fill('Next Of Kin 0400 333 444');
-  await page.locator('#rsvp_submit').click();
+	await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
+	await page.locator('#prereq_legion_id').fill('12345');
+	await page.locator('#prereq_preferred_name').fill('Newt');
+	await page.locator('#prereq_mobile').fill('0400 111 222');
+	await page.locator('#prereq_emergency_contact').fill('Next Of Kin 0400 333 444');
+	await page.locator('#rsvp_submit').click();
 
-  // Getting past the step at all is the assertion: before the fix this was MyBB's SQL
-  // error page, and the values below were never written. Deleting the row took the
-  // costumes with it, and the API stand-in is down, so they are asked for next.
-  await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
-  await page.locator('#prereq_costume').fill(`${TK}\n${TD}`);
-  await page.locator('#rsvp_submit').click();
-  await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'costumes');
+	// Getting past the step at all is the assertion: before the fix this was MyBB's SQL
+	// error page, and the values below were never written. Deleting the row took the
+	// costumes with it, and the API stand-in is down, so they are asked for next.
+	await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
+	await page.locator('#prereq_costume').fill(`${TK}\n${TD}`);
+	await page.locator('#rsvp_submit').click();
+	await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'costumes');
 
-  expect(await getUserField('newbie', 'legion_id')).toBe('12345');
-  expect(await getUserField('newbie', 'preferred_name')).toBe('Newt');
-  expect(await getUserField('newbie', 'mobile')).toBe('0400 111 222');
-  expect(await getUserField('newbie', 'emergency_contact')).toBe('Next Of Kin 0400 333 444');
-  expect(await countRsvps(eventId)).toBe(0);
+	expect(await getUserField('newbie', 'legion_id')).toBe('12345');
+	expect(await getUserField('newbie', 'preferred_name')).toBe('Newt');
+	expect(await getUserField('newbie', 'mobile')).toBe('0400 111 222');
+	expect(await getUserField('newbie', 'emergency_contact')).toBe('Next Of Kin 0400 333 444');
+	expect(await countRsvps(eventId)).toBe(0);
 });

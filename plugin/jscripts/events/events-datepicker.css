@@ -30,7 +30,9 @@
 	   sit in the low hundreds, and a calendar hidden behind one reads as a dead control. */
 	z-index: 9999 !important;
 }
-.ui-datepicker a { text-decoration: none; }
+.ui-datepicker a {
+	text-decoration: none;
+}
 
 /* --- Header: month, year, and the two arrows ---------------------------------------- */
 .ui-datepicker .ui-datepicker-header {
@@ -91,8 +93,12 @@
 	overflow: hidden;
 	text-indent: -9999px;
 }
-.ui-datepicker .ui-datepicker-prev { left: 0; }
-.ui-datepicker .ui-datepicker-next { right: 0; }
+.ui-datepicker .ui-datepicker-prev {
+	left: 0;
+}
+.ui-datepicker .ui-datepicker-next {
+	right: 0;
+}
 .ui-datepicker .ui-datepicker-prev:before,
 .ui-datepicker .ui-datepicker-next:before {
 	position: absolute;
@@ -104,14 +110,27 @@
 	line-height: 1.9em;
 	color: #555;
 }
-.ui-datepicker .ui-datepicker-prev:before { content: "\2039"; font-size: 18px; }
-.ui-datepicker .ui-datepicker-next:before { content: "\203A"; font-size: 18px; }
+.ui-datepicker .ui-datepicker-prev:before {
+	content: '\2039';
+	font-size: 18px;
+}
+.ui-datepicker .ui-datepicker-next:before {
+	content: '\203A';
+	font-size: 18px;
+}
 .ui-datepicker .ui-datepicker-prev:hover,
-.ui-datepicker .ui-datepicker-next:hover { background: #ededed; }
+.ui-datepicker .ui-datepicker-next:hover {
+	background: #ededed;
+}
 /* jQuery UI leaves the arrow in the DOM at the ends of minDate/maxDate and marks it
    disabled, so it has to read as unavailable rather than merely do nothing when clicked. */
-.ui-datepicker .ui-state-disabled { opacity: 0.35; cursor: default; }
-.ui-datepicker .ui-state-disabled:hover { background: none; }
+.ui-datepicker .ui-state-disabled {
+	opacity: 0.35;
+	cursor: default;
+}
+.ui-datepicker .ui-state-disabled:hover {
+	background: none;
+}
 
 /* --- The month grid ------------------------------------------------------------------ */
 .ui-datepicker table {
@@ -129,7 +148,10 @@
 	border: 0;
 	opacity: 0.7;
 }
-.ui-datepicker td { padding: 1px; border: 0; }
+.ui-datepicker td {
+	padding: 1px;
+	border: 0;
+}
 .ui-datepicker td span,
 .ui-datepicker td a {
 	display: block;
@@ -138,23 +160,42 @@
 	color: #333;
 	border-radius: 4px;
 }
-.ui-datepicker td a:hover { background: #ededed; }
-.ui-datepicker td.ui-datepicker-unselectable span { opacity: 0.35; }
+.ui-datepicker td a:hover {
+	background: #ededed;
+}
+.ui-datepicker td.ui-datepicker-unselectable span {
+	opacity: 0.35;
+}
 
 /* Today is outlined and the chosen day is filled, so the two stay apart when they are the
    same day - which they are every time the picker opens on an event starting today. */
-.ui-datepicker td.ui-datepicker-today a { box-shadow: inset 0 0 0 1px var(--events-accent, #2f6f9f); }
+.ui-datepicker td.ui-datepicker-today a {
+	box-shadow: inset 0 0 0 1px var(--events-accent, #2f6f9f);
+}
 .ui-datepicker td.ui-datepicker-current-day a,
 .ui-datepicker td a.ui-state-active {
 	color: #fff;
 	background: var(--events-accent, #2f6f9f);
 }
-.ui-datepicker td.ui-datepicker-current-day a:hover { background: var(--events-accent, #2f6f9f); }
+.ui-datepicker td.ui-datepicker-current-day a:hover {
+	background: var(--events-accent, #2f6f9f);
+}
 
 /* --- The pair of controls on the form ------------------------------------------------ */
 /* Date and time sit side by side where there is room and stack on a phone. The date box is
    given room for YYYY-MM-DD and no more; without a basis it would take the full column and
    leave the time box stranded on the next line at every width. */
-.events_datetime { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-.events_datetime .events_datepicker { flex: 0 1 11em; width: auto; }
-.events_datetime .events_time_input { flex: 0 1 8em; width: auto; }
+.events_datetime {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+}
+.events_datetime .events_datepicker {
+	flex: 0 1 11em;
+	width: auto;
+}
+.events_datetime .events_time_input {
+	flex: 0 1 8em;
+	width: auto;
+}

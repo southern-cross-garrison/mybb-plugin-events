@@ -9,11 +9,11 @@ export const FAKETIME_FILE = path.join(DEVENV_DIR, 'faketime', 'faketime.rc');
 export const BASE_URL = process.env.BASE_URL ?? 'http://localhost:8080';
 
 export const DB = {
-  host: process.env.DB_HOST ?? '127.0.0.1',
-  port: Number(process.env.DB_PORT ?? 3307),
-  user: process.env.DB_USER ?? 'mybb',
-  password: process.env.DB_PASSWORD ?? 'mybbpassword',
-  database: process.env.DB_NAME ?? 'mybb',
+	host: process.env.DB_HOST ?? '127.0.0.1',
+	port: Number(process.env.DB_PORT ?? 3307),
+	user: process.env.DB_USER ?? 'mybb',
+	password: process.env.DB_PASSWORD ?? 'mybbpassword',
+	database: process.env.DB_NAME ?? 'mybb',
 };
 
 export const TABLE_PREFIX = 'mybb_';

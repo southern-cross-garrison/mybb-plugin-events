@@ -21,84 +21,84 @@ const NAMES = ['9990_e2e_first', '9991_e2e_second'];
 const LOG = T('e2e_upgrade_log');
 
 function writeUpgrade(name: string): void {
-  fs.writeFileSync(
-    path.join(UPGRADES_DIR, `${name}.php`),
-    `<?php
+	fs.writeFileSync(
+		path.join(UPGRADES_DIR, `${name}.php`),
+		`<?php
 return function($db) {
     $db->write_query("CREATE TABLE IF NOT EXISTS ${LOG} (name varchar(64) NOT NULL)");
     $db->write_query("INSERT INTO ${LOG} (name) VALUES ('${name}')");
 };
-`,
-  );
+`
+	);
 }
 
 async function upgrade(): Promise<void> {
-  await runPhp(`
+	await runPhp(`
 require_once MYBB_ROOT.'inc/plugins/events/inc/events_install.php';
 events_upgrade_database();
 `);
 }
 
 async function ran(): Promise<string[]> {
-  return (await query(`SELECT name FROM ${LOG}`)).map((row: any) => row.name);
+	return (await query(`SELECT name FROM ${LOG}`)).map((row: any) => row.name);
 }
 
 async function recorded(): Promise<string[]> {
-  const rows = await query(
-    `SELECT name FROM ${T('event_plugin_schema_upgrades')} WHERE name IN (?, ?) ORDER BY name`,
-    NAMES,
-  );
-  return rows.map((row: any) => row.name);
+	const rows = await query(
+		`SELECT name FROM ${T('event_plugin_schema_upgrades')} WHERE name IN (?, ?) ORDER BY name`,
+		NAMES
+	);
+	return rows.map((row: any) => row.name);
 }
 
 test.describe('schema upgrades', () => {
-  test.beforeEach(async () => {
-    await execute(`CREATE TABLE IF NOT EXISTS ${LOG} (name varchar(64) NOT NULL)`);
-  });
+	test.beforeEach(async () => {
+		await execute(`CREATE TABLE IF NOT EXISTS ${LOG} (name varchar(64) NOT NULL)`);
+	});
 
-  test.afterEach(async () => {
-    for (const name of NAMES) {
-      fs.rmSync(path.join(UPGRADES_DIR, `${name}.php`), { force: true });
-    }
-    await execute(`DELETE FROM ${T('event_plugin_schema_upgrades')} WHERE name IN (?, ?)`, NAMES);
-    await execute(`DROP TABLE IF EXISTS ${LOG}`);
-  });
+	test.afterEach(async () => {
+		for (const name of NAMES) {
+			fs.rmSync(path.join(UPGRADES_DIR, `${name}.php`), { force: true });
+		}
+		await execute(`DELETE FROM ${T('event_plugin_schema_upgrades')} WHERE name IN (?, ?)`, NAMES);
+		await execute(`DROP TABLE IF EXISTS ${LOG}`);
+	});
 
-  test('runs each new upgrade once, oldest first', async () => {
-    // Written newest first, so the order they run in comes from their names.
-    writeUpgrade(NAMES[1]);
-    writeUpgrade(NAMES[0]);
+	test('runs each new upgrade once, oldest first', async () => {
+		// Written newest first, so the order they run in comes from their names.
+		writeUpgrade(NAMES[1]);
+		writeUpgrade(NAMES[0]);
 
-    await upgrade();
-    expect(await ran()).toEqual(NAMES);
-    expect(await recorded()).toEqual(NAMES);
+		await upgrade();
+		expect(await ran()).toEqual(NAMES);
+		expect(await recorded()).toEqual(NAMES);
 
-    await upgrade();
-    expect(await ran()).toEqual(NAMES);
-  });
+		await upgrade();
+		expect(await ran()).toEqual(NAMES);
+	});
 
-  test('runs only the upgrades a board has not had', async () => {
-    writeUpgrade(NAMES[0]);
-    await upgrade();
+	test('runs only the upgrades a board has not had', async () => {
+		writeUpgrade(NAMES[0]);
+		await upgrade();
 
-    writeUpgrade(NAMES[1]);
-    await upgrade();
+		writeUpgrade(NAMES[1]);
+		await upgrade();
 
-    expect(await ran()).toEqual(NAMES);
-  });
+		expect(await ran()).toEqual(NAMES);
+	});
 
-  test('a fresh install runs every upgrade on top of the baseline', async () => {
-    NAMES.forEach(writeUpgrade);
+	test('a fresh install runs every upgrade on top of the baseline', async () => {
+		NAMES.forEach(writeUpgrade);
 
-    // The whole install, not just the tables: what is under test is that installing
-    // takes the same path to the current schema that activating does. Everything else it
-    // does is also done by every activation, so running it on an installed board is safe.
-    await runPhp(`
+		// The whole install, not just the tables: what is under test is that installing
+		// takes the same path to the current schema that activating does. Everything else it
+		// does is also done by every activation, so running it on an installed board is safe.
+		await runPhp(`
 require_once MYBB_ROOT.'inc/plugins/events.php';
 events_install();
 `);
 
-    expect(await ran()).toEqual(NAMES);
-    expect(await recorded()).toEqual(NAMES);
-  });
+		expect(await ran()).toEqual(NAMES);
+		expect(await recorded()).toEqual(NAMES);
+	});
 });

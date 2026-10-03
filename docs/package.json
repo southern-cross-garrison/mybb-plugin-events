@@ -1,29 +1,29 @@
 {
-  "name": "mybb-plugin-events-docs",
-  "private": true,
-  "description": "User guide for the MyBB Event Management plugin, published to GitHub Pages",
-  "type": "module",
-  "packageManager": "pnpm@12.8.1",
-  "devEngines": {
-    "runtime": {
-      "name": "node",
-      "version": "^24.0.0",
-      "onFail": "download"
-    }
-  },
-  "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview",
-    "start": "astro dev",
-    "screenshots": "../node_modules/.bin/playwright test --config screenshots/playwright.config.ts"
-  },
-  "dependencies": {
-    "@astrojs/starlight": "^0.42.5",
-    "@fontsource-variable/plus-jakarta-sans": "^5.3.0",
-    "astro": "^7.3.5",
-    "sharp": "^0.35.5",
-    "starlight-image-zoom": "^0.16.0",
-    "starlight-theme-vintage": "^0.2.0"
-  }
+	"name": "mybb-plugin-events-docs",
+	"private": true,
+	"description": "User guide for the MyBB Event Management plugin, published to GitHub Pages",
+	"type": "module",
+	"packageManager": "pnpm@12.8.1",
+	"devEngines": {
+		"runtime": {
+			"name": "node",
+			"version": "^24.0.0",
+			"onFail": "download"
+		}
+	},
+	"scripts": {
+		"dev": "astro dev",
+		"build": "astro build",
+		"preview": "astro preview",
+		"start": "astro dev",
+		"screenshots": "../node_modules/.bin/playwright test --config screenshots/playwright.config.ts"
+	},
+	"dependencies": {
+		"@astrojs/starlight": "^0.42.5",
+		"@fontsource-variable/plus-jakarta-sans": "^5.3.0",
+		"astro": "^7.3.5",
+		"sharp": "^0.35.5",
+		"starlight-image-zoom": "^0.16.0",
+		"starlight-theme-vintage": "^0.2.0"
+	}
 }

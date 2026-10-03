@@ -191,7 +191,7 @@ Either way the details are:
   calendar entry carries. An event with no address simply shows none, and its calendar
   entry falls back to naming the region
 - Start and end dates. Both need a time as well as a date - there is no default, since
-  midnight would put the end at the *start* of the last day - and the end has to be later
+  midnight would put the end at the _start_ of the last day - and the end has to be later
   than the start
 - Type - a troop (the default) or a social event. See [Social Events](#social-events)
 - Signup cutoff (optional - with none, signups stay open until the event ends)
@@ -527,7 +527,7 @@ can have a place on the Sunday and be waiting for the Saturday. The maximum is t
 number for every day.
 
 The rule behind every change is one sentence: in each role's queue for each day, ordered by
-when each person signed up for it, the first *maximum* people have a place and the rest are
+when each person signed up for it, the first _maximum_ people have a place and the rest are
 waiting. So:
 
 - **Somebody drops out** - withdraws, drops a day, is excluded or is deleted - and the first
@@ -674,12 +674,12 @@ first · From 2026-01-01 · Hunter · Any role"), and open when the bar is click
 Above each view are headline cards, a month-by-month chart and the top ten of the view as
 bars, all for the current selection and all about what that view counts:
 
-| View | Cards | Month chart |
-|---|---|---|
-| People | members trooping, troops, average per member, most active | members trooping |
-| Events | events reported, troops, average turnout, best attended | troops, troopers and wranglers stacked |
-| Regions | regions, events, troops, busiest region | troops, stacked by region |
-| Costumes | costumes worn, times worn, members in costume, most worn | costumes worn, stacked by costume |
+| View     | Cards                                                     | Month chart                            |
+| -------- | --------------------------------------------------------- | -------------------------------------- |
+| People   | members trooping, troops, average per member, most active | members trooping                       |
+| Events   | events reported, troops, average turnout, best attended   | troops, troopers and wranglers stacked |
+| Regions  | regions, events, troops, busiest region                   | troops, stacked by region              |
+| Costumes | costumes worn, times worn, members in costume, most worn  | costumes worn, stacked by costume      |
 
 The region and costume charts name the first five - regions in the order the region list
 has them, costumes by how often each has been worn overall - and fold the rest into
@@ -706,7 +706,7 @@ way to ask it for anybody else's.
 `calendar_feed.php` is where a member makes a private link; it is offered after signing
 up for an event. The same page is in the User CP, as **Calendar Subscription** under
 Miscellaneous (`usercp.php?action=events_calendar`); both manage the one link. Opening it offers the calendar app's subscribe dialog (`webcal://`),
-and the same address can be pasted into Google Calendar's *Other calendars -> From URL*.
+and the same address can be pasted into Google Calendar's _Other calendars -> From URL_.
 The app then fetches `ical_feed.php` on its own schedule - Google roughly daily, Apple and
 Outlook more often - and keeps its copy in step with it, which is how a day the member
 drops, or an event they withdraw from, leaves their calendar. A downloaded `.ics` can only
@@ -830,9 +830,9 @@ A theme retints all of it by declaring the accent custom properties once:
 
 ```css
 :root {
-  --events-accent: #1090d0;
-  --events-accent-border: #1090d0;
-  --events-accent-soft: rgba(16, 144, 208, 0.18); /* the focus ring */
+	--events-accent: #1090d0;
+	--events-accent-border: #1090d0;
+	--events-accent-soft: rgba(16, 144, 208, 0.18); /* the focus ring */
 }
 ```
 
@@ -840,8 +840,8 @@ and restyles individual controls with rules written under `.events_page_wrap`:
 
 ```css
 .events_page_wrap .events_input {
-  border-radius: 3px;
-  border-color: #ccc;
+	border-radius: 3px;
+	border-color: #ccc;
 }
 ```
 

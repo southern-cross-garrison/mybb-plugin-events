@@ -8,7 +8,7 @@ import { REPO_ROOT } from './config';
  * which the suite needs in order to test the troop-report reminders under a moved clock.
  */
 export async function runPhp(snippet: string): Promise<string> {
-  const script = `<?php
+	const script = `<?php
 define('IN_MYBB', 1);
 define('MYBB_ROOT', '/var/www/html/');
 define('THIS_SCRIPT', 'e2e.php');
@@ -18,36 +18,38 @@ $lang->load('global');
 ${snippet}
 `;
 
-  const output = await new Promise<string>((resolve, reject) => {
-    const child = spawn('docker', ['compose', 'exec', '-T', 'web', 'php', '/dev/stdin'], { cwd: REPO_ROOT });
+	const output = await new Promise<string>((resolve, reject) => {
+		const child = spawn('docker', ['compose', 'exec', '-T', 'web', 'php', '/dev/stdin'], {
+			cwd: REPO_ROOT,
+		});
 
-    let stdout = '';
-    let stderr = '';
-    child.stdout.on('data', (chunk) => (stdout += chunk));
-    child.stderr.on('data', (chunk) => (stderr += chunk));
-    child.on('error', reject);
-    child.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`runPhp exited with ${code}:\n${stdout}\n${stderr}`));
-        return;
-      }
-      resolve(`${stdout}${stderr}`);
-    });
+		let stdout = '';
+		let stderr = '';
+		child.stdout.on('data', (chunk) => (stdout += chunk));
+		child.stderr.on('data', (chunk) => (stderr += chunk));
+		child.on('error', reject);
+		child.on('close', (code) => {
+			if (code !== 0) {
+				reject(new Error(`runPhp exited with ${code}:\n${stdout}\n${stderr}`));
+				return;
+			}
+			resolve(`${stdout}${stderr}`);
+		});
 
-    child.stdin.write(script);
-    child.stdin.end();
-  });
+		child.stdin.write(script);
+		child.stdin.end();
+	});
 
-  if (output.includes('MyBB SQL Error') || output.includes('Fatal error')) {
-    throw new Error(`runPhp produced a PHP/SQL error:\n${output}`);
-  }
+	if (output.includes('MyBB SQL Error') || output.includes('Fatal error')) {
+		throw new Error(`runPhp produced a PHP/SQL error:\n${output}`);
+	}
 
-  return output.trim();
+	return output.trim();
 }
 
 /** Run one of MyBB's scheduled tasks through its real task runner. */
 export async function runScheduledTask(file: string): Promise<string> {
-  return runPhp(`
+	return runPhp(`
 require_once MYBB_ROOT.'inc/functions_task.php';
 $task = $db->fetch_array($db->simple_select('tasks', '*', "file = '${file}'"));
 if(!$task) { echo "TASK_MISSING"; exit; }

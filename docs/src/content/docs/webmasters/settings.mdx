@@ -22,13 +22,13 @@ Go to **Admin CP** > **Event Management** > **Settings**.
 
 ## Dates
 
-| Setting | What it does |
-| --- | --- |
+| Setting            | What it does                                                                                                                                                                                                          |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Event Timezone** | The garrison's timezone, used for every date the plugin enters, shows and compares. Choose a named zone like `Australia/Sydney`, not a fixed offset, so daylight saving is handled. The server's timezone is ignored. |
 
 <Aside type="caution" title="Changing the timezone">
-  Existing dates keep their clock time in the new zone: an event at 18:00 stays at 18:00.
-  Set this before you start adding events.
+	Existing dates keep their clock time in the new zone: an event at 18:00 stays at 18:00. Set this
+	before you start adding events.
 </Aside>
 
 <Image src={timezone} alt="Event Timezone circled on the Settings page" />
@@ -48,15 +48,18 @@ A detail with no field picked isn't asked for.
 
 <Image src={fieldsCostumes} alt="The costume and Legion ID profile field settings circled" />
 
-<Image src={fieldsContact} alt="The check, mobile, emergency contact and preferred name profile field settings circled" />
+<Image
+	src={fieldsContact}
+	alt="The check, mobile, emergency contact and preferred name profile field settings circled"
+/>
 
 ## Costumes
 
-| Setting | What it does |
-| --- | --- |
-| **501st Legion API** | Where members' approved costumes are fetched from, by Legion ID, when they sign up to troop. Starts as `https://api.501st.com`. Leave blank to use only saved costumes. Needs PHP's curl extension. |
-| **Preapproved Costumes** | Lets members type in a costume they've been preapproved for. Off by default. |
-| **Preapproval Requirements** | A link to a post explaining how to get preapproval. Members using a preapproved costume are shown it and must confirm they've followed it. Leave blank to ask nothing. |
+| Setting                      | What it does                                                                                                                                                                                        |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **501st Legion API**         | Where members' approved costumes are fetched from, by Legion ID, when they sign up to troop. Starts as `https://api.501st.com`. Leave blank to use only saved costumes. Needs PHP's curl extension. |
+| **Preapproved Costumes**     | Lets members type in a costume they've been preapproved for. Off by default.                                                                                                                        |
+| **Preapproval Requirements** | A link to a post explaining how to get preapproval. Members using a preapproved costume are shown it and must confirm they've followed it. Leave blank to ask nothing.                              |
 
 <Image src={legionApi} alt="501st Legion API circled" />
 
@@ -64,28 +67,31 @@ A detail with no field picked isn't asked for.
 
 ## Working With Children Checks
 
-| Setting | What it does |
-| --- | --- |
-| **Working With Children Checks** | Turn off if the garrison doesn't use them. Events then can't require one. |
-| **Check Name** | What your state calls it, for example **Blue Card** in Queensland. Defaults to WWCC. |
+| Setting                          | What it does                                                                         |
+| -------------------------------- | ------------------------------------------------------------------------------------ |
+| **Working With Children Checks** | Turn off if the garrison doesn't use them. Events then can't require one.            |
+| **Check Name**                   | What your state calls it, for example **Blue Card** in Queensland. Defaults to WWCC. |
 
 <Image src={wwcc} alt="Working With Children Checks and Check Name circled" />
 
 ## Groups
 
-| Setting | What it does |
-| --- | --- |
+| Setting                           | What it does                                                                                                                                                                      |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Event Coordinator User Groups** | Members of these groups can create and edit events and see attendance sheets. They're also who can be picked as an event's coordinator. Primary and additional groups both count. |
-| **Garrison Members Group** | Splits attendees into groups on the troop report draft, and sets who's counted on My Troops. |
-| **501st Members Group** | Splits attendees on the troop report draft. |
+| **Garrison Members Group**        | Splits attendees into groups on the troop report draft, and sets who's counted on My Troops.                                                                                      |
+| **501st Members Group**           | Splits attendees on the troop report draft.                                                                                                                                       |
 
-<Image src={groups} alt="The coordinator, Garrison Members and 501st Members group settings circled" />
+<Image
+	src={groups}
+	alt="The coordinator, Garrison Members and 501st Members group settings circled"
+/>
 
 ## Forums
 
-| Setting | What it does |
-| --- | --- |
-| **Troop Report Forum** | Where troop reports are posted. |
+| Setting                 | What it does                                                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| **Troop Report Forum**  | Where troop reports are posted.                                                                                   |
 | **Default Event Forum** | Where announcement threads go for regions without a forum of their own. Leave unset to not announce those events. |
 
 <Image src={forums} alt="Troop Report Forum and Default Event Forum circled" />
@@ -111,4 +117,3 @@ URL or a path from the forum root, like `images/logo.png`. Leave blank to use th
 logo.
 
 <Image src={printLogo} alt="Print Logo circled in the Event Management Settings group" />
-

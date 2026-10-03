@@ -5,7 +5,7 @@ sidebar:
   order: 3
 ---
 
-import { Aside, Steps } from "@astrojs/starlight/components";
+import { Aside, Steps } from '@astrojs/starlight/components';
 import { Image } from 'astro:assets';
 import visibility from '../../../assets/screenshots/webmasters/profile-field-visibility.png';
 import pickCostumes from '../../../assets/screenshots/webmasters/settings-profile-fields-costumes.png';
@@ -47,9 +47,12 @@ Then pick each field on **Event Management** > **Settings**. See [Settings](../s
 
 <Image src={pickCostumes} alt="The costume and Legion ID profile field settings circled" />
 
-<Image src={pickContact} alt="The check, mobile, emergency contact and preferred name profile field settings circled" />
+<Image
+	src={pickContact}
+	alt="The check, mobile, emergency contact and preferred name profile field settings circled"
+/>
 
 <Aside type="caution">
-  Set **Viewable By** to **None** on WWCC, Mobile Number and Emergency Contact. With
-  **All groups**, every member can see them on profiles.
+	Set **Viewable By** to **None** on WWCC, Mobile Number and Emergency Contact. With **All groups**,
+	every member can see them on profiles.
 </Aside>

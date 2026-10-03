@@ -16,14 +16,14 @@ pnpm build         # what CI runs
 
 ## Layout
 
-| Folder | Audience |
-| --- | --- |
-| `src/content/docs/members/` | Troopers and wranglers |
-| `src/content/docs/coordinators/` | Event coordinators without Admin CP access |
-| `src/content/docs/admins/` | Administrators with Admin CP access |
-| `src/content/docs/webmasters/` | Whoever installs and upgrades the plugin |
-| `src/assets/screenshots/<guide>/` | Screenshots, generated (see below) |
-| `screenshots/` | The Playwright scripts that take them |
+| Folder                            | Audience                                   |
+| --------------------------------- | ------------------------------------------ |
+| `src/content/docs/members/`       | Troopers and wranglers                     |
+| `src/content/docs/coordinators/`  | Event coordinators without Admin CP access |
+| `src/content/docs/admins/`        | Administrators with Admin CP access        |
+| `src/content/docs/webmasters/`    | Whoever installs and upgrades the plugin   |
+| `src/assets/screenshots/<guide>/` | Screenshots, generated (see below)         |
+| `screenshots/`                    | The Playwright scripts that take them      |
 
 A new page is a new `.mdx` file in the right folder; the sidebar picks it up. Set
 `sidebar.order` in its frontmatter to place it.

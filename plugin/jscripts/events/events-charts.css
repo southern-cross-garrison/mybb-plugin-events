@@ -57,7 +57,9 @@
 /* A headline that names something - the best attended event, the busiest region - is
    set smaller than a number, and wraps to two lines at most rather than stretching its
    card. */
-.events_stat_name { font-size: 18px; }
+.events_stat_name {
+	font-size: 18px;
+}
 
 .events_stat_value {
 	overflow-wrap: anywhere;
@@ -100,20 +102,36 @@
 	border-radius: 2px;
 }
 
-.events_chart_trooper { background: var(--events-chart-trooper); }
-.events_chart_wrangler { background: var(--events-chart-wrangler); }
+.events_chart_trooper {
+	background: var(--events-chart-trooper);
+}
+.events_chart_wrangler {
+	background: var(--events-chart-wrangler);
+}
 
 /* The stacked charts that split by region or by costume. Five named slots, in an order
    whose neighbours stay apart under the common kinds of colour blindness, then a grey
    "Other" for the rest. Three of the five are lighter than 3:1 against the page, which
    is why these charts always carry a legend and sit above the table of the same numbers.
    A theme can recolour any slot with --events-chart-series-N. */
-.events_chart_series_1 { background: var(--events-chart-series-1, #2a78d6); }
-.events_chart_series_2 { background: var(--events-chart-series-2, #eb6834); }
-.events_chart_series_3 { background: var(--events-chart-series-3, #1baf7a); }
-.events_chart_series_4 { background: var(--events-chart-series-4, #eda100); }
-.events_chart_series_5 { background: var(--events-chart-series-5, #e87ba4); }
-.events_chart_series_other { background: var(--events-chart-series-other, #b4b2ab); }
+.events_chart_series_1 {
+	background: var(--events-chart-series-1, #2a78d6);
+}
+.events_chart_series_2 {
+	background: var(--events-chart-series-2, #eb6834);
+}
+.events_chart_series_3 {
+	background: var(--events-chart-series-3, #1baf7a);
+}
+.events_chart_series_4 {
+	background: var(--events-chart-series-4, #eda100);
+}
+.events_chart_series_5 {
+	background: var(--events-chart-series-5, #e87ba4);
+}
+.events_chart_series_other {
+	background: var(--events-chart-series-other, #b4b2ab);
+}
 
 /* Columns: troops per month */
 .events_chart_plot {
@@ -162,7 +180,9 @@
 	cursor: default;
 }
 
-.events_chart_column:hover { background: rgba(127, 127, 127, 0.08); }
+.events_chart_column:hover {
+	background: rgba(127, 127, 127, 0.08);
+}
 
 /* Trooper at the base, wrangler above it, a 2px gap between them. Only the top segment
    is rounded, and the base stays square on the axis. */
@@ -182,7 +202,9 @@
 	flex: 0 0 auto;
 }
 
-.events_chart_segment:last-child { border-radius: 4px 4px 0 0; }
+.events_chart_segment:last-child {
+	border-radius: 4px 4px 0 0;
+}
 
 .events_chart_label {
 	position: absolute;
@@ -241,7 +263,9 @@
 
 /* Blue unless the bar stands for something with a colour of its own elsewhere on the
    page - a region or a costume, which takes its slot from the month chart above. */
-.events_chart_bar:not([class*="events_chart_series_"]) { background: var(--events-chart-trooper); }
+.events_chart_bar:not([class*='events_chart_series_']) {
+	background: var(--events-chart-trooper);
+}
 
 .events_chart_bar_value {
 	flex: none;
@@ -251,7 +275,11 @@
 }
 
 @media (max-width: 480px) {
-	.events_chart_bar_row { grid-template-columns: minmax(70px, 38%) 1fr; }
+	.events_chart_bar_row {
+		grid-template-columns: minmax(70px, 38%) 1fr;
+	}
 	/* A dozen month names do not fit a phone's width; every other one does. */
-	.events_chart_column:nth-child(even) .events_chart_label { visibility: hidden; }
+	.events_chart_column:nth-child(even) .events_chart_label {
+		visibility: hidden;
+	}
 }

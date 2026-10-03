@@ -6,7 +6,7 @@ import pluginInfo from '../../plugin/inc/plugins/events.php?raw';
 const version = pluginInfo.match(/"version"\s*=>\s*"([^"]+)"/)?.[1];
 
 export const onRequest = defineRouteMiddleware(({ locals }) => {
-  const { data } = locals.starlightRoute.entry;
-  if (!version || !data.hero) return;
-  data.hero.title = `${data.hero.title ?? data.title} <span class="hero-version">(v${version})</span>`;
+	const { data } = locals.starlightRoute.entry;
+	if (!version || !data.hero) return;
+	data.hero.title = `${data.hero.title ?? data.title} <span class="hero-version">(v${version})</span>`;
 });

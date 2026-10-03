@@ -11,15 +11,15 @@ import { runPhp } from '../../tests/helpers/container';
  * aren't announced, so create those with createEvent().
  */
 export async function createAnnouncedEvent(input: EventInput): Promise<number> {
-  const eventId = await createEvent(input);
-  const output = await runPhp(`
+	const eventId = await createEvent(input);
+	const output = await runPhp(`
 require_once MYBB_ROOT.'inc/plugins/events/inc/events_thread.php';
 echo events_sync_event_thread(${eventId});
 `);
 
-  if (!(Number(output.trim()) > 0)) {
-    throw new Error(`Event ${eventId} was not announced: ${output}`);
-  }
+	if (!(Number(output.trim()) > 0)) {
+		throw new Error(`Event ${eventId} was not announced: ${output}`);
+	}
 
-  return eventId;
+	return eventId;
 }

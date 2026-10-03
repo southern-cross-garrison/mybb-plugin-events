@@ -123,7 +123,9 @@
 }
 /* The menu is closed with the hidden attribute, which display: block above would
    otherwise quietly override. */
-.events_tag_menu[hidden] { display: none; }
+.events_tag_menu[hidden] {
+	display: none;
+}
 
 .events_tag_option {
 	padding: 7px 10px;
@@ -145,4 +147,6 @@
 	line-height: 1.4;
 	opacity: 0.8;
 }
-.events_tag_note[hidden] { display: none; }
+.events_tag_note[hidden] {
+	display: none;
+}

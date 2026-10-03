@@ -14,17 +14,17 @@ import { expect, type Locator, type Page } from '@playwright/test';
 
 /** The menu option offering this username. */
 export function tagOption(page: Page, username: string): Locator {
-  return page.locator(`[data-events-tag-option="${username}"]`);
+	return page.locator(`[data-events-tag-option="${username}"]`);
 }
 
 /** The lozenge for a username that has been added. */
 export function tag(page: Page, username: string): Locator {
-  return page.locator(`[data-events-tag="${username}"]`);
+	return page.locator(`[data-events-tag="${username}"]`);
 }
 
 /** What the field will post: the comma separated list the server has always read. */
 export function excludedValue(page: Page): Locator {
-  return page.locator('input[name="exclusions"]');
+	return page.locator('input[name="exclusions"]');
 }
 
 /**
@@ -34,17 +34,17 @@ export function excludedValue(page: Page): Locator {
  *              '#event_form_exclusions' on the front end
  */
 export async function addTags(page: Page, entry: string, usernames: string[]): Promise<void> {
-  for (const username of usernames) {
-    // fill() dispatches the input event the field searches on, and the search is debounced,
-    // so the option is waited for rather than assumed to be there by the next line.
-    await page.locator(entry).fill(username);
-    await tagOption(page, username).click();
-    await expect(tag(page, username)).toBeVisible();
-  }
+	for (const username of usernames) {
+		// fill() dispatches the input event the field searches on, and the search is debounced,
+		// so the option is waited for rather than assumed to be there by the next line.
+		await page.locator(entry).fill(username);
+		await tagOption(page, username).click();
+		await expect(tag(page, username)).toBeVisible();
+	}
 }
 
 /** Take a username back off the list with its own X. */
 export async function removeTag(page: Page, username: string): Promise<void> {
-  await tag(page, username).locator('.events_tag_remove').click();
-  await expect(tag(page, username)).toHaveCount(0);
+	await tag(page, username).locator('.events_tag_remove').click();
+	await expect(tag(page, username)).toHaveCount(0);
 }

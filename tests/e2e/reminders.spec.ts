@@ -4,19 +4,19 @@ import { runPhp, runScheduledTask } from '../helpers/container';
 import { loginAs } from '../helpers/auth';
 import { signUpThroughWizard } from '../helpers/rsvp';
 import {
-  createEvent,
-  createRsvp,
-  getClaimStatuses,
-  getEventDays,
-  getRsvpStatus,
-  countRsvps,
-  query,
-  createThread,
-  countPrivateMessages,
-  getTroopReport,
-  execute,
-  T,
-  fixtures,
+	createEvent,
+	createRsvp,
+	getClaimStatuses,
+	getEventDays,
+	getRsvpStatus,
+	countRsvps,
+	query,
+	createThread,
+	countPrivateMessages,
+	getTroopReport,
+	execute,
+	T,
+	fixtures,
 } from '../helpers/db';
 
 const TK = fixtures().costumeOptions[0];
@@ -27,260 +27,277 @@ const SUBJECT = 'Troop Report Needed:%';
  * MyBB's real task runner, with the clock moved to make events overdue.
  */
 test.describe('troop report reminders', () => {
-  test('PMs every attendee of a finished event with no troop report', async () => {
-    const eventId = await createEvent({
-      title: 'Overdue Troop',
-      start: relativeToTestNow({ days: -3 }),
-      end: relativeToTestNow({ days: -2 }),
-    });
-    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
-    await createRsvp(eventId, 'trooper2', { costumes: [TK] });
+	test('PMs every attendee of a finished event with no troop report', async () => {
+		const eventId = await createEvent({
+			title: 'Overdue Troop',
+			start: relativeToTestNow({ days: -3 }),
+			end: relativeToTestNow({ days: -2 }),
+		});
+		await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+		await createRsvp(eventId, 'trooper2', { costumes: [TK] });
 
-    const output = await runScheduledTask('events_reminders');
+		const output = await runScheduledTask('events_reminders');
 
-    // The task must still be enabled: MyBB disables tasks whose file is missing.
-    expect(output).toContain('ENABLED:1');
-    expect(output).toContain('Event reminder PMs sent for 1 event(s)');
+		// The task must still be enabled: MyBB disables tasks whose file is missing.
+		expect(output).toContain('ENABLED:1');
+		expect(output).toContain('Event reminder PMs sent for 1 event(s)');
 
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
-    expect(await countPrivateMessages('trooper2', SUBJECT)).toBe(1);
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+		expect(await countPrivateMessages('trooper2', SUBJECT)).toBe(1);
 
-    const report = await getTroopReport(eventId);
-    expect(report?.last_reminder_sent).toBeTruthy();
-  });
+		const report = await getTroopReport(eventId);
+		expect(report?.last_reminder_sent).toBeTruthy();
+	});
 
-  test('leaves wranglers alone: they cannot write the report', async () => {
-    const eventId = await createEvent({
-      title: 'Wrangled Overdue Troop',
-      start: relativeToTestNow({ days: -3 }),
-      end: relativeToTestNow({ days: -2 }),
-    });
-    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
-    await createRsvp(eventId, 'wrangler', { role: 'wrangler' });
+	test('leaves wranglers alone: they cannot write the report', async () => {
+		const eventId = await createEvent({
+			title: 'Wrangled Overdue Troop',
+			start: relativeToTestNow({ days: -3 }),
+			end: relativeToTestNow({ days: -2 }),
+		});
+		await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+		await createRsvp(eventId, 'wrangler', { role: 'wrangler' });
 
-    await runScheduledTask('events_reminders');
+		await runScheduledTask('events_reminders');
 
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
-    expect(await countPrivateMessages('wrangler', SUBJECT)).toBe(0);
-  });
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+		expect(await countPrivateMessages('wrangler', SUBJECT)).toBe(0);
+	});
 
-  test('PMs a member who both trooped and wrangled exactly once', async () => {
-    const eventId = await createEvent({
-      title: 'Dual Role Overdue Troop',
-      start: relativeToTestNow({ days: -3 }),
-      end: relativeToTestNow({ days: -2 }),
-    });
-    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
-    await createRsvp(eventId, 'trooper1', { role: 'wrangler' });
+	test('PMs a member who both trooped and wrangled exactly once', async () => {
+		const eventId = await createEvent({
+			title: 'Dual Role Overdue Troop',
+			start: relativeToTestNow({ days: -3 }),
+			end: relativeToTestNow({ days: -2 }),
+		});
+		await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+		await createRsvp(eventId, 'trooper1', { role: 'wrangler' });
 
-    await runScheduledTask('events_reminders');
+		await runScheduledTask('events_reminders');
 
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
-  });
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+	});
 
-  test('does not remind about events that have not finished yet', async () => {
-    const eventId = await createEvent({
-      title: 'Upcoming Troop',
-      start: relativeToTestNow({ days: 3 }),
-      end: relativeToTestNow({ days: 3, hours: 6 }),
-    });
-    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+	test('does not remind about events that have not finished yet', async () => {
+		const eventId = await createEvent({
+			title: 'Upcoming Troop',
+			start: relativeToTestNow({ days: 3 }),
+			end: relativeToTestNow({ days: 3, hours: 6 }),
+		});
+		await createRsvp(eventId, 'trooper1', { costumes: [TK] });
 
-    await runScheduledTask('events_reminders');
+		await runScheduledTask('events_reminders');
 
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(0);
-  });
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(0);
+	});
 
-  test('does not remind again within a week, but does after one', async () => {
-    const eventId = await createEvent({
-      title: 'Repeat Troop',
-      start: relativeToTestNow({ days: -3 }),
-      end: relativeToTestNow({ days: -2 }),
-    });
-    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+	test('does not remind again within a week, but does after one', async () => {
+		const eventId = await createEvent({
+			title: 'Repeat Troop',
+			start: relativeToTestNow({ days: -3 }),
+			end: relativeToTestNow({ days: -2 }),
+		});
+		await createRsvp(eventId, 'trooper1', { costumes: [TK] });
 
-    await runScheduledTask('events_reminders');
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+		await runScheduledTask('events_reminders');
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
 
-    // Same day, and six days later: still just the one reminder.
-    await runScheduledTask('events_reminders');
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+		// Same day, and six days later: still just the one reminder.
+		await runScheduledTask('events_reminders');
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
 
-    await advanceClock({ days: 6 });
-    await runScheduledTask('events_reminders');
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+		await advanceClock({ days: 6 });
+		await runScheduledTask('events_reminders');
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
 
-    // Past the seven day mark: a second reminder goes out.
-    await advanceClock({ days: 2 });
-    await runScheduledTask('events_reminders');
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(2);
-  });
+		// Past the seven day mark: a second reminder goes out.
+		await advanceClock({ days: 2 });
+		await runScheduledTask('events_reminders');
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(2);
+	});
 
-  // The task runs on the first page view after midnight, so its hour drifts from run to
-  // run. Against an exact seven-day cutoff, a run on day 7 that came a few minutes
-  // earlier in the day than day 0's fell short of the week, and every reminder after
-  // the first went out on day 8.
-  test('reminds again on day seven even when that run is earlier in the day', async () => {
-    const eventId = await createEvent({
-      title: 'Weekly Troop',
-      start: relativeToTestNow({ days: -3 }),
-      end: relativeToTestNow({ days: -2 }),
-    });
-    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+	// The task runs on the first page view after midnight, so its hour drifts from run to
+	// run. Against an exact seven-day cutoff, a run on day 7 that came a few minutes
+	// earlier in the day than day 0's fell short of the week, and every reminder after
+	// the first went out on day 8.
+	test('reminds again on day seven even when that run is earlier in the day', async () => {
+		const eventId = await createEvent({
+			title: 'Weekly Troop',
+			start: relativeToTestNow({ days: -3 }),
+			end: relativeToTestNow({ days: -2 }),
+		});
+		await createRsvp(eventId, 'trooper1', { costumes: [TK] });
 
-    await runScheduledTask('events_reminders');
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+		await runScheduledTask('events_reminders');
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
 
-    // Late on day six is more than six days on, but still not a week of days.
-    await setClock(relativeToTestNow({ days: 6, hours: 14 }));
-    await runScheduledTask('events_reminders');
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+		// Late on day six is more than six days on, but still not a week of days.
+		await setClock(relativeToTestNow({ days: 6, hours: 14 }));
+		await runScheduledTask('events_reminders');
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
 
-    await setClock(relativeToTestNow({ days: 7, minutes: -10 }));
-    await runScheduledTask('events_reminders');
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(2);
+		await setClock(relativeToTestNow({ days: 7, minutes: -10 }));
+		await runScheduledTask('events_reminders');
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(2);
 
-    // And the week after counts from day seven, not from day eight.
-    await setClock(relativeToTestNow({ days: 14, minutes: -20 }));
-    await runScheduledTask('events_reminders');
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(3);
-  });
+		// And the week after counts from day seven, not from day eight.
+		await setClock(relativeToTestNow({ days: 14, minutes: -20 }));
+		await runScheduledTask('events_reminders');
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(3);
+	});
 
-  test('stops reminding once the troop report has been posted', async () => {
-    const eventId = await createEvent({
-      title: 'Reported Troop',
-      start: relativeToTestNow({ days: -3 }),
-      end: relativeToTestNow({ days: -2 }),
-    });
-    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+	test('stops reminding once the troop report has been posted', async () => {
+		const eventId = await createEvent({
+			title: 'Reported Troop',
+			start: relativeToTestNow({ days: -3 }),
+			end: relativeToTestNow({ days: -2 }),
+		});
+		await createRsvp(eventId, 'trooper1', { costumes: [TK] });
 
-    const threadId = await createThread('Troop Report: Reported Troop', fixtures().forums.troop_reports, 'trooper1');
-    await execute(
-      `INSERT INTO ${T('event_plugin_troop_reports')} (event_id, thread_id, created_by, created_at, posted_at)
+		const threadId = await createThread(
+			'Troop Report: Reported Troop',
+			fixtures().forums.troop_reports,
+			'trooper1'
+		);
+		await execute(
+			`INSERT INTO ${T('event_plugin_troop_reports')} (event_id, thread_id, created_by, created_at, posted_at)
        VALUES (?, ?, ?, ?, ?)`,
-      [eventId, threadId, fixtures().users.trooper1, relativeToTestNow({ days: -1 }), relativeToTestNow({ days: -1 })],
-    );
+			[
+				eventId,
+				threadId,
+				fixtures().users.trooper1,
+				relativeToTestNow({ days: -1 }),
+				relativeToTestNow({ days: -1 }),
+			]
+		);
 
-    await advanceClock({ days: 30 });
-    await runScheduledTask('events_reminders');
+		await advanceClock({ days: 30 });
+		await runScheduledTask('events_reminders');
 
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(0);
-  });
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(0);
+	});
 
-  test('does not remind about archived events', async () => {
-    const eventId = await createEvent({
-      title: 'Archived Overdue Troop',
-      status: 'archived',
-      start: relativeToTestNow({ days: -3 }),
-      end: relativeToTestNow({ days: -2 }),
-    });
-    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+	test('does not remind about archived events', async () => {
+		const eventId = await createEvent({
+			title: 'Archived Overdue Troop',
+			status: 'archived',
+			start: relativeToTestNow({ days: -3 }),
+			end: relativeToTestNow({ days: -2 }),
+		});
+		await createRsvp(eventId, 'trooper1', { costumes: [TK] });
 
-    await runScheduledTask('events_reminders');
+		await runScheduledTask('events_reminders');
 
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(0);
-  });
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(0);
+	});
 
-  test('does nothing for a finished event nobody signed up to', async () => {
-    await createEvent({
-      title: 'Lonely Troop',
-      start: relativeToTestNow({ days: -3 }),
-      end: relativeToTestNow({ days: -2 }),
-    });
+	test('does nothing for a finished event nobody signed up to', async () => {
+		await createEvent({
+			title: 'Lonely Troop',
+			start: relativeToTestNow({ days: -3 }),
+			end: relativeToTestNow({ days: -2 }),
+		});
 
-    const output = await runScheduledTask('events_reminders');
-    expect(output).toContain('Event reminder PMs sent for 0 event(s)');
-  });
+		const output = await runScheduledTask('events_reminders');
+		expect(output).toContain('Event reminder PMs sent for 0 event(s)');
+	});
 
-  test('an event that finishes while the clock advances becomes overdue', async () => {
-    const eventId = await createEvent({
-      title: 'Soon Finished Troop',
-      start: relativeToTestNow({ days: 1 }),
-      end: relativeToTestNow({ days: 1, hours: 6 }),
-    });
-    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+	test('an event that finishes while the clock advances becomes overdue', async () => {
+		const eventId = await createEvent({
+			title: 'Soon Finished Troop',
+			start: relativeToTestNow({ days: 1 }),
+			end: relativeToTestNow({ days: 1, hours: 6 }),
+		});
+		await createRsvp(eventId, 'trooper1', { costumes: [TK] });
 
-    await runScheduledTask('events_reminders');
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(0);
+		await runScheduledTask('events_reminders');
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(0);
 
-    await setClock(relativeToTestNow({ days: 2 }));
-    await runScheduledTask('events_reminders');
-    expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
-  });
+		await setClock(relativeToTestNow({ days: 2 }));
+		await runScheduledTask('events_reminders');
+		expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+	});
 
-  // The troop report is written by somebody who went. A trooper still waiting when the
-  // event ended never had a place, so they are not asked to write it up. The queues here
-  // are built by the members signing up through rsvp.php against a full event, so the
-  // waitlisted status is the plugin's own rather than one the test wrote. Signups have to
-  // happen while the event is still ahead - signups close, and the queues stop being
-  // settled, once it has ended - so the clock is moved past its end afterwards.
-  test.describe('waitlisted troopers', () => {
-    test('a trooper who never got off the waitlist is not reminded; the one with the place is', async ({ page }) => {
-      const eventId = await createEvent({
-        title: 'Queued Overdue Troop',
-        start: relativeToTestNow({ days: 2 }),
-        end: relativeToTestNow({ days: 2, hours: 6 }),
-        maxTroopers: 1,
-      });
+	// The troop report is written by somebody who went. A trooper still waiting when the
+	// event ended never had a place, so they are not asked to write it up. The queues here
+	// are built by the members signing up through rsvp.php against a full event, so the
+	// waitlisted status is the plugin's own rather than one the test wrote. Signups have to
+	// happen while the event is still ahead - signups close, and the queues stop being
+	// settled, once it has ended - so the clock is moved past its end afterwards.
+	test.describe('waitlisted troopers', () => {
+		test('a trooper who never got off the waitlist is not reminded; the one with the place is', async ({
+			page,
+		}) => {
+			const eventId = await createEvent({
+				title: 'Queued Overdue Troop',
+				start: relativeToTestNow({ days: 2 }),
+				end: relativeToTestNow({ days: 2, hours: 6 }),
+				maxTroopers: 1,
+			});
 
-      await loginAs(page, 'trooper1');
-      await signUpThroughWizard(page, eventId, { costumes: [TK] });
-      // Apart in time, so the queue order is claimed_at rather than a tie.
-      await advanceClock({ minutes: 5 });
-      await loginAs(page, 'trooper2');
-      await signUpThroughWizard(page, eventId);
-      expect(await getRsvpStatus(eventId, 'trooper1')).toBe('attending');
-      expect(await getRsvpStatus(eventId, 'trooper2')).toBe('waitlisted');
+			await loginAs(page, 'trooper1');
+			await signUpThroughWizard(page, eventId, { costumes: [TK] });
+			// Apart in time, so the queue order is claimed_at rather than a tie.
+			await advanceClock({ minutes: 5 });
+			await loginAs(page, 'trooper2');
+			await signUpThroughWizard(page, eventId);
+			expect(await getRsvpStatus(eventId, 'trooper1')).toBe('attending');
+			expect(await getRsvpStatus(eventId, 'trooper2')).toBe('waitlisted');
 
-      await setClock(relativeToTestNow({ days: 4 }));
-      const output = await runScheduledTask('events_reminders');
-      expect(output).toContain('Event reminder PMs sent for 1 event(s)');
+			await setClock(relativeToTestNow({ days: 4 }));
+			const output = await runScheduledTask('events_reminders');
+			expect(output).toContain('Event reminder PMs sent for 1 event(s)');
 
-      expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
-      expect(await countPrivateMessages('trooper2', SUBJECT)).toBe(0);
-    });
+			expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+			expect(await countPrivateMessages('trooper2', SUBJECT)).toBe(0);
+		});
 
-    test('on a weekend, trooping any one day is enough to be reminded; waiting for every day is not', async ({ page }) => {
-      const eventId = await createEvent({
-        title: 'Queued Overdue Weekend Troop',
-        start: '2026-10-03 09:00:00',
-        end: '2026-10-04 17:00:00',
-        days: [{ date: '2026-10-03' }, { date: '2026-10-04' }],
-        maxTroopers: 1,
-      });
-      const [saturday, sunday] = (await getEventDays(eventId)).map((day) => Number(day.id));
+		test('on a weekend, trooping any one day is enough to be reminded; waiting for every day is not', async ({
+			page,
+		}) => {
+			const eventId = await createEvent({
+				title: 'Queued Overdue Weekend Troop',
+				start: '2026-10-03 09:00:00',
+				end: '2026-10-04 17:00:00',
+				days: [{ date: '2026-10-03' }, { date: '2026-10-04' }],
+				maxTroopers: 1,
+			});
+			const [saturday, sunday] = (await getEventDays(eventId)).map((day) => Number(day.id));
 
-      // trooper1 takes Saturday's place; trooper2 waits for Saturday but gets Sunday's;
-      // nowwcc wants only Saturday and waits behind trooper2 for it.
-      await loginAs(page, 'trooper1');
-      await signUpThroughWizard(page, eventId, { costumes: [TK], dayRoles: { [sunday]: 'none' } });
-      await advanceClock({ minutes: 5 });
-      await loginAs(page, 'trooper2');
-      await signUpThroughWizard(page, eventId);
-      await advanceClock({ minutes: 5 });
-      await loginAs(page, 'nowwcc');
-      await signUpThroughWizard(page, eventId, { dayRoles: { [sunday]: 'none' } });
+			// trooper1 takes Saturday's place; trooper2 waits for Saturday but gets Sunday's;
+			// nowwcc wants only Saturday and waits behind trooper2 for it.
+			await loginAs(page, 'trooper1');
+			await signUpThroughWizard(page, eventId, { costumes: [TK], dayRoles: { [sunday]: 'none' } });
+			await advanceClock({ minutes: 5 });
+			await loginAs(page, 'trooper2');
+			await signUpThroughWizard(page, eventId);
+			await advanceClock({ minutes: 5 });
+			await loginAs(page, 'nowwcc');
+			await signUpThroughWizard(page, eventId, { dayRoles: { [sunday]: 'none' } });
 
-      expect(await getClaimStatuses(eventId, 'trooper2')).toEqual({ [saturday]: 'waitlisted', [sunday]: 'attending' });
-      expect(await getClaimStatuses(eventId, 'nowwcc')).toEqual({ [saturday]: 'waitlisted' });
-      expect(await getRsvpStatus(eventId, 'nowwcc')).toBe('waitlisted');
+			expect(await getClaimStatuses(eventId, 'trooper2')).toEqual({
+				[saturday]: 'waitlisted',
+				[sunday]: 'attending',
+			});
+			expect(await getClaimStatuses(eventId, 'nowwcc')).toEqual({ [saturday]: 'waitlisted' });
+			expect(await getRsvpStatus(eventId, 'nowwcc')).toBe('waitlisted');
 
-      await setClock('2026-10-06 09:00:00');
-      await runScheduledTask('events_reminders');
+			await setClock('2026-10-06 09:00:00');
+			await runScheduledTask('events_reminders');
 
-      expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
-      expect(await countPrivateMessages('trooper2', SUBJECT)).toBe(1);
-      expect(await countPrivateMessages('nowwcc', SUBJECT)).toBe(0);
-    });
-  });
+			expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+			expect(await countPrivateMessages('trooper2', SUBJECT)).toBe(1);
+			expect(await countPrivateMessages('nowwcc', SUBJECT)).toBe(0);
+		});
+	});
 
-  // The reminder is one PM to every attendee, and MyBB refuses the whole PM if any one
-  // recipient does not exist - so a single deleted member used to silence it for the
-  // rest of the event, every night, with nothing but a skipped event to show for it.
-  test.describe('deleted members', () => {
-    /** Register a member through MyBB's own datahandler; returns the uid. */
-    async function registerMember(username: string): Promise<number> {
-      const output = await runPhp(`
+	// The reminder is one PM to every attendee, and MyBB refuses the whole PM if any one
+	// recipient does not exist - so a single deleted member used to silence it for the
+	// rest of the event, every night, with nothing but a skipped event to show for it.
+	test.describe('deleted members', () => {
+		/** Register a member through MyBB's own datahandler; returns the uid. */
+		async function registerMember(username: string): Promise<number> {
+			const output = await runPhp(`
 require_once MYBB_ROOT.'inc/datahandlers/user.php';
 $handler = new UserDataHandler('insert');
 $handler->set_data(array(
@@ -296,78 +313,85 @@ if(!$handler->validate_user()) { echo 'INVALID:'.implode(',', array_keys($handle
 $user = $handler->insert_user();
 echo 'UID:'.$user['uid'];
 `);
-      const match = output.match(/UID:(\d+)/);
-      expect(match, output).not.toBeNull();
-      return Number(match![1]);
-    }
+			const match = output.match(/UID:(\d+)/);
+			expect(match, output).not.toBeNull();
+			return Number(match![1]);
+		}
 
-    /** A signup by uid: createRsvp() only knows the fixture members. */
-    async function insertSignup(eventId: number, userId: number, role: 'trooper' | 'wrangler' = 'trooper'): Promise<number> {
-      const result = await execute(
-        `INSERT INTO ${T('event_plugin_rsvps')} (event_id, user_id, role, rsvp_date, status) VALUES (?, ?, ?, ?, 'attending')`,
-        [eventId, userId, role, relativeToTestNow({ days: -4 })],
-      );
-      if (role === 'trooper') {
-        await execute(`INSERT INTO ${T('event_plugin_rsvp_costumes')} (rsvp_id, costume) VALUES (?, ?)`, [result.insertId, TK]);
-      }
-      return result.insertId;
-    }
+		/** A signup by uid: createRsvp() only knows the fixture members. */
+		async function insertSignup(
+			eventId: number,
+			userId: number,
+			role: 'trooper' | 'wrangler' = 'trooper'
+		): Promise<number> {
+			const result = await execute(
+				`INSERT INTO ${T('event_plugin_rsvps')} (event_id, user_id, role, rsvp_date, status) VALUES (?, ?, ?, ?, 'attending')`,
+				[eventId, userId, role, relativeToTestNow({ days: -4 })]
+			);
+			if (role === 'trooper') {
+				await execute(
+					`INSERT INTO ${T('event_plugin_rsvp_costumes')} (rsvp_id, costume) VALUES (?, ?)`,
+					[result.insertId, TK]
+				);
+			}
+			return result.insertId;
+		}
 
-    /** Delete members the way the Admin CP and the pruning task do. */
-    async function deleteMembers(uids: number[]): Promise<void> {
-      await runPhp(`
+		/** Delete members the way the Admin CP and the pruning task do. */
+		async function deleteMembers(uids: number[]): Promise<void> {
+			await runPhp(`
 require_once MYBB_ROOT.'inc/datahandlers/user.php';
 $handler = new UserDataHandler('delete');
 $handler->delete_user(array(${uids.join(',')}));
 `);
-    }
+		}
 
-    test('a signup whose member no longer exists does not stop the reminder', async () => {
-      const eventId = await createEvent({
-        title: 'Orphaned Overdue Troop',
-        start: relativeToTestNow({ days: -3 }),
-        end: relativeToTestNow({ days: -2 }),
-      });
-      await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+		test('a signup whose member no longer exists does not stop the reminder', async () => {
+			const eventId = await createEvent({
+				title: 'Orphaned Overdue Troop',
+				start: relativeToTestNow({ days: -3 }),
+				end: relativeToTestNow({ days: -2 }),
+			});
+			await createRsvp(eventId, 'trooper1', { costumes: [TK] });
 
-      // Left behind by a deletion the plugin was not there to see - before this fix, or
-      // straight from the database.
-      const [{ uid: ghost }] = await query<any>(`SELECT MAX(uid) + 1000 AS uid FROM ${T('users')}`);
-      await insertSignup(eventId, ghost);
+			// Left behind by a deletion the plugin was not there to see - before this fix, or
+			// straight from the database.
+			const [{ uid: ghost }] = await query<any>(`SELECT MAX(uid) + 1000 AS uid FROM ${T('users')}`);
+			await insertSignup(eventId, ghost);
 
-      const output = await runScheduledTask('events_reminders');
+			const output = await runScheduledTask('events_reminders');
 
-      expect(output).toContain('Event reminder PMs sent for 1 event(s)');
-      expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
-      expect((await getTroopReport(eventId))?.last_reminder_sent).toBeTruthy();
-    });
+			expect(output).toContain('Event reminder PMs sent for 1 event(s)');
+			expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+			expect((await getTroopReport(eventId))?.last_reminder_sent).toBeTruthy();
+		});
 
-    test('deleting a member withdraws their signups, and the reminder still goes out', async () => {
-      const username = `e2e_deleted_${Date.now()}`;
-      const ghost = await registerMember(username);
+		test('deleting a member withdraws their signups, and the reminder still goes out', async () => {
+			const username = `e2e_deleted_${Date.now()}`;
+			const ghost = await registerMember(username);
 
-      const eventId = await createEvent({
-        title: 'Deleted Member Troop',
-        start: relativeToTestNow({ days: -3 }),
-        end: relativeToTestNow({ days: -2 }),
-      });
-      await createRsvp(eventId, 'trooper1', { costumes: [TK] });
-      await insertSignup(eventId, ghost);
-      await insertSignup(eventId, ghost, 'wrangler');
-      expect(await countRsvps(eventId)).toBe(3);
+			const eventId = await createEvent({
+				title: 'Deleted Member Troop',
+				start: relativeToTestNow({ days: -3 }),
+				end: relativeToTestNow({ days: -2 }),
+			});
+			await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+			await insertSignup(eventId, ghost);
+			await insertSignup(eventId, ghost, 'wrangler');
+			expect(await countRsvps(eventId)).toBe(3);
 
-      await deleteMembers([ghost]);
+			await deleteMembers([ghost]);
 
-      // The counts now agree with the attendee list, which never showed them.
-      expect(await countRsvps(eventId)).toBe(1);
-      const leftovers = await query<any>(
-        `SELECT COUNT(*) AS n FROM ${T('event_plugin_rsvp_costumes')} c
-         LEFT JOIN ${T('event_plugin_rsvps')} r ON r.id = c.rsvp_id WHERE r.id IS NULL`,
-      );
-      expect(Number(leftovers[0].n)).toBe(0);
+			// The counts now agree with the attendee list, which never showed them.
+			expect(await countRsvps(eventId)).toBe(1);
+			const leftovers = await query<any>(
+				`SELECT COUNT(*) AS n FROM ${T('event_plugin_rsvp_costumes')} c
+         LEFT JOIN ${T('event_plugin_rsvps')} r ON r.id = c.rsvp_id WHERE r.id IS NULL`
+			);
+			expect(Number(leftovers[0].n)).toBe(0);
 
-      await runScheduledTask('events_reminders');
-      expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
-    });
-  });
+			await runScheduledTask('events_reminders');
+			expect(await countPrivateMessages('trooper1', SUBJECT)).toBe(1);
+		});
+	});
 });

@@ -1,5 +1,10 @@
 import { test as base, expect, Page } from '@playwright/test';
-import { resetPluginData, restoreBoardContent, deletePrivateMessages, alignUserActivityToClock } from './db';
+import {
+	resetPluginData,
+	restoreBoardContent,
+	deletePrivateMessages,
+	alignUserActivityToClock,
+} from './db';
 import { resetToTestNow, resetClock, readContainerClock } from './clock';
 import { resetLegionApiStub } from './legion-api';
 
@@ -9,21 +14,21 @@ import { resetLegionApiStub } from './legion-api';
  * than the real wall clock.
  */
 export const test = base.extend<{ cleanBoard: void }>({
-  cleanBoard: [
-    async ({}, use) => {
-      await resetPluginData();
-      await restoreBoardContent();
-      await deletePrivateMessages();
-      resetLegionApiStub();
-      await moveClock(resetToTestNow);
-      await use();
-    },
-    { auto: true },
-  ],
+	cleanBoard: [
+		async ({}, use) => {
+			await resetPluginData();
+			await restoreBoardContent();
+			await deletePrivateMessages();
+			resetLegionApiStub();
+			await moveClock(resetToTestNow);
+			await use();
+		},
+		{ auto: true },
+	],
 });
 
 test.afterAll(async () => {
-  await moveClock(resetClock);
+	await moveClock(resetClock);
 });
 
 /**
@@ -41,13 +46,13 @@ test.afterAll(async () => {
  * are still ahead of the clock.
  */
 async function moveClock(move: () => Promise<void>): Promise<void> {
-  await move();
-  await alignUserActivityToClock(await readContainerClock());
+	await move();
+	await alignUserActivityToClock(await readContainerClock());
 }
 
 export { expect };
 
 /** Assert the page is MyBB's "no permission" / error page carrying a given message. */
 export async function expectMyBBError(page: Page, message: string | RegExp): Promise<void> {
-  await expect(page.locator('#content, .error, body')).toContainText(message);
+	await expect(page.locator('#content, .error, body')).toContainText(message);
 }

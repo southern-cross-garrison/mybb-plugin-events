@@ -19,9 +19,9 @@ Buttons, highlights and the printed page header use one accent colour. Set it on
 
 ```css
 :root {
-  --events-accent: #1090d0;
-  --events-accent-border: #1090d0;
-  --events-accent-soft: rgba(16, 144, 208, 0.18); /* focus ring */
+	--events-accent: #1090d0;
+	--events-accent-border: #1090d0;
+	--events-accent-soft: rgba(16, 144, 208, 0.18); /* focus ring */
 }
 ```
 
@@ -37,16 +37,15 @@ Prefix rules with `.events_page_wrap`:
 
 ```css
 .events_page_wrap .events_input {
-  border-radius: 3px;
-  border-color: #ccc;
+	border-radius: 3px;
+	border-color: #ccc;
 }
 ```
 
 Without the prefix, the plugin's stylesheet wins a tie, because it loads last.
 
 <Aside type="caution">
-  Don't edit `events.css` or the plugin's templates directly. Reactivating the plugin
-  replaces them.
+	Don't edit `events.css` or the plugin's templates directly. Reactivating the plugin replaces them.
 </Aside>
 
 ## Printing

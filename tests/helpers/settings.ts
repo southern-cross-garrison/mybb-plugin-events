@@ -16,14 +16,14 @@ import { getSetting } from './db';
  * control was added to it.
  */
 export async function setSettings(values: Record<string, string>): Promise<void> {
-  const assignments = Object.entries(values)
-    .map(
-      ([name, value]) =>
-        `$db->update_query('settings', array('value' => $db->escape_string('${value.replace(/'/g, "\\'")}')), "name = '${name}'");`,
-    )
-    .join('\n');
+	const assignments = Object.entries(values)
+		.map(
+			([name, value]) =>
+				`$db->update_query('settings', array('value' => $db->escape_string('${value.replace(/'/g, "\\'")}')), "name = '${name}'");`
+		)
+		.join('\n');
 
-  await runPhp(`
+	await runPhp(`
 ${assignments}
 rebuild_settings();
 `);
@@ -36,14 +36,14 @@ rebuild_settings();
  * baseline's settings for the tests after it.
  */
 export async function withSettings(values: Record<string, string>): Promise<() => Promise<void>> {
-  const previous: Record<string, string> = {};
-  for (const name of Object.keys(values)) {
-    previous[name] = await getSetting(name);
-  }
+	const previous: Record<string, string> = {};
+	for (const name of Object.keys(values)) {
+		previous[name] = await getSetting(name);
+	}
 
-  await setSettings(values);
+	await setSettings(values);
 
-  return async () => {
-    await setSettings(previous);
-  };
+	return async () => {
+		await setSettings(previous);
+	};
 }

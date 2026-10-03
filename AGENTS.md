@@ -47,7 +47,7 @@ baseline picks the change up.
   which surfaces as page views failing at random with "BIGINT UNSIGNED value is out of
   range", not as anything that points at the snapshot. Run `scripts/db-restore.sh` first
   (it resets the clock and realigns the timestamps), then re-provision, then snapshot. It
-  records the run's *content* as well: the last test's threads, posts and PMs are still on
+  records the run's _content_ as well: the last test's threads, posts and PMs are still on
   the board when the run ends, so a snapshot taken after a run bakes them into the
   baseline that every later run starts from. Restoring first is what clears them.
 - The plugin has to run on PHP 7.4 (the garrison's host) and the latest 8.x, and CI runs
@@ -60,14 +60,14 @@ baseline picks the change up.
 - The error-log assertions (`tests/helpers/error-log.ts`) ignore a short, exact list of
   warnings the garrison theme's templates raise on PHP 8 - variables and keys its
   templates read that MyBB never sets. Add to that list only for a warning raised inside
-  an eval'd *theme* template; one from anywhere else is a real failure.
+  an eval'd _theme_ template; one from anywhere else is a real failure.
 - libfaketime is built from a pinned release in `docker/web.Dockerfile`, not installed
   from Debian. PHP on the newer images reads file times through `stat64()`, which Debian's
   0.9.10 does not intercept, so every file written under a moved clock looked older than
   `time()` and MyBB served a theme's cached stylesheet through `css.php` instead. 0.9.13
   also refuses - by killing the process - an offset with an `s` suffix, which older
   versions ignored, so `tests/helpers/clock.ts` writes a bare number of seconds. It kills a
-  process over an *empty* file just the same, and with `FAKETIME_NO_CACHE` every process
+  process over an _empty_ file just the same, and with `FAKETIME_NO_CACHE` every process
   re-reads the file on every clock call, so the file is only ever replaced by rename
   (`write()` in `clock.ts`, `reset_faketime` in `scripts/env.sh`), never rewritten with
   `writeFileSync` or `>`. Rewritten in place, it is empty for an instant; when Apache's
@@ -103,7 +103,7 @@ baseline picks the change up.
   own parser (`events_parse_description()`). The front end gets the whole editor from the
   `codebuttons` template, which carries its own stylesheet and scripts; the Admin CP half
   returns only the configuration script, so `events_admin.php` has to put sceditor in
-  `$page->extra_header` *before* `output_header()` runs. Miss that and the box is a plain
+  `$page->extra_header` _before_ `output_header()` runs. Miss that and the box is a plain
   textarea with no error anywhere. Anything that shows a description has to go through the
   parser - `events_description_text()` is the plain-text pass the iCal feed needs - and the
   announcement thread carries it unescaped, unlike every other value it interpolates.
@@ -131,7 +131,7 @@ baseline picks the change up.
   `scripts/provision.php` activates it. Without it the board looks fine but every thread
   subject in a forum is an `<a href="">`, so nothing a test posts - an event announcement,
   a troop report - can be reached from the forum it was posted into.
-- Plugin settings are created by `events_install_settings()`, which runs from *both*
+- Plugin settings are created by `events_install_settings()`, which runs from _both_
   `events_install()` and `events_activate()`. MyBB gives plugins no upgrade hook, so a
   setting added to that list only reaches an already-installed board because activation
   tops it up - the same reason `events_upgrade_database()` runs there. Existing settings
@@ -164,10 +164,10 @@ baseline picks the change up.
 - Printing is handled entirely in `events.css`, and it works by keeping `.events_page_wrap`
   and the ancestors holding it in the document and hiding every other element. That is
   deliberately blind to the theme - naming a header or a footer would not survive the next
-  one - so anything that has to appear on paper must be rendered *inside* that wrapper.
+  one - so anything that has to appear on paper must be rendered _inside_ that wrapper.
   `{$events_print_header}` is there for exactly that reason, and every full-page template
   opens with it.
-- Two runs of the e2e suite cannot overlap. `workers: 1` serialises tests *within* a run,
+- Two runs of the e2e suite cannot overlap. `workers: 1` serialises tests _within_ a run,
   but nothing serialised the runs themselves, and global setup restores the database and
   wipes `.devenv/auth` - so a second run (another terminal, the VS Code Playwright
   extension, a second agent session) truncates tables mid-test and deletes the login state
@@ -185,7 +185,7 @@ baseline picks the change up.
 
 - Never delete `.devenv/suite.lock` to get a run moving. The lock takes itself over when the
   process that wrote it is gone - `assertNoRunInFlight()` checks `isAlive(pid)` before it
-  honours a lock - so a lock that is blocking you is one whose owner is *still running*, and
+  honours a lock - so a lock that is blocking you is one whose owner is _still running_, and
   removing it does precisely the damage the lock exists to prevent. If a lock ever does
   outlive its process, that is a bug in `suite-lock.ts` to fix, not to route around.
 
@@ -262,7 +262,7 @@ baseline picks the change up.
   refused whole and sent back to a fresh form. It fingerprints the rows rather than
   keeping a counter so that region add/delete and MyBB's own settings screen are covered
   without having to remember to bump anything. A form re-rendered after a validation
-  error keeps the token it was *submitted* with, not a fresh one.
+  error keeps the token it was _submitted_ with, not a fresh one.
 
 - Changing a setting from a test means changing it the way the Admin CP does. MyBB serves
   `$mybb->settings` from the generated `inc/settings.php`, not from the `settings` table,
@@ -293,7 +293,7 @@ baseline picks the change up.
   describe over that fallback, because it is the half that would otherwise rot unnoticed.
 
 - `verify_post_check()` behaves differently in the Admin CP: on the front end it calls
-  `error()` and stops the request, but with `IN_ADMINCP` defined it merely *returns false*.
+  `error()` and stops the request, but with `IN_ADMINCP` defined it merely _returns false_.
   Calling it bare there - `verify_post_check($mybb->get_input('my_post_key'));` - therefore
   checks nothing at all, and both `events_admin_set_status()` and `events_admin_delete_event()`
   shipped that way. They are GET links, so that was a link an administrator could be sent and
@@ -336,7 +336,7 @@ baseline picks the change up.
   another hook - there is no central place to put this, and a missed one is a thread the
   excluded member can read.
 
-- `events_block_hidden_thread()` checks *every* reference a request carries - tid, pid,
+- `events_block_hidden_thread()` checks _every_ reference a request carries - tid, pid,
   newreply's `replyto`, an attachment, a poll - and refuses if any is hidden. It used to stop
   at the first one it found, and pages disagree about which they believe: `attachment.php`
   never reads `tid`, `polls.php` and `editpost.php` go by the poll or the post, and
@@ -347,10 +347,10 @@ baseline picks the change up.
 
 - Two of those surfaces do not identify their thread the way the rest do, and a hook
   registered on them is not the same thing as a hook that fires. The archive parses its
-  thread out of the URL *path* (`archive/index.php?thread-12.html`) into `archive/global.php`'s
+  thread out of the URL _path_ (`archive/index.php?thread-12.html`) into `archive/global.php`'s
   own `$action` and `$id`, and never touches `$mybb->input['tid']` - so
   `events_block_hidden_thread()` has to read those globals when `IN_ARCHIVE` is defined, and
-  check `$action` with them because `$id` is a *fid* when the action is `forum`. On
+  check `$action` with them because `$id` is a _fid_ when the action is `forum`. On
   `xmlhttp.php` only the actions that name a `tid` or a `pid` are covered, which is why
   `tests/e2e/exclusions.spec.ts` probes `action=edit_post` rather than a quote endpoint:
   `get_multiquoted` reads its posts from a cookie, so nothing about the request says which
@@ -365,7 +365,7 @@ baseline picks the change up.
   need not have turned on - none of them is a subject line. If a fourth appears, check
   whether it leaks a subject before treating it the same way.
 
-- An announced event is read *in its thread*. `events_thread_postbit()` swaps the
+- An announced event is read _in its thread_. `events_thread_postbit()` swaps the
   `postbit`/`postbit_classic` templates for `events_postbit` while the thread's first post
   is built and restores them straight after, because MyBB gives a plugin no way to replace
   a post's output. Paging, anchors, quick reply and thread tools stay MyBB's own. The card
@@ -376,13 +376,13 @@ baseline picks the change up.
   is also what Tapatalk shows, so that post must stay complete. Link to an event with
   `events_event_url()`, not a hard-coded `event.php?id=`.
 
-- Because of that, `events.css` is attached to `showthread.php` and reaches *every* thread
+- Because of that, `events.css` is attached to `showthread.php` and reaches _every_ thread
   on the board. Nothing in it may apply outside the plugin's own markup. The print rules
   in particular are scoped to `body:has(.events_page_wrap)`: unscoped, they hide everything
   that is not an event, so printing an ordinary thread would come out blank.
   `event-threads.spec.ts` guards this.
 
-- Every date the plugin stores is a *wall clock* in the board's configured event timezone
+- Every date the plugin stores is a _wall clock_ in the board's configured event timezone
   (the `events_timezone` setting, picked in Admin CP -> Event Management -> Settings). The
   columns carry no offset, so the zone is what gives them meaning, and the server's own
   timezone is deliberately not it - a garrison's events happen where the garrison is, and
@@ -408,7 +408,7 @@ baseline picks the change up.
   form changed in between is warned about again. When an event goes back to one day, the
   day it still runs on doesn't count as removed, even though its row is deleted. A
   single-day event has no rows to diff, so its one day is a stand-in with id 0
-  (`events_single_event_day()`, read from the stored dates *before* the save overwrites
+  (`events_single_event_day()`, read from the stored dates _before_ the save overwrites
   them): moving it to another date cancels and PMs every signup the same way.
 
 - A PM to several recipients is all-or-nothing: `PMDataHandler` refuses the whole message
@@ -423,7 +423,7 @@ baseline picks the change up.
   and a double-clicked submit is two requests racing through the same check-then-write.
   Anything that reads state to decide what to write holds a named lock
   (`events_acquire_lock()` / `events_release_lock()`, MariaDB `GET_LOCK`) around both, and
-  does the read *after* taking the lock. `events_save_signup()` locks the whole event
+  does the read _after_ taking the lock. `events_save_signup()` locks the whole event
   (`events_signup_lock()`), not one member: whether a signup gets a place depends on
   everybody else's, so two members confirming for the last place under per-member locks
   both got it. A second Confirm still becomes an update to the first. `events_save_event()`
@@ -436,7 +436,7 @@ baseline picks the change up.
   that the exclusion hooks therefore never hide). The body is `events_write_event_thread()`. `tests/helpers/double-submit.ts` fires overlapping submits from the page. The
   signup race only loses some of the time, so one passing run of a test like that proves
   little.
-- Troop attendance (`events_attendance.php`) is counted from the report's *first post*,
+- Troop attendance (`events_attendance.php`) is counted from the report's _first post_,
   never from the form that posted it, so posting and editing reach it by the same path.
   Posting is `events_post_troop_report()` (`events_troop_report.php`), which
   `troop_report.php` and `scripts/seed-demo.php` both call. Do not post a report any other
@@ -466,7 +466,7 @@ baseline picks the change up.
 
 - MyBB's Admin CP `generate_select_box()` writes each option's key into `value=""` as it
   is, and compares the selection with the key as it is. A select whose keys are
-  board-supplied text - a region - needs its keys *and* its selected value passed through
+  board-supplied text - a region - needs its keys _and_ its selected value passed through
   `htmlspecialchars_uni()`. The event form's region select and the Reports filter both do
   this. Escape only the labels and a quote in a region breaks out of the attribute; escape
   the keys but not the selection and the filter silently shows "All regions" while
@@ -480,7 +480,7 @@ baseline picks the change up.
   (troopers) and `--events-wrangle` (wranglers), the same pair the event card's turnout
   dots use.
 
-- Maximum troopers and wranglers work on one rule: a *place* is a role on one day (or on
+- Maximum troopers and wranglers work on one rule: a _place_ is a role on one day (or on
   the whole event, for an event with no days), its queue is every claim on it ordered by
   `claimed_at` (ties within the second by the claim's own `id`, never the signup's), and the first `max` of the queue are attending and the rest waitlisted.
   `events_waitlist_moves()` is that rule and nothing else; `events_rebalance_waitlist()`
@@ -494,7 +494,7 @@ baseline picks the change up.
   that: `events_event_roles($event)` is trooper and wrangler for a troop and `attendee` alone
   for a social event. `events_rsvp_roles()` is every role that exists, for code that reads or
   clears signups whatever the event is (the queues, `events_write_signup()`), and
-  `events_rsvp_role()` only proves a value is *a* role, not one the event takes. Anything
+  `events_rsvp_role()` only proves a value is _a_ role, not one the event takes. Anything
   that lists, counts or offers roles for one event iterates `events_event_roles()` - iterate
   the other and a troop grows an Attendees count, or a social event a Troopers one. A social
   event never has a troop report, so everything downstream of one (reminders, attendance,
@@ -504,7 +504,7 @@ baseline picks the change up.
 
 - On an event with days, a signup's own `rsvps.status` is kept in step with its claims
   (attending if any claim is), so every `status = 'attending'` read elsewhere means "going,
-  at least in part" and needed no change. Anything that lists *days*, though, has to look at
+  at least in part" and needed no change. Anything that lists _days_, though, has to look at
   the claim's status: `events_get_attendees()` returns only the claims with the status it
   was asked for (attending unless told otherwise), and `events_get_user_signup()` returns
   waitlisted rows too, with `day_status`. A new place a signup is read from has to decide
@@ -516,9 +516,9 @@ baseline picks the change up.
   and a re-provision, since both of those live in the database at runtime.
   `tests/e2e/plugin-setup.spec.ts` asserts on both lists, so it fails until they match.
 - The web container has libfaketime preloaded, reading `.devenv/faketime/faketime.rc`.
-  Writing that file moves PHP's clock for both Apache and CLI. The database clock is *not*
+  Writing that file moves PHP's clock for both Apache and CLI. The database clock is _not_
   faked, so plugin code compares times in PHP rather than with SQL `NOW()`.
-- Moving that clock *backwards* has to be paired with realigning MyBB's activity
+- Moving that clock _backwards_ has to be paired with realigning MyBB's activity
   timestamps. MyBB's shutdown handler adds `now - lastactive` to `users.timeonline`, which
   is UNSIGNED, so stamps left in the future make the next page view fail with "BIGINT
   UNSIGNED value is out of range" - and it is the dev forum in a browser that breaks, long
@@ -528,7 +528,7 @@ baseline picks the change up.
 
 - The calendar subscription feed (`ical_feed.php`) is fetched by calendar servers with no
   session, so it defines `ALLOWABLE_PAGE` and its token is the entire access check.
-  Everything it renders has to be asked *as the token's member*, by passing their uid -
+  Everything it renders has to be asked _as the token's member_, by passing their uid -
   `events_can_view_event($event, $uid)`, `events_get_user_signup($id, $uid)` - never
   through a helper that reads `$mybb->user`, which on that page is a guest. The VEVENTs
   are built by `events_ical_vevents()` (`events_ical.php`) for both it and `ical.php`, so
@@ -558,7 +558,7 @@ baseline picks the change up.
   without checking anything. A new MyBB table that holds threads, posts or anything
   counted from them belongs in `BOARD_CONTENT_TABLES`. The datacache is restored only for
   the rows built from posts: `tasks` holds each task's next run, and rewinding it sets the
-  reminder task off mid-test. A test that reads a listing to prove a thread is *absent*
+  reminder task off mid-test. A test that reads a listing to prove a thread is _absent_
   should check the listing is one page first, as `openForumListing()` in
   `exclusions.spec.ts` does.
 
@@ -567,7 +567,7 @@ baseline picks the change up.
   It writes the `adminlog` row itself rather than calling MyBB's `log_admin_action()`, which
   exists only in the Admin CP and reads its module from the request, and coordinators edit
   from `manage_event.php` with no Admin CP at all. Logging sits in the two forms and the
-  status/delete actions, *not* in `events_save_event()`, because the demo seed and tests call
+  status/delete actions, _not_ in `events_save_event()`, because the demo seed and tests call
   that from the command line. An edit names the fields it changed by comparing
   `events_event_log_state()` before and after the save; a new field on the event form belongs
   in that list too. The wording on the log page comes from `events_admin_log_action()` on
@@ -592,7 +592,7 @@ baseline picks the change up.
 - Saying you will troop fetches the member's costumes from the 501st Legion API
   (`events_sync_user_costumes()`, `events_legion_api.php`) and overwrites the costume
   profile field, on the attendance step and before the prerequisites step reads it. Nothing
-  short of a member record *with costumes* touches the field. The suite never calls the real
+  short of a member record _with costumes_ touches the field. The suite never calls the real
   API - the fixtures' Legion IDs belong to real members, whose costumes would replace the
   fixtures'. Provisioning points `events_legion_api_url` at `tests/stubs/legion-api.php`,
   which global setup copies to the forum root and which answers 503 unless a test stubs an

@@ -178,6 +178,9 @@ importers:
       node:
         specifier: runtime:^24.0.0
         version: runtime:24.21.0
+      prettier:
+        specifier: ^3.9.9
+        version: 3.9.9
 
 packages:
 
@@ -362,6 +365,11 @@ packages:
     engines: {node: '>=20'}
     hasBin: true
 
+  prettier@3.9.9:
+    resolution: {integrity: sha512-Z/CJHIkdujO/OtN7nXUii0Rf3VT5SRuhjBA82Xvu2XhBUgX3nhP67T0LHceBdQLex7OOFGTox+Q5Yg8Jk2Qivg==}
+    engines: {node: '>=14'}
+    hasBin: true
+
   safer-buffer@2.1.2:
     resolution: {integrity: sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==}
 
@@ -420,6 +428,8 @@ snapshots:
   playwright@1.63.0:
     dependencies:
       playwright-core: 1.63.0
+
+  prettier@3.9.9: {}
 
   safer-buffer@2.1.2: {}
 

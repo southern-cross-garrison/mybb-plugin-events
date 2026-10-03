@@ -17,11 +17,11 @@ import { releaseSuiteLock } from './helpers/suite-lock';
  * runs once, after everything.
  */
 export default async function globalTeardown(): Promise<void> {
-  try {
-    await resetClock();
-    await alignUserActivityToClock(await readContainerClock());
-  } finally {
-    await closeDb();
-    releaseSuiteLock();
-  }
+	try {
+		await resetClock();
+		await alignUserActivityToClock(await readContainerClock());
+	} finally {
+		await closeDb();
+		releaseSuiteLock();
+	}
 }

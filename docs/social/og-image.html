@@ -1,19 +1,83 @@
 <!doctype html>
 <!-- The social preview image (public/og-image.jpg). Regenerate with: node social/render.mjs -->
-<html><head><style>
-@font-face{font-family:PJS;src:url(../node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2) format('woff2');font-weight:200 800}
-html,body{margin:0}
-body{width:1200px;height:630px;box-sizing:border-box;font-family:PJS,sans-serif;color:#e8ecf5;
- background:radial-gradient(1200px 600px at 85% 0%, oklch(0.32 0.07 258) 0%, transparent 60%),linear-gradient(160deg, oklch(0.26 0.05 258), oklch(0.17 0.035 258));
- display:flex;align-items:center;gap:64px;padding:0 90px;position:relative;overflow:hidden}
-.logo{width:260px;flex:none;filter:drop-shadow(0 20px 40px rgba(0,0,0,.45))}
-.kicker{font-size:26px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:oklch(0.8 0.04 250)}
-h1{font-size:104px;line-height:1;margin:18px 0 26px;font-weight:800;letter-spacing:-.03em;color:#fff}
-p{font-size:34px;line-height:1.35;margin:0;color:oklch(0.86 0.02 250);max-width:640px}
-.url{position:absolute;left:90px;right:90px;bottom:44px;display:flex;justify-content:space-between;font-size:24px;font-weight:600;color:oklch(0.72 0.04 250);border-top:1px solid oklch(0.45 0.05 258 / .6);padding-top:22px}
-</style></head><body>
-<img class="logo" src="../src/assets/scg-logo.svg">
-<div><div class="kicker">Southern Cross Garrison</div><h1>Events Guide</h1>
-<p>Find a troop, sign up, and run events on the garrison forums.</p></div>
-<div class="url"><span>events-guide.501scg.org</span><span>501st Legion</span></div>
-</body></html>
+<html>
+	<head>
+		<style>
+			@font-face {
+				font-family: PJS;
+				src: url(../node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2)
+					format('woff2');
+				font-weight: 200 800;
+			}
+			html,
+			body {
+				margin: 0;
+			}
+			body {
+				width: 1200px;
+				height: 630px;
+				box-sizing: border-box;
+				font-family: PJS, sans-serif;
+				color: #e8ecf5;
+				background:
+					radial-gradient(1200px 600px at 85% 0%, oklch(0.32 0.07 258) 0%, transparent 60%),
+					linear-gradient(160deg, oklch(0.26 0.05 258), oklch(0.17 0.035 258));
+				display: flex;
+				align-items: center;
+				gap: 64px;
+				padding: 0 90px;
+				position: relative;
+				overflow: hidden;
+			}
+			.logo {
+				width: 260px;
+				flex: none;
+				filter: drop-shadow(0 20px 40px rgba(0, 0, 0, 0.45));
+			}
+			.kicker {
+				font-size: 26px;
+				font-weight: 600;
+				letter-spacing: 0.14em;
+				text-transform: uppercase;
+				color: oklch(0.8 0.04 250);
+			}
+			h1 {
+				font-size: 104px;
+				line-height: 1;
+				margin: 18px 0 26px;
+				font-weight: 800;
+				letter-spacing: -0.03em;
+				color: #fff;
+			}
+			p {
+				font-size: 34px;
+				line-height: 1.35;
+				margin: 0;
+				color: oklch(0.86 0.02 250);
+				max-width: 640px;
+			}
+			.url {
+				position: absolute;
+				left: 90px;
+				right: 90px;
+				bottom: 44px;
+				display: flex;
+				justify-content: space-between;
+				font-size: 24px;
+				font-weight: 600;
+				color: oklch(0.72 0.04 250);
+				border-top: 1px solid oklch(0.45 0.05 258 / 0.6);
+				padding-top: 22px;
+			}
+		</style>
+	</head>
+	<body>
+		<img class="logo" src="../src/assets/scg-logo.svg" />
+		<div>
+			<div class="kicker">Southern Cross Garrison</div>
+			<h1>Events Guide</h1>
+			<p>Find a troop, sign up, and run events on the garrison forums.</p>
+		</div>
+		<div class="url"><span>events-guide.501scg.org</span><span>501st Legion</span></div>
+	</body>
+</html>

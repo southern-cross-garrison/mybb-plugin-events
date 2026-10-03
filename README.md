@@ -20,11 +20,11 @@ database snapshot the suite resets to.
 
 When it finishes:
 
-| | |
-|---|---|
-| Forum | <http://localhost:8080> |
-| Admin CP | <http://localhost:8080/admin/> - `admin` / `adminpass123` |
-| Database | `localhost:3307` - `mybb` / `mybbpassword` |
+|            |                                                                                |
+| ---------- | ------------------------------------------------------------------------------ |
+| Forum      | <http://localhost:8080>                                                        |
+| Admin CP   | <http://localhost:8080/admin/> - `admin` / `adminpass123`                      |
+| Database   | `localhost:3307` - `mybb` / `mybbpassword`                                     |
 | phpMyAdmin | `docker compose --profile tools up -d phpmyadmin` then <http://localhost:8081> |
 
 Ports come from `.env` (copy `.env.example`) if the defaults clash.
@@ -168,10 +168,13 @@ Accent colours are the one thing a theme usually wants to change, so they are re
 every button, pill and signup dot with one declaration:
 
 ```css
-:root { --events-accent: #1090d0; --events-accent-border: #1090d0; }
+:root {
+	--events-accent: #1090d0;
+	--events-accent-border: #1090d0;
+}
 ```
 
-The fallbacks are deliberately *not* defaults in a `:root` block inside `events.css`. That
+The fallbacks are deliberately _not_ defaults in a `:root` block inside `events.css`. That
 stylesheet is installed last in the display order, so a `:root` block there would
 out-order the theme's own and the override would silently never apply.
 
@@ -191,52 +194,52 @@ relative to that instant, so nothing depends on the real date.
 
 **Moving the clock.** The web container runs with `libfaketime` preloaded, reading a
 bind-mounted control file. `setClock('2026-10-05 18:30:00')` writes that file and waits until
-a real HTTP request observes the change, which moves PHP's clock for Apache requests *and*
+a real HTTP request observes the change, which moves PHP's clock for Apache requests _and_
 for anything run through `docker compose exec`. That is how signup cutoffs, event start and
 end times, troop report availability and the weekly reminder cadence are tested - the data
 stays still and time moves, which is the way round that matches production.
 
-The database clock is deliberately *not* faked. Plugin code therefore compares times in PHP
+The database clock is deliberately _not_ faked. Plugin code therefore compares times in PHP
 rather than with SQL `NOW()`.
 
 **Fixtures.** `scripts/provision.php` creates the custom profile fields, usergroups, forums
 and users the suite needs, and writes `test-forum/events-fixtures.json` with their ids. The
 users are shaped around the scenarios:
 
-| User | Purpose |
-|---|---|
-| `admin` | Admin CP access |
-| `gec` | Event coordinator: manages events from the front end, no Admin CP rights |
-| `trooper1` | Garrison member with a complete profile - signs up without prerequisites |
-| `trooper2` | 501st member with a complete profile |
-| `newbie` | No profile details at all - drives the prerequisites step |
-| `nowwcc` | Everything except a WWCC - drives the WWCC-required branch |
+| User       | Purpose                                                                    |
+| ---------- | -------------------------------------------------------------------------- |
+| `admin`    | Admin CP access                                                            |
+| `gec`      | Event coordinator: manages events from the front end, no Admin CP rights   |
+| `trooper1` | Garrison member with a complete profile - signs up without prerequisites   |
+| `trooper2` | 501st member with a complete profile                                       |
+| `newbie`   | No profile details at all - drives the prerequisites step                  |
+| `nowwcc`   | Everything except a WWCC - drives the WWCC-required branch                 |
 | `wrangler` | Contact details but no Legion ID and no costumes - the wrangling-only path |
-| `excluded` | Used for per-event exclusions |
+| `excluded` | Used for per-event exclusions                                              |
 
 All of them use the password `testpass123`.
 
 ## What is covered
 
-| Spec | Covers |
-|---|---|
-| `plugin-setup` | Templates installed, task registered, settings mapped, nav link, guest access, Admin CP module |
-| `admin-events` | Event create/edit/delete, validation, multi-day, exclusions, publish and archive, coordinator has no Admin CP access |
-| `manage-events` | The front-end event form: a coordinator creating and editing without the Admin CP, the pending default, multi-day round-trips, exclusions, validation, and who is turned away |
-| `events-listing` | List and calendar views, the view toggle (its toolbar position, icon and remembered per-member view), filters applying on change with a `<noscript>` button behind them, region filter, archived hidden until the filter asks and the filter surviving the toggle and the paging, the calendar's month stepper in place of a heading bar, attendance markers, pending visibility, multi-day spanning, month paging |
-| `signup-flow` | The whole wizard: attendance, prerequisites, costumes, confirmation; validation; state carried between steps; editing an existing signup; multiselect costume parsing |
-| `signup-locking` | **Clock travel:** cutoffs, event end, late signups during an event, pending/archived status, exclusions, guests, and that an existing signup survives the lock |
-| `exclusions` | What an exclusion hides: the listing and calendar, the event's own pages and feed, the announcement thread across every surface that could name it, the troop report staying readable, and the coordinator carve-out |
-| `signup-roles` | Choosing trooping or wrangling, mixing the two across days, what each role is asked for, the event page and listing, and how both roles reach the coordinator surfaces |
-| `coordinator` | RSVP list and filters, attendance sheet and its day filter, permissions |
-| `troop-report` | Availability after the event ends, draft segmentation by club, posting, archiving, duplicate prevention, announcement-thread comment |
-| `event-announcements` | The generated forum thread for an event: which region's forum it lands in, the default fallback, pending events staying unannounced, edits rewriting the post rather than adding another, and BBCode neutralised |
-| `reminders` | The scheduled task under a moved clock: who gets PMed, the weekly cadence, and when reminders stop |
-| `ical` | Feed contents, one VEVENT per day, escaping, permissions |
-| `timezone` | **Clock travel:** the board's event timezone, with the server on another one - cutoffs, the end of an event, what the pages show, and the UTC instants in the feed |
-| `print` | Print media: the board chrome is gone, the branded ribbon is there and will actually print, and the attendance sheet paginates with a repeating header |
-| `regions` | The board's region list in the Admin CP: renaming one and its events and forum following it, adding one and filing an event under it, the delete dialog's two steps and where the events go, and that all of it works with JavaScript turned off |
-| `health` | Every page renders with no PHP warning or SQL error logged |
+| Spec                  | Covers                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `plugin-setup`        | Templates installed, task registered, settings mapped, nav link, guest access, Admin CP module                                                                                                                                                                                                                                                                                                                     |
+| `admin-events`        | Event create/edit/delete, validation, multi-day, exclusions, publish and archive, coordinator has no Admin CP access                                                                                                                                                                                                                                                                                               |
+| `manage-events`       | The front-end event form: a coordinator creating and editing without the Admin CP, the pending default, multi-day round-trips, exclusions, validation, and who is turned away                                                                                                                                                                                                                                      |
+| `events-listing`      | List and calendar views, the view toggle (its toolbar position, icon and remembered per-member view), filters applying on change with a `<noscript>` button behind them, region filter, archived hidden until the filter asks and the filter surviving the toggle and the paging, the calendar's month stepper in place of a heading bar, attendance markers, pending visibility, multi-day spanning, month paging |
+| `signup-flow`         | The whole wizard: attendance, prerequisites, costumes, confirmation; validation; state carried between steps; editing an existing signup; multiselect costume parsing                                                                                                                                                                                                                                              |
+| `signup-locking`      | **Clock travel:** cutoffs, event end, late signups during an event, pending/archived status, exclusions, guests, and that an existing signup survives the lock                                                                                                                                                                                                                                                     |
+| `exclusions`          | What an exclusion hides: the listing and calendar, the event's own pages and feed, the announcement thread across every surface that could name it, the troop report staying readable, and the coordinator carve-out                                                                                                                                                                                               |
+| `signup-roles`        | Choosing trooping or wrangling, mixing the two across days, what each role is asked for, the event page and listing, and how both roles reach the coordinator surfaces                                                                                                                                                                                                                                             |
+| `coordinator`         | RSVP list and filters, attendance sheet and its day filter, permissions                                                                                                                                                                                                                                                                                                                                            |
+| `troop-report`        | Availability after the event ends, draft segmentation by club, posting, archiving, duplicate prevention, announcement-thread comment                                                                                                                                                                                                                                                                               |
+| `event-announcements` | The generated forum thread for an event: which region's forum it lands in, the default fallback, pending events staying unannounced, edits rewriting the post rather than adding another, and BBCode neutralised                                                                                                                                                                                                   |
+| `reminders`           | The scheduled task under a moved clock: who gets PMed, the weekly cadence, and when reminders stop                                                                                                                                                                                                                                                                                                                 |
+| `ical`                | Feed contents, one VEVENT per day, escaping, permissions                                                                                                                                                                                                                                                                                                                                                           |
+| `timezone`            | **Clock travel:** the board's event timezone, with the server on another one - cutoffs, the end of an event, what the pages show, and the UTC instants in the feed                                                                                                                                                                                                                                                 |
+| `print`               | Print media: the board chrome is gone, the branded ribbon is there and will actually print, and the attendance sheet paginates with a repeating header                                                                                                                                                                                                                                                             |
+| `regions`             | The board's region list in the Admin CP: renaming one and its events and forum following it, adding one and filing an event under it, the delete dialog's two steps and where the events go, and that all of it works with JavaScript turned off                                                                                                                                                                   |
+| `health`              | Every page renders with no PHP warning or SQL error logged                                                                                                                                                                                                                                                                                                                                                         |
 
 ## Continuous integration
 
@@ -245,7 +248,7 @@ once on PHP 7.4 and once on 8.5, and uploads each one's Playwright report, trace
 container logs when something fails. Before the suite it lints every PHP file in `plugin/`
 and `scripts/`, which is what catches PHP 8-only syntax in a file no test loads.
 
-Once both versions pass, the *Package the plugin* job uploads the release as the run's
+Once both versions pass, the _Package the plugin_ job uploads the release as the run's
 `mybb-plugin-events-<sha>` artifact. Downloaded, it is a zip of the contents of `plugin/`
 with no folder around them, so it expands straight over a forum root. `PLUGIN.md` is left
 out of it for the same reason it is kept out of `plugin/`.
@@ -260,7 +263,7 @@ git tag v1.3
 git push origin v1.3
 ```
 
-The tag runs the whole workflow, and once both PHP versions pass, the *Publish the release*
+The tag runs the whole workflow, and once both PHP versions pass, the _Publish the release_
 job attaches the zip as `mybb-plugin-events.zip` with release notes generated from the
 commits since the last tag. It fails without publishing if the tag and the plugin's
 version disagree. The asset keeps the same name every release, so

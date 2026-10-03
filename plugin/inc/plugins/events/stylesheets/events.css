@@ -68,9 +68,21 @@
 	padding: 0 12px;
 	max-width: var(--events-page-width, 100%);
 }
-@media (min-width: 768px) { .events_page_wrap { max-width: var(--events-page-width, 720px); } }
-@media (min-width: 992px) { .events_page_wrap { max-width: var(--events-page-width, 960px); } }
-@media (min-width: 1200px) { .events_page_wrap { max-width: var(--events-page-width, 1275px); } }
+@media (min-width: 768px) {
+	.events_page_wrap {
+		max-width: var(--events-page-width, 720px);
+	}
+}
+@media (min-width: 992px) {
+	.events_page_wrap {
+		max-width: var(--events-page-width, 960px);
+	}
+}
+@media (min-width: 1200px) {
+	.events_page_wrap {
+		max-width: var(--events-page-width, 1275px);
+	}
+}
 
 /* ---------------------------------------------------------------------------
  * In a thread
@@ -124,19 +136,34 @@
  * and it is set to read as one thing with its two arrows rather than as a sentence with
  * links at each end.
  * ------------------------------------------------------------------------ */
-.events_month_nav { display: inline-flex; align-items: center; gap: 2px; }
-.events_month_name { font-weight: 600; font-size: 1.05em; padding: 0 6px; white-space: nowrap; }
+.events_month_nav {
+	display: inline-flex;
+	align-items: center;
+	gap: 2px;
+}
+.events_month_name {
+	font-weight: 600;
+	font-size: 1.05em;
+	padding: 0 6px;
+	white-space: nowrap;
+}
 
 /* The arrows are glyphs, so they are given a hit area to sit in rather than being left
    as two characters to aim at, and their names live in aria-label - "«" is not one. */
 .events_month_step {
-	display: inline-flex; align-items: center; justify-content: center;
-	width: 26px; height: 26px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 26px;
 	border-radius: 4px;
 	line-height: 1;
 	text-decoration: none;
 }
-.events_month_step:hover { text-decoration: none; background: rgba(127, 127, 127, 0.18); }
+.events_month_step:hover {
+	text-decoration: none;
+	background: rgba(127, 127, 127, 0.18);
+}
 
 /* ---------------------------------------------------------------------------
  * View toggle
@@ -154,7 +181,9 @@
  * the note on .events_select for why equal specificity would lose. */
 .events_page_wrap .events_view_toggle,
 .events_page_wrap .events_filter_button {
-	display: inline-flex; align-items: center; gap: 6px;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
 	padding: 3px 11px;
 	background: transparent;
 	color: inherit;
@@ -169,7 +198,10 @@
 	opacity: 0.85;
 }
 .events_page_wrap .events_view_toggle:hover,
-.events_page_wrap .events_filter_button:hover { opacity: 1; background: rgba(127, 127, 127, 0.18); }
+.events_page_wrap .events_filter_button:hover {
+	opacity: 1;
+	background: rgba(127, 127, 127, 0.18);
+}
 
 /* ---------------------------------------------------------------------------
  * Filter disclosure
@@ -184,17 +216,25 @@
  * script here to put them back. Taken out of flow as well, or it would leave a 1px item
  * and a gap in the toolbar's flex row.
  * ------------------------------------------------------------------------ */
-.events_toolbar { position: relative; }
+.events_toolbar {
+	position: relative;
+}
 .events_filter_disclosure {
-	position: absolute; top: 0; left: 0;
-	width: 1px; height: 1px;
-	margin: 0; padding: 0;
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 1px;
+	height: 1px;
+	margin: 0;
+	padding: 0;
 	opacity: 0;
 	pointer-events: none;
 }
 /* Overridden in the max-width block below, which is the only screen size this button
    has a job at. Written after the shared look above so it wins on load order. */
-.events_page_wrap .events_filter_button { display: none; }
+.events_page_wrap .events_filter_button {
+	display: none;
+}
 /* The ring belongs on the button, since the box it is on cannot be seen. */
 .events_filter_disclosure:focus-visible + .events_filter_button {
 	outline: 2px solid var(--events-accent, #2f6f9f);
@@ -224,7 +264,9 @@
  * carry that class - the filters, Create Event and the view switch all use it for the
  * shared one-line-form layout - and only the first of them is the panel. */
 @media screen and (max-width: 700px) {
-	.events_page_wrap .events_filter_button { display: inline-flex; }
+	.events_page_wrap .events_filter_button {
+		display: inline-flex;
+	}
 
 	.events_toolbar #events_filter_form {
 		/* Last in the row, and wider than the row, so it takes a line of its own. */
@@ -238,24 +280,34 @@
 		border-radius: 6px;
 	}
 
-	#events_filter_open:not(:checked) ~ #events_filter_form { display: none; }
+	#events_filter_open:not(:checked) ~ #events_filter_form {
+		display: none;
+	}
 }
 
 /* Hard right, whatever else the toolbar is carrying. `margin-left: auto` on a flex item
    eats the free space to its left, which keeps the toggle on the same row as everything
    else instead of the absolute positioning that would drop it out of the wrap. */
-.events_toolbar .events_view_form { margin-left: auto; }
+.events_toolbar .events_view_form {
+	margin-left: auto;
+}
 
 /* The icon is a mask rather than the background-image the funnel and the select's arrow
    are, because those sit on a known light surface and this one has to take the heading
    bar's colour with it - a mask is painted in currentColor, a background image carries
    whatever colour was baked into the data URI. */
-.events_view_icon, .events_filter_icon {
-	width: 14px; height: 14px; flex: none;
+.events_view_icon,
+.events_filter_icon {
+	width: 14px;
+	height: 14px;
+	flex: none;
 	background-color: currentColor;
-	-webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
-	-webkit-mask-position: center; mask-position: center;
-	-webkit-mask-size: 14px 14px; mask-size: 14px 14px;
+	-webkit-mask-repeat: no-repeat;
+	mask-repeat: no-repeat;
+	-webkit-mask-position: center;
+	mask-position: center;
+	-webkit-mask-size: 14px 14px;
+	mask-size: 14px 14px;
 }
 
 /* A funnel for the filters, and for each view button an icon naming the view it goes
@@ -273,14 +325,33 @@
 	mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='M5.4 3.6h9.1M5.4 8h9.1M5.4 12.4h9.1M1.7 3.6h.01M1.7 8h.01M1.7 12.4h.01'/%3E%3C/svg%3E");
 }
 
-.events_toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; }
-.events_filter_form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; }
-.events_filter_form label { display: inline-flex; align-items: center; gap: 6px; }
+.events_toolbar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 20px;
+}
+.events_filter_form {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin: 0;
+}
+.events_filter_form label {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
 
 /* The archived toggle sits between the region select and the Filter button, and reads as
    one control with its box - so it keeps its two words on one line however narrow the
    toolbar gets, and wraps as a whole instead. */
-.events_filter_check { white-space: nowrap; font: inherit; font-weight: normal; }
+.events_filter_check {
+	white-space: nowrap;
+	font: inherit;
+	font-weight: normal;
+}
 
 .events_select {
 	/* inherit, so the control follows the theme's body font - but not a label's weight:
@@ -305,7 +376,10 @@
 	background-position: right 10px center;
 	background-size: 11px 11px;
 }
-.events_select:focus { border-color: var(--events-accent, #2f6f9f); outline: none; }
+.events_select:focus {
+	border-color: var(--events-accent, #2f6f9f);
+	outline: none;
+}
 
 /* ---------------------------------------------------------------------------
  * Notice
@@ -338,16 +412,27 @@
 	border-left: 4px solid var(--events-accent, #2f6f9f);
 	border-radius: 3px;
 }
-.events_legion_lookup[hidden] { display: none; }
-.events_legion_lookup p { margin: 0; }
-.events_legion_lookup_costumes { margin: 4px 0 0; padding-left: 18px; }
+.events_legion_lookup[hidden] {
+	display: none;
+}
+.events_legion_lookup p {
+	margin: 0;
+}
+.events_legion_lookup_costumes {
+	margin: 4px 0 0;
+	padding-left: 18px;
+}
 
 /* Under the costumes it is about, on the signup's costumes and confirm steps. */
-.rsvp_costumes_notice { margin-top: 12px; }
+.rsvp_costumes_notice {
+	margin-top: 12px;
+}
 
 /* The sentence the notice sits under, which is ordinary instruction rather than part of
    the box - so it keeps its own spacing and the notice does not inherit the gap. */
-.troop_report_intro { margin: 0 0 12px; }
+.troop_report_intro {
+	margin: 0 0 12px;
+}
 
 /* ---------------------------------------------------------------------------
  * Form controls
@@ -357,12 +442,30 @@
  * unstyled - a browser-default box next to a theme's own form fields. Here each field is
  * a stack: label, control, hint, with room to breathe between them.
  * ------------------------------------------------------------------------ */
-.events_field { margin: 0 0 20px; max-width: 32em; }
-.events_field:last-child { margin-bottom: 0; }
+.events_field {
+	margin: 0 0 20px;
+	max-width: 32em;
+}
+.events_field:last-child {
+	margin-bottom: 0;
+}
 
-.events_label { display: block; font-weight: 600; margin: 0 0 6px; }
-.events_required { color: #c0392b; margin-left: 3px; }
-.events_hint { display: block; margin: 7px 0 0; font-size: 0.9em; line-height: 1.4; opacity: 0.75; }
+.events_label {
+	display: block;
+	font-weight: 600;
+	margin: 0 0 6px;
+}
+.events_required {
+	color: #c0392b;
+	margin-left: 3px;
+}
+.events_hint {
+	display: block;
+	margin: 7px 0 0;
+	font-size: 0.9em;
+	line-height: 1.4;
+	opacity: 0.75;
+}
 
 .events_input {
 	/* inherit, so the control follows the theme's body font rather than the browser's
@@ -385,90 +488,183 @@
 	box-shadow: 0 0 0 3px var(--events-accent-soft, rgba(47, 111, 159, 0.18));
 }
 
-textarea.events_input { resize: vertical; }
+textarea.events_input {
+	resize: vertical;
+}
 /* The troop report is a document being edited, so it gets a floor no `rows` can undercut.
    A shorter textarea - an event's description - takes its height from `rows` instead. */
-.events_textarea { min-height: 22em; }
+.events_textarea {
+	min-height: 22em;
+}
 
 /* A list of tickable rows - costumes to wear, ways to attend a day. The whole row is the
    label, so the hit target is the row rather than the box and its few characters. */
-.events_options { display: flex; flex-direction: column; gap: 6px; max-width: 32em; }
+.events_options {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	max-width: 32em;
+}
 .events_option {
-	display: flex; align-items: center; gap: 10px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
 	padding: 9px 12px;
-	border: 1px solid #dedede; border-radius: 4px;
+	border: 1px solid #dedede;
+	border-radius: 4px;
 	cursor: pointer;
 }
-.events_option:hover { border-color: #bcbcbc; }
-.events_option input { margin: 0; flex: none; }
+.events_option:hover {
+	border-color: #bcbcbc;
+}
+.events_option input {
+	margin: 0;
+	flex: none;
+}
 /* The preapproval row carries its own text box, which takes whatever the row has left. */
-.costume_preapproval_option .events_input { flex: 1 1 auto; width: auto; min-width: 0; padding: 5px 8px; }
+.costume_preapproval_option .events_input {
+	flex: 1 1 auto;
+	width: auto;
+	min-width: 0;
+	padding: 5px 8px;
+}
 /* The board's preapproval requirements, read like terms before the box agreeing to them.
    Under the costume list at the page's width rather than the list's, and a long post
    scrolls inside its box rather than pushing the box to agree out of sight. */
-#costume_preapproval_requirements { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
-#costume_preapproval_requirements[hidden] { display: none; }
+#costume_preapproval_requirements {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 12px;
+}
+#costume_preapproval_requirements[hidden] {
+	display: none;
+}
 .events_terms {
-	max-height: 22em; overflow-y: auto;
+	max-height: 22em;
+	overflow-y: auto;
 	padding: 10px 14px;
-	border: 1px solid #dedede; border-radius: 4px;
+	border: 1px solid #dedede;
+	border-radius: 4px;
 	background: var(--events-lookup, rgba(47, 111, 159, 0.05));
 	line-height: 1.5;
 }
-.events_terms_title { margin: 0 0 6px; font-size: 1em; }
-.events_terms_body > :first-child { margin-top: 0; }
-.events_terms_body > :last-child { margin-bottom: 0; }
+.events_terms_title {
+	margin: 0 0 6px;
+	font-size: 1em;
+}
+.events_terms_body > :first-child {
+	margin-top: 0;
+}
+.events_terms_body > :last-child {
+	margin-bottom: 0;
+}
 
 /* A row of the event form's day grid: one day the event covers, and the hours it runs
    that day. The date is derived from the event's start and end dates rather than typed,
    so it reads as a label and posts as a hidden field. The row wraps to a stack on a
    narrow screen, where the date and two controls will not sit side by side. */
 .events_day_row {
-	display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 10px;
 	padding: 10px 0;
 	border-bottom: 1px solid #ededed;
 }
-.events_day_row:last-child { border-bottom: 0; }
-.events_day_date { flex: none; align-self: center; min-width: 9.5em; font-weight: 600; opacity: 0.75; }
-.events_day_cell { flex: 1 1 9em; min-width: 8em; }
-.events_day_cell_label { display: block; margin: 0 0 4px; font-size: 0.85em; opacity: 0.75; }
+.events_day_row:last-child {
+	border-bottom: 0;
+}
+.events_day_date {
+	flex: none;
+	align-self: center;
+	min-width: 9.5em;
+	font-weight: 600;
+	opacity: 0.75;
+}
+.events_day_cell {
+	flex: 1 1 9em;
+	min-width: 8em;
+}
+.events_day_cell_label {
+	display: block;
+	margin: 0 0 4px;
+	font-size: 0.85em;
+	opacity: 0.75;
+}
 
 /* The day rows are the page's one wide block, so they opt out of the 32em field column. */
-#event_form_days { max-width: none; }
+#event_form_days {
+	max-width: none;
+}
 
 /* So does the description, for the same reason: it is MyBB's BBCode editor, whose toolbar
    has some thirty buttons on it and wraps to three rows in a 32em column. events_form_field()
    puts "field_" + the control's id on the wrapper, which is what this reaches for. */
-#field_event_form_description { max-width: none; }
-#event_form_days_hint { margin: 0 0 4px; }
+#field_event_form_description {
+	max-width: none;
+}
+#event_form_days_hint {
+	margin: 0 0 4px;
+}
 
 /* A troop's maximums and a social event's are both on the form, and the one for the other
    type is put away off the Type select, script or not. A browser without :has() shows
    all three, and the save only keeps the ones the chosen type takes. */
-#manage_event_form:has(#event_form_event_type option[value="social"]:checked) .events_type_troop,
-#manage_event_form:has(#event_form_event_type option[value="troop"]:checked) .events_type_social { display: none; }
+#manage_event_form:has(#event_form_event_type option[value='social']:checked) .events_type_troop,
+#manage_event_form:has(#event_form_event_type option[value='troop']:checked) .events_type_social {
+	display: none;
+}
 
 /* The day-change warning's stand-in for the Save button, there only so that Enter in a
    field is not taken as agreeing to the warning - see events_day_change_warning(). Off
    screen rather than display: none, which some browsers take as no default button. */
-.events_default_submit { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.events_default_submit {
+	position: absolute;
+	left: -9999px;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+}
 
 /* ---------------------------------------------------------------------------
  * Events list - signup counts, action buttons, status pills
  * ------------------------------------------------------------------------ */
-.event_count { display: inline-block; margin-right: 10px; white-space: nowrap; }
-.event_count_dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: baseline; }
+.event_count {
+	display: inline-block;
+	margin-right: 10px;
+	white-space: nowrap;
+}
+.event_count_dot {
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	margin-right: 4px;
+	vertical-align: baseline;
+}
 .event_count_trooper .event_count_dot,
-.event_count_attendee .event_count_dot { background: var(--events-accent, #2f6f9f); }
-.event_count_wrangler .event_count_dot { background: var(--events-wrangle, #c77700); }
-.event_count_key { font-size: 0.85em; opacity: 0.7; margin-left: 2px; }
+.event_count_attendee .event_count_dot {
+	background: var(--events-accent, #2f6f9f);
+}
+.event_count_wrangler .event_count_dot {
+	background: var(--events-wrangle, #c77700);
+}
+.event_count_key {
+	font-size: 0.85em;
+	opacity: 0.7;
+	margin-left: 2px;
+}
 
 /* The one value in the Status column that is a job outstanding rather than a state the
    event is in, so it is the one that is coloured - amber for "somebody still has to do
    this", which is the colour the plugin already spends on that meaning. Its own class
    rather than a rule keyed on the text, so a theme can restyle it and a translation
    would not silently lose it. */
-.event_status_needs_report { color: #b36b00; font-weight: 600; }
+.event_status_needs_report {
+	color: #b36b00;
+	font-weight: 600;
+}
 
 /* The last column is the one thing on the row the viewer can act on, and it holds either
    a button or a pill. Centred, under a centred heading: the states are one word each
@@ -478,7 +674,10 @@ textarea.events_input { resize: vertical; }
    The cards at narrow widths still range this cell right, via justify-content on the grid
    area below - there it is the last thing in a stack rather than a column of its own, and
    the edge it is against is the card's, not the table's. */
-.event_you, .event_you_head { text-align: center; }
+.event_you,
+.event_you_head {
+	text-align: center;
+}
 
 /* ---------------------------------------------------------------------------
  * The event page's turnout tab
@@ -506,10 +705,15 @@ textarea.events_input { resize: vertical; }
  * clip-path polygon cannot round the bottom left corner, and rather than skewing the
  * whole tab because that would slant the right edge too and lift it off the card's.
  * ------------------------------------------------------------------------ */
-.event_card { position: relative; }
+.event_card {
+	position: relative;
+}
 
 .event_counts_tab {
-	position: absolute; top: 0; right: 0; z-index: 1;
+	position: absolute;
+	top: 0;
+	right: 0;
+	z-index: 1;
 	margin: 0;
 	padding: 6px 14px 7px 12px;
 	background: var(--events-tab, #eaeff4);
@@ -518,8 +722,12 @@ textarea.events_input { resize: vertical; }
 }
 
 .event_counts_tab::before {
-	content: "";
-	position: absolute; top: 0; bottom: 0; left: -22px; width: 42px;
+	content: '';
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	left: -22px;
+	width: 42px;
 	background: inherit;
 	border-bottom-left-radius: 12px;
 	/* Behind the tab's own text. A positioned pseudo-element otherwise paints over its
@@ -540,13 +748,15 @@ textarea.events_input { resize: vertical; }
 	transform-origin: top left;
 }
 
-.event_counts_tab .event_count { margin-right: 0; }
+.event_counts_tab .event_count {
+	margin-right: 0;
+}
 
 /* A dot between the two, because in the tab they sit close enough to read as one string
    without one. Generated content rather than a span, so the counts helper keeps writing
    the same markup for the listing, where the lozenges are spaced apart instead. */
 .event_counts_tab .event_count + .event_count::before {
-	content: "\00b7";
+	content: '\00b7';
 	margin: 0 10px;
 	opacity: 0.45;
 }
@@ -555,23 +765,44 @@ textarea.events_input { resize: vertical; }
    below it; wide, there is room beside it and only the right hand end needs keeping
    clear - the meta rows are short labels and would otherwise run under the tab the first
    time an event had a long address. */
-#event_meta { padding-top: 30px; }
+#event_meta {
+	padding-top: 30px;
+}
 @media (min-width: 620px) {
-	#event_meta { padding-top: 0; padding-right: 230px; }
+	#event_meta {
+		padding-top: 0;
+		padding-right: 230px;
+	}
 }
 
 /* The address under an event's title, rather than a column of its own: a venue runs as
    long as the rest of the row put together, and a column for it would squeeze the five
    beside it. Small and quiet, because it is the answer to a second question - the title
    is still what the eye runs down. */
-.event_address { display: block; margin-top: 3px; font-size: 0.85em; line-height: 1.3; }
+.event_address {
+	display: block;
+	margin-top: 3px;
+	font-size: 0.85em;
+	line-height: 1.3;
+}
 
 .event_btn {
-	display: inline-block; padding: 5px 12px; border-radius: 4px; line-height: 1.2;
-	background: var(--events-accent, #2f6f9f); border: 1px solid var(--events-accent-border, #2a6390); color: #fff;
-	font-weight: 600; font-size: 0.9em; text-decoration: none; white-space: nowrap;
+	display: inline-block;
+	padding: 5px 12px;
+	border-radius: 4px;
+	line-height: 1.2;
+	background: var(--events-accent, #2f6f9f);
+	border: 1px solid var(--events-accent-border, #2a6390);
+	color: #fff;
+	font-weight: 600;
+	font-size: 0.9em;
+	text-decoration: none;
+	white-space: nowrap;
 }
-.event_btn:hover { text-decoration: none; filter: brightness(1.08); }
+.event_btn:hover {
+	text-decoration: none;
+	filter: brightness(1.08);
+}
 
 /* Hover has to restate the text colour, and the selectors have to name the element to do
    it. A theme's `a:hover { color: ... }` is (0,1,1) and out-specifies a lone class, so a
@@ -579,28 +810,68 @@ textarea.events_input { resize: vertical; }
    pointer lands on it - which on a theme whose link colour is close to the accent leaves
    the label invisible against its own fill rather than merely off-palette. Naming the
    element takes these to (0,2,1) and settles it outright rather than on load order. */
-a.event_btn:link, a.event_btn:visited, a.event_btn:hover, a.event_btn:focus,
-a.event_action_primary:link, a.event_action_primary:visited,
-a.event_action_primary:hover, a.event_action_primary:focus { color: #fff; }
+a.event_btn:link,
+a.event_btn:visited,
+a.event_btn:hover,
+a.event_btn:focus,
+a.event_action_primary:link,
+a.event_action_primary:visited,
+a.event_action_primary:hover,
+a.event_action_primary:focus {
+	color: #fff;
+}
 
-a.event_action_secondary:link, a.event_action_secondary:visited,
-a.event_action_secondary:hover, a.event_action_secondary:focus { color: #333; }
+a.event_action_secondary:link,
+a.event_action_secondary:visited,
+a.event_action_secondary:hover,
+a.event_action_secondary:focus {
+	color: #333;
+}
 
 .event_pill {
-	display: inline-block; padding: 4px 10px; border-radius: 999px;
-	font-size: 0.85em; font-weight: 600; border: 1px solid; white-space: nowrap;
+	display: inline-block;
+	padding: 4px 10px;
+	border-radius: 999px;
+	font-size: 0.85em;
+	font-weight: 600;
+	border: 1px solid;
+	white-space: nowrap;
 }
 /* A social event's attendees wear the trooper's colours: it is the event's one role, and
    the accent is what the plugin spends on "going". */
 .event_pill_trooper,
-.event_pill_attendee { background: #eaf2f8; border-color: #b8d4e8; color: #1f4e6e; }
-.event_pill_wrangler { background: #fdf3e3; border-color: #f0d5a8; color: #8a5300; }
-.event_pill_social { background: #eef6ee; border-color: #bcd9bc; color: #2f5f2f; font-weight: normal; margin-left: 6px; }
-.event_pill_locked { background: #f2f2f2; border-color: #dedede; color: #767676; font-weight: normal; }
+.event_pill_attendee {
+	background: #eaf2f8;
+	border-color: #b8d4e8;
+	color: #1f4e6e;
+}
+.event_pill_wrangler {
+	background: #fdf3e3;
+	border-color: #f0d5a8;
+	color: #8a5300;
+}
+.event_pill_social {
+	background: #eef6ee;
+	border-color: #bcd9bc;
+	color: #2f5f2f;
+	font-weight: normal;
+	margin-left: 6px;
+}
+.event_pill_locked {
+	background: #f2f2f2;
+	border-color: #dedede;
+	color: #767676;
+	font-weight: normal;
+}
 /* Dashed, not just recoloured: a place in the queue must never pass for a place, and a
    dashed outline still says so printed in black and white or to somebody who cannot tell
    the colours apart. */
-.event_pill_waitlisted { background: #f6f2fa; border-color: #a58dbd; border-style: dashed; color: #5b3f78; }
+.event_pill_waitlisted {
+	background: #f6f2fa;
+	border-color: #a58dbd;
+	border-style: dashed;
+	color: #5b3f78;
+}
 
 /* ---------------------------------------------------------------------------
  * Events list - cards on a phone and a tablet
@@ -640,10 +911,16 @@ a.event_action_secondary:hover, a.event_action_secondary:focus { color: #333; }
 	   background takes the gridlines with it too - those are the .tborder colour showing
 	   through the cellspacing, which a block-level table no longer honours anyway. */
 	#events_table,
-	#events_table > tbody { display: block; background: none; border: 0; }
+	#events_table > tbody {
+		display: block;
+		background: none;
+		border: 0;
+	}
 
 	/* The headings name columns that no longer exist. */
-	#events_table .events_list_head { display: none; }
+	#events_table .events_list_head {
+		display: none;
+	}
 
 	tr.event_row {
 		display: grid;
@@ -660,10 +937,10 @@ a.event_action_secondary:hover, a.event_action_secondary:focus { color: #333; }
 		   than the screen rather than wrapping inside it. */
 		grid-template-columns: auto minmax(0, 1fr) minmax(0, 40%);
 		grid-template-areas:
-			"title   title   status"
-			"start   region  region"
-			"counts  counts  you"
-			"address address address";
+			'title   title   status'
+			'start   region  region'
+			'counts  counts  you'
+			'address address address';
 		margin: 0 0 10px;
 		/* The card is painted here rather than left to the theme's .trow1 on each of the
 		   six cells: the cells no longer tile the card once the title and the address
@@ -697,7 +974,9 @@ a.event_action_secondary:hover, a.event_action_secondary:focus { color: #333; }
 	   and the card's fill is on the row rather than on the cell it gives up.
 	   It also means the padding below belongs to the two children, since a
 	   display: contents box draws nothing of its own. */
-	tr.event_row > .event_title { display: contents; }
+	tr.event_row > .event_title {
+		display: contents;
+	}
 
 	/* The card has no column headings, so the hierarchy is carried by weight: the title,
 	   then when it starts, then the facts that only matter once you are reading it. */
@@ -730,23 +1009,47 @@ a.event_action_secondary:hover, a.event_action_secondary:focus { color: #333; }
 		justify-content: flex-end;
 		padding-top: 12px;
 	}
-	tr.event_row > .event_start { grid-area: start; padding-top: 6px; }
-	tr.event_row > .event_region { grid-area: region; padding-top: 6px; }
-	tr.event_row > .event_counts { grid-area: counts; padding-bottom: 11px; }
-	tr.event_row > .event_you { grid-area: you; justify-content: flex-end; padding-bottom: 11px; }
+	tr.event_row > .event_start {
+		grid-area: start;
+		padding-top: 6px;
+	}
+	tr.event_row > .event_region {
+		grid-area: region;
+		padding-top: 6px;
+	}
+	tr.event_row > .event_counts {
+		grid-area: counts;
+		padding-bottom: 11px;
+	}
+	tr.event_row > .event_you {
+		grid-area: you;
+		justify-content: flex-end;
+		padding-bottom: 11px;
+	}
 
-	tr.event_row > .event_start { font-weight: 600; }
+	tr.event_row > .event_start {
+		font-weight: 600;
+	}
 	tr.event_row > .event_region,
-	tr.event_row > .event_status { font-size: 0.85em; opacity: 0.75; }
+	tr.event_row > .event_status {
+		font-size: 0.85em;
+		opacity: 0.75;
+	}
 	/* Not dimmed with the rest of the column: the other values are states to glance
 	   past and this one is a job outstanding. The text itself is the same at every
 	   screen size - see events_status_label(), which title-cases it once for both. */
-	tr.event_row > .event_status_needs_report { opacity: 1; }
+	tr.event_row > .event_status_needs_report {
+		opacity: 1;
+	}
 
 	/* Start and region read as one line, so the separator between them is drawn rather
 	   than written into the markup - the two are separate cells, and on the table they
 	   are separate columns with nothing between them. */
-	tr.event_row > .event_region::before { content: "\00b7"; margin: 0 8px 0 0; opacity: 0.6; }
+	tr.event_row > .event_region::before {
+		content: '\00b7';
+		margin: 0 8px 0 0;
+		opacity: 0.6;
+	}
 
 	/* The lock message is the only thing on the card that has to wrap, and a pill that
 	   wraps is not a pill - four short lines inside a rounded box read as a speech
@@ -764,49 +1067,119 @@ a.event_action_secondary:hover, a.event_action_secondary:focus { color: #333; }
 	}
 
 	/* Sized for a thumb rather than a pointer. */
-	tr.event_row .event_btn { padding: 7px 16px; font-size: 0.95em; }
+	tr.event_row .event_btn {
+		padding: 7px 16px;
+		font-size: 0.95em;
+	}
 
 	/* The empty state is one cell spanning six columns that are no longer there. */
-	#events_empty, #events_empty > td { display: block; }
-	#events_empty > td { padding: 12px; border: 0; border-radius: 6px; }
+	#events_empty,
+	#events_empty > td {
+		display: block;
+	}
+	#events_empty > td {
+		padding: 12px;
+		border: 0;
+		border-radius: 6px;
+	}
 }
 
 /* ---------------------------------------------------------------------------
  * Event page - the signup / coordinator action row
  * ------------------------------------------------------------------------ */
-#event_actions, #gec_controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-#event_actions { margin: 2px 0; }
+#event_actions,
+#gec_controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+}
+#event_actions {
+	margin: 2px 0;
+}
 
 /* The coordinator's buttons share the bar, pushed to its far end so they never read as
    part of signing up. */
-#gec_controls { margin-left: auto; }
-
-.event_action, a.event_action {
-	display: inline-block; padding: 8px 15px; border-radius: 4px; line-height: 1.2;
-	font-weight: 600; font-size: 0.95em; text-decoration: none; border: 1px solid transparent;
+#gec_controls {
+	margin-left: auto;
 }
-a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
-.event_action_primary { background: var(--events-accent, #2f6f9f); border-color: var(--events-accent-border, #2a6390); color: #fff; }
-.event_action_secondary { background: #fdfdfd; border-color: #bcbcbc; color: #333; }
-.event_action_secondary:hover { background: #f3f3f3; border-color: #9a9a9a; }
-.event_action_locked { background: #f2f2f2; border-color: #dedede; color: #767676; font-weight: normal; }
+
+.event_action,
+a.event_action {
+	display: inline-block;
+	padding: 8px 15px;
+	border-radius: 4px;
+	line-height: 1.2;
+	font-weight: 600;
+	font-size: 0.95em;
+	text-decoration: none;
+	border: 1px solid transparent;
+}
+a.event_action:hover {
+	text-decoration: none;
+	filter: brightness(1.08);
+}
+.event_action_primary {
+	background: var(--events-accent, #2f6f9f);
+	border-color: var(--events-accent-border, #2a6390);
+	color: #fff;
+}
+.event_action_secondary {
+	background: #fdfdfd;
+	border-color: #bcbcbc;
+	color: #333;
+}
+.event_action_secondary:hover {
+	background: #f3f3f3;
+	border-color: #9a9a9a;
+}
+.event_action_locked {
+	background: #f2f2f2;
+	border-color: #dedede;
+	color: #767676;
+	font-weight: normal;
+}
 
 .event_action_status {
-	display: inline-block; padding: 7px 13px; border-radius: 999px;
-	font-size: 0.9em; font-weight: 600; border: 1px solid;
+	display: inline-block;
+	padding: 7px 13px;
+	border-radius: 999px;
+	font-size: 0.9em;
+	font-weight: 600;
+	border: 1px solid;
 }
 .event_action_status_trooper,
-.event_action_status_attendee { background: #eaf2f8; border-color: #b8d4e8; color: #1f4e6e; }
-.event_action_status_wrangler { background: #fdf3e3; border-color: #f0d5a8; color: #8a5300; }
-.event_action_status_waitlisted { background: #f6f2fa; border-color: #a58dbd; border-style: dashed; color: #5b3f78; }
+.event_action_status_attendee {
+	background: #eaf2f8;
+	border-color: #b8d4e8;
+	color: #1f4e6e;
+}
+.event_action_status_wrangler {
+	background: #fdf3e3;
+	border-color: #f0d5a8;
+	color: #8a5300;
+}
+.event_action_status_waitlisted {
+	background: #f6f2fa;
+	border-color: #a58dbd;
+	border-style: dashed;
+	color: #5b3f78;
+}
 
 /* The wizard's submit row: the button is the theme's, the link beside it needs the gap. */
-#rsvp_cancel, #troop_report_cancel { margin-left: 12px; }
+#rsvp_cancel,
+#troop_report_cancel {
+	margin-left: 12px;
+}
 /* The wizard's errors sit in the button row, directly above the button. */
-#rsvp_errors { margin: 0 0 10px; }
+#rsvp_errors {
+	margin: 0 0 10px;
+}
 /* The tick's glyph carries almost no side bearing, so the gap is set here rather
    than left to a space in the markup. */
-.event_signup_tick { margin-right: 4px; }
+.event_signup_tick {
+	margin-right: 4px;
+}
 
 /* ---------------------------------------------------------------------------
  * Event page - who is attending
@@ -833,61 +1206,129 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 	color: inherit;
 }
 
-#rsvp_list { margin-top: 18px; }
-#rsvp_list_count { font-weight: normal; opacity: 0.7; }
+#rsvp_list {
+	margin-top: 18px;
+}
+#rsvp_list_count {
+	font-weight: normal;
+	opacity: 0.7;
+}
 
 /* The filters are a <details> whose <summary> is the heading row, so the panel opens and
    closes without a line of JavaScript. Nobody wants to filter a list of a dozen people
    most of the time, so the controls stay folded away behind the funnel and the section
    reads as a list. A filtered page renders it already open - see event.php. */
-#rsvp_filter { margin: 0; }
+#rsvp_filter {
+	margin: 0;
+}
 #rsvp_filter_toggle {
-	display: flex; align-items: center; gap: 10px; cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	cursor: pointer;
 	/* Both halves of dropping the default triangle: the funnel is the affordance here. */
 	list-style: none;
 }
-#rsvp_filter_toggle::-webkit-details-marker { display: none; }
+#rsvp_filter_toggle::-webkit-details-marker {
+	display: none;
+}
 /* The wrapper carries the gap above the heading, and the row carries the one below. */
-#rsvp_filter_toggle .events_section_heading { margin: 0; }
+#rsvp_filter_toggle .events_section_heading {
+	margin: 0;
+}
 
 .rsvp_filter_funnel {
 	/* The word "Filter" is in the markup for a screen reader and pushed out of sight
 	   here, since the funnel says it to everybody else. The icon is an inline data URI
 	   for the same reason the select's arrow is - see .events_select above. */
-	display: inline-block; width: 18px; height: 18px; flex: none;
-	overflow: hidden; text-indent: 100%; white-space: nowrap;
+	display: inline-block;
+	width: 18px;
+	height: 18px;
+	flex: none;
+	overflow: hidden;
+	text-indent: 100%;
+	white-space: nowrap;
 	opacity: 0.6;
 	background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23555' d='M1.6 2.5h12.8a.6.6 0 0 1 .46.98L10 9.6v3.6a.6.6 0 0 1-.33.54l-2.8 1.4a.6.6 0 0 1-.87-.54V9.6L1.14 3.48A.6.6 0 0 1 1.6 2.5z'/%3E%3C/svg%3E");
-	background-repeat: no-repeat; background-position: center; background-size: 16px 16px;
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: 16px 16px;
 }
-#rsvp_filter_toggle:hover .rsvp_filter_funnel { opacity: 0.85; }
-#rsvp_filter[open] .rsvp_filter_funnel { opacity: 1; }
+#rsvp_filter_toggle:hover .rsvp_filter_funnel {
+	opacity: 0.85;
+}
+#rsvp_filter[open] .rsvp_filter_funnel {
+	opacity: 1;
+}
 
-#rsvp_filter_form { margin: 10px 0 0; }
+#rsvp_filter_form {
+	margin: 10px 0 0;
+}
 /* Nothing to filter by - a social event of one day - so there is no panel to open. */
 #rsvp_filter[data-empty] .rsvp_filter_funnel,
-#rsvp_filter[data-empty] #rsvp_filter_form { display: none; }
-#rsvp_filter[data-empty] #rsvp_filter_toggle { cursor: default; pointer-events: none; }
-#rsvp_rows { margin: 14px 0 0; padding-left: 22px; }
-#rsvp_rows li { margin: 0 0 5px; line-height: 1.8; }
-#rsvp_list_empty { list-style: none; margin-left: -22px; opacity: 0.75; }
+#rsvp_filter[data-empty] #rsvp_filter_form {
+	display: none;
+}
+#rsvp_filter[data-empty] #rsvp_filter_toggle {
+	cursor: default;
+	pointer-events: none;
+}
+#rsvp_rows {
+	margin: 14px 0 0;
+	padding-left: 22px;
+}
+#rsvp_rows li {
+	margin: 0 0 5px;
+	line-height: 1.8;
+}
+#rsvp_list_empty {
+	list-style: none;
+	margin-left: -22px;
+	opacity: 0.75;
+}
 
-.rsvp_username { font-weight: 600; }
+.rsvp_username {
+	font-weight: 600;
+}
 /* The pill sets its own spacing, since the dot separators below skip it. */
-.rsvp_row .event_pill { margin: 0 7px; }
+.rsvp_row .event_pill {
+	margin: 0 7px;
+}
 /* Separators are drawn rather than written into the markup, so each span holds only its
    own value: a wrangler with no Legion ID and no costume simply has fewer spans, and the
    first one left standing still starts the run without a leading dot. */
-.rsvp_detail + .rsvp_detail::before { content: "\00b7"; margin: 0 7px; opacity: 0.55; }
-.rsvp_date { opacity: 0.7; font-size: 0.9em; }
+.rsvp_detail + .rsvp_detail::before {
+	content: '\00b7';
+	margin: 0 7px;
+	opacity: 0.55;
+}
+.rsvp_date {
+	opacity: 0.7;
+	font-size: 0.9em;
+}
 
 /* The waitlist, under the attendance list: numbered, because its order is who is next. */
-#waitlist_list { margin-top: 18px; }
-#waitlist_count { font-weight: normal; opacity: 0.7; }
-#waitlist_rows { margin: 8px 0 0; padding-left: 22px; }
-#waitlist_rows li { margin: 0 0 5px; line-height: 1.8; }
-.waitlist_row .event_pill { margin: 0 7px 0 0; }
-.waitlist_row .rsvp_username { margin-right: 7px; }
+#waitlist_list {
+	margin-top: 18px;
+}
+#waitlist_count {
+	font-weight: normal;
+	opacity: 0.7;
+}
+#waitlist_rows {
+	margin: 8px 0 0;
+	padding-left: 22px;
+}
+#waitlist_rows li {
+	margin: 0 0 5px;
+	line-height: 1.8;
+}
+.waitlist_row .event_pill {
+	margin: 0 7px 0 0;
+}
+.waitlist_row .rsvp_username {
+	margin-right: 7px;
+}
 
 /* ---------------------------------------------------------------------------
  * Signup wizard - the attendance step
@@ -909,17 +1350,40 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 /* The days the sentence above has just counted. Tight against it - it is the same
    statement continued, not a new one - and the markers are pulled inside the cell, which
    a default <ul> indents them out of. */
-.signup_intro_days { margin: -6px 0 12px; padding-left: 1.3em; }
-.signup_intro_days li { margin: 0; }
+.signup_intro_days {
+	margin: -6px 0 12px;
+	padding-left: 1.3em;
+}
+.signup_intro_days li {
+	margin: 0;
+}
 
-.signup_primary { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 12px; }
-.signup_primary_label { font-weight: 600; }
+.signup_primary {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 14px;
+	margin: 0 0 12px;
+}
+.signup_primary_label {
+	font-weight: 600;
+}
 
-.signup_choices { display: flex; flex-wrap: wrap; gap: 6px; }
-.signup_choice { position: relative; display: inline-flex; }
+.signup_choices {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+.signup_choice {
+	position: relative;
+	display: inline-flex;
+}
 .signup_choice input {
-	position: absolute; top: 0; left: 0;
-	width: 100%; height: 100%;
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
 	margin: 0;
 	opacity: 0;
 	cursor: pointer;
@@ -935,7 +1399,9 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 	border: 1px solid #cfcfcf;
 	border-radius: 999px;
 }
-.signup_choice input:hover + .signup_choice_text { border-color: #9a9a9a; }
+.signup_choice input:hover + .signup_choice_text {
+	border-color: #9a9a9a;
+}
 .signup_choice input:focus-visible + .signup_choice_text {
 	outline: 2px solid var(--events-accent, #2f6f9f);
 	outline-offset: 2px;
@@ -948,19 +1414,34 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 }
 /* A chosen chip carries the colour its role carries everywhere else on the plugin's
    pages, so a grid of mixed days reads without being counted through. */
-.signup_choice input[value="wrangler"]:checked + .signup_choice_text {
+.signup_choice input[value='wrangler']:checked + .signup_choice_text {
 	background: var(--events-wrangle, #c77700);
 	border-color: var(--events-wrangle, #c77700);
 }
-.signup_choice input[value="none"]:checked + .signup_choice_text { background: #767676; border-color: #767676; }
+.signup_choice input[value='none']:checked + .signup_choice_text {
+	background: #767676;
+	border-color: #767676;
+}
 
 /* The gap below the leading question is set from above rather than below it: the
    disclosure checkbox has to stay a sibling of the grid for the rule that opens it, so
    there is no wrapper of its own to space. */
 
-.signup_per_day { width: 15px; height: 15px; margin: 0; vertical-align: -2px; accent-color: var(--events-accent, #2f6f9f); }
-.signup_per_day_label { margin-left: 8px; font-weight: 600; cursor: pointer; }
-.signup_per_day:not(:checked) ~ .signup_days { display: none; }
+.signup_per_day {
+	width: 15px;
+	height: 15px;
+	margin: 0;
+	vertical-align: -2px;
+	accent-color: var(--events-accent, #2f6f9f);
+}
+.signup_per_day_label {
+	margin-left: 8px;
+	font-weight: 600;
+	cursor: pointer;
+}
+.signup_per_day:not(:checked) ~ .signup_days {
+	display: none;
+}
 
 .signup_days {
 	margin: 12px 0 0;
@@ -969,19 +1450,36 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 	border-radius: 4px;
 	background: #fafafa;
 }
-.signup_days_hint { margin: 0 0 10px; font-size: 0.9em; opacity: 0.85; }
+.signup_days_hint {
+	margin: 0 0 10px;
+	font-size: 0.9em;
+	opacity: 0.85;
+}
 
 .signup_day {
-	display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
-	margin: 0 0 8px; padding: 10px 12px;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 16px;
+	margin: 0 0 8px;
+	padding: 10px 12px;
 	background: #fff;
-	border: 1px solid #e6e6e6; border-radius: 4px;
+	border: 1px solid #e6e6e6;
+	border-radius: 4px;
 }
-.signup_day:last-child { margin-bottom: 0; }
+.signup_day:last-child {
+	margin-bottom: 0;
+}
 /* Fixed basis rather than natural width, so the answers line up down the list however
    long an individual day's label runs. It collapses to its own line on a phone. */
-.signup_day_label { font-weight: 600; flex: 0 0 15em; max-width: 100%; }
-.signup_summary_days { margin: 2px 0; }
+.signup_day_label {
+	font-weight: 600;
+	flex: 0 0 15em;
+	max-width: 100%;
+}
+.signup_summary_days {
+	margin: 2px 0;
+}
 
 /* ---------------------------------------------------------------------------
  * Calendar view
@@ -990,84 +1488,198 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
    the grid reads the same on a light theme and a dark one. Events are chips edged in the
    accent; the ones the viewer is signed up to are filled with it. */
 #events_calendar {
-	width: 100%; table-layout: fixed;
-	border-collapse: separate; border-spacing: 0;
-	border: 1px solid rgba(127, 127, 127, 0.25); border-radius: 8px; overflow: hidden;
+	width: 100%;
+	table-layout: fixed;
+	border-collapse: separate;
+	border-spacing: 0;
+	border: 1px solid rgba(127, 127, 127, 0.25);
+	border-radius: 8px;
+	overflow: hidden;
 }
 #events_calendar th {
-	padding: 8px; border-bottom: 1px solid rgba(127, 127, 127, 0.25); background: none;
-	font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
-	text-align: left; opacity: 0.7;
+	padding: 8px;
+	border-bottom: 1px solid rgba(127, 127, 127, 0.25);
+	background: none;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	text-align: left;
+	opacity: 0.7;
 }
 #events_calendar td {
-	height: 104px; padding: 6px; vertical-align: top;
-	border-right: 1px solid rgba(127, 127, 127, 0.18); border-bottom: 1px solid rgba(127, 127, 127, 0.18);
+	height: 104px;
+	padding: 6px;
+	vertical-align: top;
+	border-right: 1px solid rgba(127, 127, 127, 0.18);
+	border-bottom: 1px solid rgba(127, 127, 127, 0.18);
 }
-#events_calendar tr > :last-child { border-right: 0; }
-#events_calendar tr:last-child td { border-bottom: 0; }
-#events_calendar td.is_weekend { background: rgba(127, 127, 127, 0.03); }
-#events_calendar td.other_month { background: rgba(127, 127, 127, 0.07); }
-#events_calendar .calendar_empty { display: none; }
+#events_calendar tr > :last-child {
+	border-right: 0;
+}
+#events_calendar tr:last-child td {
+	border-bottom: 0;
+}
+#events_calendar td.is_weekend {
+	background: rgba(127, 127, 127, 0.03);
+}
+#events_calendar td.other_month {
+	background: rgba(127, 127, 127, 0.07);
+}
+#events_calendar .calendar_empty {
+	display: none;
+}
 
-#events_calendar .calendar_date { display: flex; align-items: center; gap: 4px; }
-#events_calendar .calendar_weekday { display: none; }
+#events_calendar .calendar_date {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+#events_calendar .calendar_weekday {
+	display: none;
+}
 #events_calendar .calendar_day_number {
-	display: inline-flex; align-items: center; justify-content: center;
-	min-width: 24px; height: 24px; border-radius: 12px;
-	font-size: 12px; font-weight: 600; line-height: 1;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 24px;
+	height: 24px;
+	border-radius: 12px;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1;
 }
 #events_calendar .is_today .calendar_day_number {
-	background: var(--events-accent, #2f6f9f); color: #fff;
-	-webkit-print-color-adjust: exact; print-color-adjust: exact;
+	background: var(--events-accent, #2f6f9f);
+	color: #fff;
+	-webkit-print-color-adjust: exact;
+	print-color-adjust: exact;
 }
 
-#events_calendar .calendar_events { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+#events_calendar .calendar_events {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	margin-top: 4px;
+}
 #events_calendar .calendar_event {
-	display: block; padding: 3px 6px; border-radius: 4px;
+	display: block;
+	padding: 3px 6px;
+	border-radius: 4px;
 	border-left: 3px solid var(--events-accent, #2f6f9f);
-	background: var(--events-accent-soft, rgba(47, 111, 159, 0.14)); color: inherit;
-	font-size: 11px; font-weight: 600; line-height: 1.3; text-decoration: none; overflow-wrap: anywhere;
+	background: var(--events-accent-soft, rgba(47, 111, 159, 0.14));
+	color: inherit;
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 1.3;
+	text-decoration: none;
+	overflow-wrap: anywhere;
 }
 #events_calendar .calendar_event.rsvped {
-	background: var(--events-accent, #2f6f9f); border-left-color: var(--events-accent-border, #2a6390); color: #fff;
-	-webkit-print-color-adjust: exact; print-color-adjust: exact;
+	background: var(--events-accent, #2f6f9f);
+	border-left-color: var(--events-accent-border, #2a6390);
+	color: #fff;
+	-webkit-print-color-adjust: exact;
+	print-color-adjust: exact;
 }
-#events_calendar .calendar_event:hover { text-decoration: none; filter: brightness(0.94); }
-#events_calendar .calendar_event:focus-visible { outline: 2px solid var(--events-accent, #2f6f9f); outline-offset: 1px; }
+#events_calendar .calendar_event:hover {
+	text-decoration: none;
+	filter: brightness(0.94);
+}
+#events_calendar .calendar_event:focus-visible {
+	outline: 2px solid var(--events-accent, #2f6f9f);
+	outline-offset: 1px;
+}
 /* The address under the chip, not inside it: one anchor cannot go to two places, and in a
    cell this size the venue has to give way to the event it belongs to. */
 #events_calendar .calendar_event_address {
-	display: block; margin: -1px 0 2px; padding: 0 0 0 9px;
-	font-size: 10px; line-height: 1.25; opacity: 0.75; word-break: break-word;
+	display: block;
+	margin: -1px 0 2px;
+	padding: 0 0 0 9px;
+	font-size: 10px;
+	line-height: 1.25;
+	opacity: 0.75;
+	word-break: break-word;
 }
 
 /* Seven columns of 50px cannot hold an event title, so on a phone the month becomes an
    agenda: the days that have something on, one to a row, with the date down the left.
    `screen and` so a phone's print dialog still gets the grid. */
 @media screen and (max-width: 700px) {
-	#events_calendar, #events_calendar tbody, #events_calendar tr { display: block; }
-	#events_calendar { border: 0; border-radius: 0; overflow: visible; }
-	#events_calendar .calendar_weekdays, #events_calendar td { display: none; }
+	#events_calendar,
+	#events_calendar tbody,
+	#events_calendar tr {
+		display: block;
+	}
+	#events_calendar {
+		border: 0;
+		border-radius: 0;
+		overflow: visible;
+	}
+	#events_calendar .calendar_weekdays,
+	#events_calendar td {
+		display: none;
+	}
 
-	#events_calendar .calendar_empty { display: block; }
-	#events_calendar .calendar_empty td { display: block; height: auto; padding: 24px 0; border: 0; text-align: center; opacity: 0.7; }
+	#events_calendar .calendar_empty {
+		display: block;
+	}
+	#events_calendar .calendar_empty td {
+		display: block;
+		height: auto;
+		padding: 24px 0;
+		border: 0;
+		text-align: center;
+		opacity: 0.7;
+	}
 
 	#events_calendar td.has_events {
-		display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px;
-		height: auto; padding: 12px 0; border: 0; background: none;
+		display: grid;
+		grid-template-columns: 44px minmax(0, 1fr);
+		gap: 12px;
+		height: auto;
+		padding: 12px 0;
+		border: 0;
+		background: none;
 	}
 	#events_calendar tr:not(:last-child) td.has_events,
-	#events_calendar td.has_events:not(:last-child) { border-bottom: 1px solid rgba(127, 127, 127, 0.18); }
-
-	#events_calendar .calendar_date { flex-direction: column; gap: 2px; }
-	#events_calendar .calendar_weekday {
-		display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.7;
+	#events_calendar td.has_events:not(:last-child) {
+		border-bottom: 1px solid rgba(127, 127, 127, 0.18);
 	}
-	#events_calendar .calendar_day_number { min-width: 34px; height: 34px; border-radius: 17px; font-size: 17px; }
 
-	#events_calendar .calendar_events { gap: 6px; margin-top: 0; }
-	#events_calendar .calendar_event { padding: 9px 12px; border-radius: 6px; font-size: 14px; }
-	#events_calendar .calendar_event_address { margin: -2px 0 2px; padding-left: 15px; font-size: 12px; }
+	#events_calendar .calendar_date {
+		flex-direction: column;
+		gap: 2px;
+	}
+	#events_calendar .calendar_weekday {
+		display: block;
+		font-size: 11px;
+		font-weight: 600;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		opacity: 0.7;
+	}
+	#events_calendar .calendar_day_number {
+		min-width: 34px;
+		height: 34px;
+		border-radius: 17px;
+		font-size: 17px;
+	}
+
+	#events_calendar .calendar_events {
+		gap: 6px;
+		margin-top: 0;
+	}
+	#events_calendar .calendar_event {
+		padding: 9px 12px;
+		border-radius: 6px;
+		font-size: 14px;
+	}
+	#events_calendar .calendar_event_address {
+		margin: -2px 0 2px;
+		padding-left: 15px;
+		font-size: 12px;
+	}
 }
 
 /* ---------------------------------------------------------------------------
@@ -1078,16 +1690,39 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
    these too. What sets them apart is here: a heading that says what they are, and a
    dashed rule down the side so a page of them cannot be mistaken for more attendees,
    on screen or on paper. */
-.attendance_waitlist { margin-top: 24px; border-left: 4px dashed #a58dbd; padding-left: 12px; }
-.attendance_waitlist_heading { margin: 0 0 4px; }
-.attendance_waitlist_table .attendee_role { font-style: italic; }
+.attendance_waitlist {
+	margin-top: 24px;
+	border-left: 4px dashed #a58dbd;
+	padding-left: 12px;
+}
+.attendance_waitlist_heading {
+	margin: 0 0 4px;
+}
+.attendance_waitlist_table .attendee_role {
+	font-style: italic;
+}
 
-:is(#attendance_table, .attendance_waitlist_table) { width: 100%; border-collapse: collapse; margin: 16px 0; }
-:is(#attendance_table, .attendance_waitlist_table) th, :is(#attendance_table, .attendance_waitlist_table) td { border: 1px solid #999; padding: 8px; text-align: left; vertical-align: top; }
-:is(#attendance_table, .attendance_waitlist_table) th { background: #f0f0f0; font-weight: bold; }
+:is(#attendance_table, .attendance_waitlist_table) {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 16px 0;
+}
+:is(#attendance_table, .attendance_waitlist_table) th,
+:is(#attendance_table, .attendance_waitlist_table) td {
+	border: 1px solid #999;
+	padding: 8px;
+	text-align: left;
+	vertical-align: top;
+}
+:is(#attendance_table, .attendance_waitlist_table) th {
+	background: #f0f0f0;
+	font-weight: bold;
+}
 /* Banded by person, not by row: an attendee is a <tbody> holding the pair of rows, so the
    stripe covers both halves of one person rather than alternating within them. */
-:is(#attendance_table, .attendance_waitlist_table) tbody.attendee_group:nth-of-type(even) td { background: #f7f7f7; }
+:is(#attendance_table, .attendance_waitlist_table) tbody.attendee_group:nth-of-type(even) td {
+	background: #f7f7f7;
+}
 
 /* Fixed proportions rather than letting the content size the columns, so the sheet keeps
    the same shape whoever is on it - and so the tick column stays wide enough to aim a pen
@@ -1098,96 +1733,312 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
    colspans cover. Keyed on the cells' classes rather than nth-child, because the Days
    column only exists for an event that has days and every position after it would
    otherwise shift. */
-:is(#attendance_table, .attendance_waitlist_table) { table-layout: fixed; }
-:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_num { width: 5%; }
-:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_preferred_name { width: 22%; }
-:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_username { width: 21%; }
-:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_role { width: 18%; }
-:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_legion_id { width: 24%; }
-:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_attended { width: 10%; }
+:is(#attendance_table, .attendance_waitlist_table) {
+	table-layout: fixed;
+}
+:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_num {
+	width: 5%;
+}
+:is(#attendance_table, .attendance_waitlist_table)
+	.attendance_identity_head
+	.attendee_preferred_name {
+	width: 22%;
+}
+:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_username {
+	width: 21%;
+}
+:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_role {
+	width: 18%;
+}
+:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_legion_id {
+	width: 24%;
+}
+:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_attended {
+	width: 10%;
+}
 
 /* Seven columns instead of six: everything gives a little back to make room for Days. */
-:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_num { width: 4%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_preferred_name { width: 16%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_username { width: 16%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_role { width: 17%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_legion_id { width: 15%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_days { width: 22%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_attended { width: 10%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days
+	.attendance_identity_head
+	.attendee_num {
+	width: 4%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_days
+	.attendance_identity_head
+	.attendee_preferred_name {
+	width: 16%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_days
+	.attendance_identity_head
+	.attendee_username {
+	width: 16%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_days
+	.attendance_identity_head
+	.attendee_role {
+	width: 17%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_days
+	.attendance_identity_head
+	.attendee_legion_id {
+	width: 15%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_days
+	.attendance_identity_head
+	.attendee_days {
+	width: 22%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_days
+	.attendance_identity_head
+	.attendee_attended {
+	width: 10%;
+}
 
 /* A social event's sheet has no Legion ID column, and gives its share to the names. */
-:is(#attendance_table, .attendance_waitlist_table).is_social .attendance_identity_head .attendee_preferred_name { width: 32%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social .attendance_identity_head .attendee_username { width: 30%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social .attendance_identity_head .attendee_role { width: 23%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_days .attendance_identity_head .attendee_preferred_name { width: 22%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_days .attendance_identity_head .attendee_username { width: 20%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_days .attendance_identity_head .attendee_role { width: 18%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_days .attendance_identity_head .attendee_days { width: 26%; }
+:is(#attendance_table, .attendance_waitlist_table).is_social
+	.attendance_identity_head
+	.attendee_preferred_name {
+	width: 32%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social
+	.attendance_identity_head
+	.attendee_username {
+	width: 30%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social
+	.attendance_identity_head
+	.attendee_role {
+	width: 23%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days
+	.attendance_identity_head
+	.attendee_preferred_name {
+	width: 22%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days
+	.attendance_identity_head
+	.attendee_username {
+	width: 20%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days
+	.attendance_identity_head
+	.attendee_role {
+	width: 18%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days
+	.attendance_identity_head
+	.attendee_days {
+	width: 26%;
+}
 
 /* A WWCC column beside the Legion ID, on an event that requires one: each layout gives
    it room from the names and the role. Every column is restated so no combination of
    the three classes is left adding to more than 100. */
-:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_num { width: 5%; }
-:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_preferred_name { width: 20%; }
-:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_username { width: 18%; }
-:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_role { width: 15%; }
-:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_legion_id { width: 14%; }
-:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_wwcc { width: 18%; }
-:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_attended { width: 10%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_num { width: 4%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_preferred_name { width: 14%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_username { width: 13%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_role { width: 13%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_legion_id { width: 12%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_wwcc { width: 14%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_days { width: 20%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_attended { width: 10%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc .attendance_identity_head .attendee_num { width: 5%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc .attendance_identity_head .attendee_preferred_name { width: 26%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc .attendance_identity_head .attendee_username { width: 24%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc .attendance_identity_head .attendee_role { width: 18%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc .attendance_identity_head .attendee_wwcc { width: 17%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc .attendance_identity_head .attendee_attended { width: 10%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc .attendance_identity_head .attendee_num { width: 4%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc .attendance_identity_head .attendee_preferred_name { width: 18%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc .attendance_identity_head .attendee_username { width: 16%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc .attendance_identity_head .attendee_role { width: 14%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc .attendance_identity_head .attendee_wwcc { width: 16%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc .attendance_identity_head .attendee_days { width: 22%; }
-:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc .attendance_identity_head .attendee_attended { width: 10%; }
+:is(#attendance_table, .attendance_waitlist_table).has_wwcc
+	.attendance_identity_head
+	.attendee_num {
+	width: 5%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_wwcc
+	.attendance_identity_head
+	.attendee_preferred_name {
+	width: 20%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_wwcc
+	.attendance_identity_head
+	.attendee_username {
+	width: 18%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_wwcc
+	.attendance_identity_head
+	.attendee_role {
+	width: 15%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_wwcc
+	.attendance_identity_head
+	.attendee_legion_id {
+	width: 14%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_wwcc
+	.attendance_identity_head
+	.attendee_wwcc {
+	width: 18%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_wwcc
+	.attendance_identity_head
+	.attendee_attended {
+	width: 10%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc
+	.attendance_identity_head
+	.attendee_num {
+	width: 4%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc
+	.attendance_identity_head
+	.attendee_preferred_name {
+	width: 14%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc
+	.attendance_identity_head
+	.attendee_username {
+	width: 13%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc
+	.attendance_identity_head
+	.attendee_role {
+	width: 13%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc
+	.attendance_identity_head
+	.attendee_legion_id {
+	width: 12%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc
+	.attendance_identity_head
+	.attendee_wwcc {
+	width: 14%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc
+	.attendance_identity_head
+	.attendee_days {
+	width: 20%;
+}
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc
+	.attendance_identity_head
+	.attendee_attended {
+	width: 10%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc
+	.attendance_identity_head
+	.attendee_num {
+	width: 5%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc
+	.attendance_identity_head
+	.attendee_preferred_name {
+	width: 26%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc
+	.attendance_identity_head
+	.attendee_username {
+	width: 24%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc
+	.attendance_identity_head
+	.attendee_role {
+	width: 18%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc
+	.attendance_identity_head
+	.attendee_wwcc {
+	width: 17%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_wwcc
+	.attendance_identity_head
+	.attendee_attended {
+	width: 10%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc
+	.attendance_identity_head
+	.attendee_num {
+	width: 4%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc
+	.attendance_identity_head
+	.attendee_preferred_name {
+	width: 18%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc
+	.attendance_identity_head
+	.attendee_username {
+	width: 16%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc
+	.attendance_identity_head
+	.attendee_role {
+	width: 14%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc
+	.attendance_identity_head
+	.attendee_wwcc {
+	width: 16%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc
+	.attendance_identity_head
+	.attendee_days {
+	width: 22%;
+}
+:is(#attendance_table, .attendance_waitlist_table).is_social.has_days.has_wwcc
+	.attendance_identity_head
+	.attendee_attended {
+	width: 10%;
+}
 
 /* Where one person ends and the next begins. Without it the sheet reads as twice as many
    people, half of them nameless. The rule goes along the bottom of the pair, which means
    the contact row's cells *and* the two that span both rows - they end at the same line. */
-:is(#attendance_table, .attendance_waitlist_table) tbody.attendee_group > .attendee_row > td[rowspan],
-:is(#attendance_table, .attendance_waitlist_table) tbody.attendee_group > .attendee_row_contact > td { border-bottom-width: 3px; }
+:is(#attendance_table, .attendance_waitlist_table)
+	tbody.attendee_group
+	> .attendee_row
+	> td[rowspan],
+:is(#attendance_table, .attendance_waitlist_table)
+	tbody.attendee_group
+	> .attendee_row_contact
+	> td {
+	border-bottom-width: 3px;
+}
 
 /* The number and the tick sit against two rows of content, so they are centred in it
    rather than pinned to the top of the first row. */
-:is(#attendance_table, .attendance_waitlist_table) .attendee_num { text-align: center; vertical-align: middle; }
+:is(#attendance_table, .attendance_waitlist_table) .attendee_num {
+	text-align: center;
+	vertical-align: middle;
+}
 
 /* The contact row is supporting detail under the name, so it is labelled quietly rather
    than repeating the header's weight down the sheet. */
-:is(#attendance_table, .attendance_waitlist_table) .attendance_contact_head th { font-weight: normal; font-style: italic; }
+:is(#attendance_table, .attendance_waitlist_table) .attendance_contact_head th {
+	font-weight: normal;
+	font-style: italic;
+}
 
 /* Bullets pulled back inside the cell - a default <ul> indents its markers into the
    neighbouring column's border. */
-:is(#attendance_table, .attendance_waitlist_table) .attendee_days_list { margin: 0; padding-left: 1.1em; }
-:is(#attendance_table, .attendance_waitlist_table) .attendee_days_list li { margin: 0; }
+:is(#attendance_table, .attendance_waitlist_table) .attendee_days_list {
+	margin: 0;
+	padding-left: 1.1em;
+}
+:is(#attendance_table, .attendance_waitlist_table) .attendee_days_list li {
+	margin: 0;
+}
 
 /* The tick box is the point of the last column, so centre it and give it something to
    aim at with a pen as well as with a mouse. */
-:is(#attendance_table, .attendance_waitlist_table) td.attendee_attended { text-align: center; vertical-align: middle; }
-:is(#attendance_table, .attendance_waitlist_table) .attendee_tick { width: 17px; height: 17px; margin: 0; cursor: pointer; }
+:is(#attendance_table, .attendance_waitlist_table) td.attendee_attended {
+	text-align: center;
+	vertical-align: middle;
+}
+:is(#attendance_table, .attendance_waitlist_table) .attendee_tick {
+	width: 17px;
+	height: 17px;
+	margin: 0;
+	cursor: pointer;
+}
 /* Nothing is held on one line by force: table-layout: fixed does not widen a column to
    fit, so a value told not to wrap - "Trooper / Wrangler" on a mixed signup, say - runs
    out over the cell beside it instead. Wrapping is the lesser of the two. */
-:is(#attendance_table, .attendance_waitlist_table) th, :is(#attendance_table, .attendance_waitlist_table) td { overflow-wrap: break-word; }
+:is(#attendance_table, .attendance_waitlist_table) th,
+:is(#attendance_table, .attendance_waitlist_table) td {
+	overflow-wrap: break-word;
+}
 /* The Legion ID is the one exception: a short value in a known format, whose column is
    sized to hold it, and which reads badly broken over two lines. The value only - the
    heading has to be free to wrap, or at a narrow width "Legion ID" runs out over the
    column beside it, which is the very thing the rule above is avoiding. */
-:is(#attendance_table, .attendance_waitlist_table) td.attendee_legion_id { white-space: nowrap; }
+:is(#attendance_table, .attendance_waitlist_table) td.attendee_legion_id {
+	white-space: nowrap;
+}
 
 /* ---------------------------------------------------------------------------
  * Print
@@ -1197,145 +2048,404 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
  * which event it belongs to. It is built by events_print_header() and sits inside
  * .events_page_wrap, because that wrapper is the only thing the print rules keep.
  * ------------------------------------------------------------------------ */
-.events_print_header { display: none; }
+.events_print_header {
+	display: none;
+}
 
 /* A link that opens a menu under it (the signup confirmation's Add to Calendar). Inline,
    so it sits in a row of links separated by pipes. */
-.events_dropdown { display: inline-block; position: relative; }
-.events_dropdown_toggle { display: inline; cursor: pointer; list-style: none; color: var(--events-accent, #2f6f9f); }
-.events_dropdown_toggle::-webkit-details-marker { display: none; }
+.events_dropdown {
+	display: inline-block;
+	position: relative;
+}
+.events_dropdown_toggle {
+	display: inline;
+	cursor: pointer;
+	list-style: none;
+	color: var(--events-accent, #2f6f9f);
+}
+.events_dropdown_toggle::-webkit-details-marker {
+	display: none;
+}
 .events_dropdown_toggle::after {
-	content: ""; display: inline-block; margin-left: 5px; vertical-align: middle;
-	border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid currentColor;
+	content: '';
+	display: inline-block;
+	margin-left: 5px;
+	vertical-align: middle;
+	border-left: 4px solid transparent;
+	border-right: 4px solid transparent;
+	border-top: 5px solid currentColor;
 }
 .events_dropdown_list {
-	position: absolute; top: 100%; left: 0; z-index: 10; margin-top: 4px;
-	padding: 4px 0; background: #fff; color: #333;
-	border: 1px solid rgba(0, 0, 0, 0.15); border-radius: 4px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	position: absolute;
+	top: 100%;
+	left: 0;
+	z-index: 10;
+	margin-top: 4px;
+	padding: 4px 0;
+	background: #fff;
+	color: #333;
+	border: 1px solid rgba(0, 0, 0, 0.15);
+	border-radius: 4px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
-.events_dropdown_list a { display: block; padding: 8px 14px; white-space: nowrap; }
-.events_dropdown_list a:hover { background: rgba(0, 0, 0, 0.05); }
+.events_dropdown_list a {
+	display: block;
+	padding: 8px 14px;
+	white-space: nowrap;
+}
+.events_dropdown_list a:hover {
+	background: rgba(0, 0, 0, 0.05);
+}
 
 /* Calendar subscription (calendar_feed.php). */
-.events_feed_link { margin: 12px 0; }
+.events_feed_link {
+	margin: 12px 0;
+}
 /* A split button: the subscribe link, and a caret that opens a menu under it. Styled
    here rather than with the theme's .button, which themes tend to write for form inputs
    only - on the garrison's an <a class="button"> is a plain link. Links name the element
    so the text colour survives a theme's a:hover (see .event_btn). */
-.events_feed_split { display: inline-flex; position: relative; align-items: stretch; }
-a.events_feed_split_main, a.events_feed_split_main:hover, a.events_feed_split_main:visited, .events_feed_split_toggle {
-	background: var(--events-accent, #2f6f9f); border: 1px solid var(--events-accent-border, #2a6390); color: #fff;
+.events_feed_split {
+	display: inline-flex;
+	position: relative;
+	align-items: stretch;
+}
+a.events_feed_split_main,
+a.events_feed_split_main:hover,
+a.events_feed_split_main:visited,
+.events_feed_split_toggle {
+	background: var(--events-accent, #2f6f9f);
+	border: 1px solid var(--events-accent-border, #2a6390);
+	color: #fff;
 	text-decoration: none;
 }
 a.events_feed_split_main {
-	display: inline-block; padding: 10px 18px; border-radius: 4px 0 0 4px; line-height: 1.2;
-	font-weight: 600; font-size: 1.05em;
+	display: inline-block;
+	padding: 10px 18px;
+	border-radius: 4px 0 0 4px;
+	line-height: 1.2;
+	font-weight: 600;
+	font-size: 1.05em;
 }
-a.events_feed_split_main:hover, .events_feed_split_toggle:hover { filter: brightness(1.08); }
-.events_feed_menu { display: flex; margin: 0; }
+a.events_feed_split_main:hover,
+.events_feed_split_toggle:hover {
+	filter: brightness(1.08);
+}
+.events_feed_menu {
+	display: flex;
+	margin: 0;
+}
 .events_feed_split_toggle {
-	display: flex; align-items: center; padding: 0 12px; border-radius: 0 4px 4px 0; cursor: pointer;
-	border-left-color: rgba(255, 255, 255, 0.45); list-style: none;
+	display: flex;
+	align-items: center;
+	padding: 0 12px;
+	border-radius: 0 4px 4px 0;
+	cursor: pointer;
+	border-left-color: rgba(255, 255, 255, 0.45);
+	list-style: none;
 }
-.events_feed_split_toggle::-webkit-details-marker { display: none; }
+.events_feed_split_toggle::-webkit-details-marker {
+	display: none;
+}
 .events_feed_split_toggle::after {
-	content: ""; width: 0; height: 0;
-	border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid currentColor;
+	content: '';
+	width: 0;
+	height: 0;
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-top: 6px solid currentColor;
 }
 .events_feed_menu_list {
-	position: absolute; top: 100%; right: 0; z-index: 10; margin-top: 4px; min-width: 100%;
-	box-sizing: border-box; padding: 4px 0; background: #fff; color: #333;
-	border: 1px solid rgba(0, 0, 0, 0.15); border-radius: 4px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	position: absolute;
+	top: 100%;
+	right: 0;
+	z-index: 10;
+	margin-top: 4px;
+	min-width: 100%;
+	box-sizing: border-box;
+	padding: 4px 0;
+	background: #fff;
+	color: #333;
+	border: 1px solid rgba(0, 0, 0, 0.15);
+	border-radius: 4px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
-.events_feed_menu_list a { display: block; padding: 8px 14px; white-space: nowrap; }
-.events_feed_menu_list a:hover { background: rgba(0, 0, 0, 0.05); }
+.events_feed_menu_list a {
+	display: block;
+	padding: 8px 14px;
+	white-space: nowrap;
+}
+.events_feed_menu_list a:hover {
+	background: rgba(0, 0, 0, 0.05);
+}
 
-.events_feed_copy { display: none; margin-top: 16px; }
-.events_feed_copy:target, .events_feed_copy.events_feed_copy_open { display: block; }
-.events_feed_copy .events_notice { margin-bottom: 12px; }
-.events_feed_url_row { display: flex; align-items: center; gap: 8px; }
-.events_feed_url {
-	flex: 1; min-width: 0; padding: 8px 10px; border-radius: 4px; background: rgba(127, 127, 127, 0.1);
-	color: inherit; font-family: monospace; overflow-wrap: anywhere; user-select: all;
+.events_feed_copy {
+	display: none;
+	margin-top: 16px;
 }
-#calendar_feed_copy_button { flex: none; margin: 0; }
+.events_feed_copy:target,
+.events_feed_copy.events_feed_copy_open {
+	display: block;
+}
+.events_feed_copy .events_notice {
+	margin-bottom: 12px;
+}
+.events_feed_url_row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.events_feed_url {
+	flex: 1;
+	min-width: 0;
+	padding: 8px 10px;
+	border-radius: 4px;
+	background: rgba(127, 127, 127, 0.1);
+	color: inherit;
+	font-family: monospace;
+	overflow-wrap: anywhere;
+	user-select: all;
+}
+#calendar_feed_copy_button {
+	flex: none;
+	margin: 0;
+}
 /* The id as well as the class, to out-specify the theme's button.button fill. */
 #calendar_feed_copy_button.events_feed_copied,
-#calendar_feed_copy_button.events_feed_copied:hover { background: #2e7d32; border-color: #276b2b; color: #fff; }
+#calendar_feed_copy_button.events_feed_copied:hover {
+	background: #2e7d32;
+	border-color: #276b2b;
+	color: #fff;
+}
 /* A theme's .button sets display, which would otherwise beat the attribute. */
-#calendar_feed_copy_button[hidden] { display: none; }
-.events_feed_actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
-.events_feed_form { display: inline; margin: 0; }
+#calendar_feed_copy_button[hidden] {
+	display: none;
+}
+.events_feed_actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 10px 0;
+}
+.events_feed_form {
+	display: inline;
+	margin: 0;
+}
 
 /* ---------------------------------------------------------------------------
  * Removing a signup - the coordinator's X on each signup row, and the dialog it opens
  * ------------------------------------------------------------------------ */
-a.rsvp_remove, a.rsvp_remove:link, a.rsvp_remove:visited {
-	display: inline-block; margin-left: 8px; padding: 0 7px; border-radius: 4px; vertical-align: -1px;
-	font-size: 1.3em; font-weight: bold; line-height: 1.2; color: #a33; text-decoration: none; opacity: 0.7;
+a.rsvp_remove,
+a.rsvp_remove:link,
+a.rsvp_remove:visited {
+	display: inline-block;
+	margin-left: 8px;
+	padding: 0 7px;
+	border-radius: 4px;
+	vertical-align: -1px;
+	font-size: 1.3em;
+	font-weight: bold;
+	line-height: 1.2;
+	color: #a33;
+	text-decoration: none;
+	opacity: 0.7;
 }
-a.rsvp_remove:hover, a.rsvp_remove:focus { opacity: 1; background: rgba(170, 51, 51, 0.1); color: #a33; text-decoration: none; }
+a.rsvp_remove:hover,
+a.rsvp_remove:focus {
+	opacity: 1;
+	background: rgba(170, 51, 51, 0.1);
+	color: #a33;
+	text-decoration: none;
+}
 
 .events_modal {
-	position: fixed; z-index: 1000; top: 0; right: 0; bottom: 0; left: 0;
-	display: flex; align-items: center; justify-content: center; padding: 16px;
+	position: fixed;
+	z-index: 1000;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 16px;
 }
 /* `hidden` is what the script toggles, and a display rule would out-specify it. */
-.events_modal[hidden] { display: none; }
-.events_modal_backdrop { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: rgba(0, 0, 0, 0.55); }
+.events_modal[hidden] {
+	display: none;
+}
+.events_modal_backdrop {
+	position: absolute;
+	top: 0;
+	right: 0;
+	bottom: 0;
+	left: 0;
+	background: rgba(0, 0, 0, 0.55);
+}
 .events_modal_card {
-	position: relative; box-sizing: border-box; width: 560px; max-width: 100%; max-height: 100%; overflow-y: auto;
-	margin: 0; padding: 18px 20px 16px; color: #333; background: #fff;
-	border-radius: 6px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+	position: relative;
+	box-sizing: border-box;
+	width: 560px;
+	max-width: 100%;
+	max-height: 100%;
+	overflow-y: auto;
+	margin: 0;
+	padding: 18px 20px 16px;
+	color: #333;
+	background: #fff;
+	border-radius: 6px;
+	box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
 }
-.events_modal_head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-.events_modal_title { margin: 0; font-size: 1.15em; }
+.events_modal_head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 8px;
+}
+.events_modal_title {
+	margin: 0;
+	font-size: 1.15em;
+}
 .events_modal_close {
-	flex: none; margin: -6px -8px 0 0; padding: 0 8px; border: 0; background: none;
-	font-size: 1.6em; line-height: 1.2; color: inherit; opacity: 0.6; cursor: pointer;
+	flex: none;
+	margin: -6px -8px 0 0;
+	padding: 0 8px;
+	border: 0;
+	background: none;
+	font-size: 1.6em;
+	line-height: 1.2;
+	color: inherit;
+	opacity: 0.6;
+	cursor: pointer;
 }
-.events_modal_close:hover, .events_modal_close:focus { opacity: 1; }
-.events_modal_field[hidden], .events_modal_card .events_notice[hidden] { display: none; }
-.events_modal_card .events_input { box-sizing: border-box; width: 100%; }
+.events_modal_close:hover,
+.events_modal_close:focus {
+	opacity: 1;
+}
+.events_modal_field[hidden],
+.events_modal_card .events_notice[hidden] {
+	display: none;
+}
+.events_modal_card .events_input {
+	box-sizing: border-box;
+	width: 100%;
+}
 
-.events_remove_actions { display: flex; flex-wrap: wrap; flex-direction: row-reverse; justify-content: flex-start; gap: 8px; margin-top: 14px; }
-#remove_signup_page .events_remove_actions { flex-direction: row; }
-.events_remove_actions button.event_action { cursor: pointer; font-family: inherit; }
-.events_remove_actions [hidden] { display: none; }
+.events_remove_actions {
+	display: flex;
+	flex-wrap: wrap;
+	flex-direction: row-reverse;
+	justify-content: flex-start;
+	gap: 8px;
+	margin-top: 14px;
+}
+#remove_signup_page .events_remove_actions {
+	flex-direction: row;
+}
+.events_remove_actions button.event_action {
+	cursor: pointer;
+	font-family: inherit;
+}
+.events_remove_actions [hidden] {
+	display: none;
+}
 
 /* A split button: the main way to remove, and a caret that opens the others under it.
    Buttons rather than the feed's links, so both take the fill from the same rule. */
-.events_split { display: inline-flex; position: relative; align-items: stretch; }
-.events_split_main, .events_split_toggle {
-	background: var(--events-accent, #2f6f9f); border: 1px solid var(--events-accent-border, #2a6390); color: #fff;
-	font: inherit; font-weight: 600; font-size: 0.95em; line-height: 1.2; cursor: pointer;
+.events_split {
+	display: inline-flex;
+	position: relative;
+	align-items: stretch;
 }
-.events_split_main { padding: 8px 15px; border-radius: 4px 0 0 4px; }
-.events_split_main[hidden] { display: none; }
-.events_split_main:hover, .events_split_toggle:hover { filter: brightness(1.08); }
-.events_split_menu { display: flex; margin: 0; }
+.events_split_main,
 .events_split_toggle {
-	display: flex; align-items: center; height: 100%; box-sizing: border-box; padding: 0 11px;
-	border-radius: 0 4px 4px 0; border-left-color: rgba(255, 255, 255, 0.45); list-style: none;
+	background: var(--events-accent, #2f6f9f);
+	border: 1px solid var(--events-accent-border, #2a6390);
+	color: #fff;
+	font: inherit;
+	font-weight: 600;
+	font-size: 0.95em;
+	line-height: 1.2;
+	cursor: pointer;
 }
-.events_split_toggle::-webkit-details-marker { display: none; }
+.events_split_main {
+	padding: 8px 15px;
+	border-radius: 4px 0 0 4px;
+}
+.events_split_main[hidden] {
+	display: none;
+}
+.events_split_main:hover,
+.events_split_toggle:hover {
+	filter: brightness(1.08);
+}
+.events_split_menu {
+	display: flex;
+	margin: 0;
+}
+.events_split_toggle {
+	display: flex;
+	align-items: center;
+	height: 100%;
+	box-sizing: border-box;
+	padding: 0 11px;
+	border-radius: 0 4px 4px 0;
+	border-left-color: rgba(255, 255, 255, 0.45);
+	list-style: none;
+}
+.events_split_toggle::-webkit-details-marker {
+	display: none;
+}
 .events_split_toggle::after {
-	content: ""; width: 0; height: 0;
-	border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid currentColor;
+	content: '';
+	width: 0;
+	height: 0;
+	border-left: 5px solid transparent;
+	border-right: 5px solid transparent;
+	border-top: 6px solid currentColor;
 }
 .events_split_list {
-	position: absolute; top: 100%; right: 0; z-index: 10; margin-top: 4px; min-width: 100%;
-	box-sizing: border-box; padding: 4px 0; background: #fff; color: #333;
-	border: 1px solid rgba(0, 0, 0, 0.15); border-radius: 4px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+	position: absolute;
+	top: 100%;
+	right: 0;
+	z-index: 10;
+	margin-top: 4px;
+	min-width: 100%;
+	box-sizing: border-box;
+	padding: 4px 0;
+	background: #fff;
+	color: #333;
+	border: 1px solid rgba(0, 0, 0, 0.15);
+	border-radius: 4px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 .events_split_list button {
-	display: block; width: 100%; padding: 8px 14px; border: 0; background: none; color: inherit;
-	font: inherit; text-align: left; white-space: nowrap; cursor: pointer;
+	display: block;
+	width: 100%;
+	padding: 8px 14px;
+	border: 0;
+	background: none;
+	color: inherit;
+	font: inherit;
+	text-align: left;
+	white-space: nowrap;
+	cursor: pointer;
 }
-.events_split_list button:hover, .events_split_list button:focus { background: rgba(0, 0, 0, 0.05); }
-.events_split_list button[hidden] { display: none; }
+.events_split_list button:hover,
+.events_split_list button:focus {
+	background: rgba(0, 0, 0, 0.05);
+}
+.events_split_list button[hidden] {
+	display: none;
+}
 /* At the foot of the dialog, which scrolls and so clips anything hanging below it. */
-.events_modal .events_split_list { top: auto; bottom: 100%; margin: 0 0 4px; }
+.events_modal .events_split_list {
+	top: auto;
+	bottom: 100%;
+	margin: 0 0 4px;
+}
 
 @media print {
 	/* Hide everything that is neither the plugin's page nor an ancestor holding it in
@@ -1353,7 +2463,8 @@ a.rsvp_remove:hover, a.rsvp_remove:focus { opacity: 1; background: rgba(170, 51,
 	 * throws the whole rule out as invalid and prints what it has always printed, so
 	 * the fallback is the old behaviour rather than a blank sheet.
 	 */
-	body:has(.events_page_wrap) *:not(:has(.events_page_wrap)):not(.events_page_wrap, .events_page_wrap *) {
+	body:has(.events_page_wrap)
+		*:not(:has(.events_page_wrap)):not(.events_page_wrap, .events_page_wrap *) {
 		display: none !important;
 	}
 
@@ -1362,31 +2473,62 @@ a.rsvp_remove:hover, a.rsvp_remove:focus { opacity: 1; background: rgba(170, 51,
 	   margin instead of inside a 1275px column. */
 	body:has(.events_page_wrap) :has(.events_page_wrap) {
 		display: block !important;
-		width: auto !important; max-width: none !important;
-		margin: 0 !important; padding: 0 !important;
-		border: 0 !important; background: none !important; box-shadow: none !important;
+		width: auto !important;
+		max-width: none !important;
+		margin: 0 !important;
+		padding: 0 !important;
+		border: 0 !important;
+		background: none !important;
+		box-shadow: none !important;
 	}
 
-	html:has(.events_page_wrap), body:has(.events_page_wrap) { margin: 0; padding: 0; background: #fff; font-size: 10pt; }
-	.events_page_wrap { width: auto; max-width: none; margin: 0; padding: 0; }
+	html:has(.events_page_wrap),
+	body:has(.events_page_wrap) {
+		margin: 0;
+		padding: 0;
+		background: #fff;
+		font-size: 10pt;
+	}
+	.events_page_wrap {
+		width: auto;
+		max-width: none;
+		margin: 0;
+		padding: 0;
+	}
 
 	/* Ink, not screen colour. !important because a theme's own sheet can load after this
 	   one, and every colour here exists to be overridden on screen but not on paper. */
-	.events_page_wrap, .events_page_wrap * { color: #000 !important; }
-	.events_page_wrap a { text-decoration: none; }
+	.events_page_wrap,
+	.events_page_wrap * {
+		color: #000 !important;
+	}
+	.events_page_wrap a {
+		text-decoration: none;
+	}
 
 	/* The trooper/wrangler dots are background colour, which a browser leaves out of a
 	   print unless the reader asks for background graphics. Drawn as outlines they keep
 	   working; the word or letter beside them carries the meaning either way. */
-	.event_count_dot { background: none !important; border: 0.5pt solid #000; }
+	.event_count_dot {
+		background: none !important;
+		border: 0.5pt solid #000;
+	}
 
 	/* The turnout tab is a shape cut out of a background, and a background is the one
 	   thing a print is not guaranteed to carry. On paper it goes back into the flow as a
 	   plain line above the card - which also keeps an absolutely positioned box from
 	   landing on top of the first meta row once the page is re-laid out for print. */
-	.event_counts_tab { position: static; padding: 0 0 6pt; background: none !important; }
-	.event_counts_tab::before { display: none; }
-	#event_meta { padding: 0 !important; }
+	.event_counts_tab {
+		position: static;
+		padding: 0 0 6pt;
+		background: none !important;
+	}
+	.event_counts_tab::before {
+		display: none;
+	}
+	#event_meta {
+		padding: 0 !important;
+	}
 
 	/* Controls that can only do something in a browser. The status pills are not
 	   controls, so a printed event page still says what the reader signed up for. */
@@ -1397,9 +2539,14 @@ a.rsvp_remove:hover, a.rsvp_remove:focus { opacity: 1; background: rgba(170, 51,
 	.event_btn,
 	.rsvp_filter_funnel,
 	#gec_controls,
-	#rsvp_filter_form { display: none !important; }
+	#rsvp_filter_form {
+		display: none !important;
+	}
 
-	.events_print_header { display: block; margin: 0 0 12pt; }
+	.events_print_header {
+		display: block;
+		margin: 0 0 12pt;
+	}
 
 	/* A slim coloured ribbon, logo on the left, board and document kind beside it. The
 	   colour is the plugin's accent, so a theme that sets --events-accent brands the
@@ -1408,19 +2555,25 @@ a.rsvp_remove:hover, a.rsvp_remove:focus { opacity: 1; background: rgba(170, 51,
 	   white text from a print unless the reader turns background graphics on, and a
 	   ribbon that silently prints as white-on-white would be worse than none. */
 	.events_print_ribbon {
-		display: flex; align-items: center; gap: 8pt;
+		display: flex;
+		align-items: center;
+		gap: 8pt;
 		padding: 4pt 8pt;
 		background: var(--events-accent, #2f6f9f);
 		-webkit-print-color-adjust: exact;
 		print-color-adjust: exact;
 	}
-	.events_page_wrap .events_print_ribbon, .events_page_wrap .events_print_ribbon * { color: #fff !important; }
+	.events_page_wrap .events_print_ribbon,
+	.events_page_wrap .events_print_ribbon * {
+		color: #fff !important;
+	}
 	/* Painted from the URL the page hands over in --events-print-logo. Declaring the
 	   background here rather than on an <img> in the markup is what keeps the file off
 	   the wire for the readers who never print. */
 	.events_print_logo {
 		display: block;
-		width: 26pt; height: 26pt;
+		width: 26pt;
+		height: 26pt;
 		background-image: var(--events-print-logo);
 		background-repeat: no-repeat;
 		background-position: center;
@@ -1428,42 +2581,105 @@ a.rsvp_remove:hover, a.rsvp_remove:focus { opacity: 1; background: rgba(170, 51,
 		-webkit-print-color-adjust: exact;
 		print-color-adjust: exact;
 	}
-	.events_print_board { font-size: 8.5pt; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+	.events_print_board {
+		font-size: 8.5pt;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
 
-	.events_print_title { display: block; font-size: 17pt; font-weight: 700; line-height: 1.15; margin: 8pt 0 0; }
-	.events_print_meta { display: block; font-size: 9pt; margin-top: 2pt; }
-	.events_print_title, .events_print_meta { padding-bottom: 5pt; }
-	.events_print_meta, .events_print_header > .events_print_title:last-child { border-bottom: 1pt solid #000; }
+	.events_print_title {
+		display: block;
+		font-size: 17pt;
+		font-weight: 700;
+		line-height: 1.15;
+		margin: 8pt 0 0;
+	}
+	.events_print_meta {
+		display: block;
+		font-size: 9pt;
+		margin-top: 2pt;
+	}
+	.events_print_title,
+	.events_print_meta {
+		padding-bottom: 5pt;
+	}
+	.events_print_meta,
+	.events_print_header > .events_print_title:last-child {
+		border-bottom: 1pt solid #000;
+	}
 
 	/* The event name is in the masthead; the on-screen heading under it would repeat it. */
-	#attendance_event_title { display: none; }
-	#attendance_day { font-size: 11pt; margin: 0 0 8pt; }
+	#attendance_event_title {
+		display: none;
+	}
+	#attendance_day {
+		font-size: 11pt;
+		margin: 0 0 8pt;
+	}
 	/* Its own heading and a rule down the side, in ink: the dashed purple of the screen
 	   is a background colour's worth of distinction, and printers drop those. */
-	.attendance_waitlist { margin-top: 14pt; border-left: 3pt dashed #000; padding-left: 6pt; }
-	.attendance_waitlist_heading { font-size: 11pt; margin: 0 0 2pt; }
+	.attendance_waitlist {
+		margin-top: 14pt;
+		border-left: 3pt dashed #000;
+		padding-left: 6pt;
+	}
+	.attendance_waitlist_heading {
+		font-size: 11pt;
+		margin: 0 0 2pt;
+	}
 
-	:is(#attendance_table, .attendance_waitlist_table) { margin: 0; font-size: 9pt; }
+	:is(#attendance_table, .attendance_waitlist_table) {
+		margin: 0;
+		font-size: 9pt;
+	}
 	/* 0.75pt is one device pixel at 96dpi. Below that the grid is sub-pixel, and the
 	   rasteriser drops whichever lines round to nothing - which showed up as the table's
 	   top edge going missing in the print preview while the rest of the grid survived. */
-	:is(#attendance_table, .attendance_waitlist_table) th, :is(#attendance_table, .attendance_waitlist_table) td { border: 1.5pt solid #000; padding: 4pt; }
+	:is(#attendance_table, .attendance_waitlist_table) th,
+	:is(#attendance_table, .attendance_waitlist_table) td {
+		border: 1.5pt solid #000;
+		padding: 4pt;
+	}
 	/* Browsers print no backgrounds unless the reader opts into background graphics, so
 	   the header row and the banding are weighted with rules instead of fills. */
-	:is(#attendance_table, .attendance_waitlist_table) th { background: none; border-bottom-width: 2.25pt; }
-	:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head th { border-top-width: 2.25pt; }
-	:is(#attendance_table, .attendance_waitlist_table) tbody.attendee_group:nth-of-type(even) td { background: none; }
+	:is(#attendance_table, .attendance_waitlist_table) th {
+		background: none;
+		border-bottom-width: 2.25pt;
+	}
+	:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head th {
+		border-top-width: 2.25pt;
+	}
+	:is(#attendance_table, .attendance_waitlist_table) tbody.attendee_group:nth-of-type(even) td {
+		background: none;
+	}
 	/* Repeat the header on every sheet, and never split a person across two of them - a
 	   <tbody> is the pair of rows, so avoiding a break inside it is what keeps somebody's
 	   phone number on the same page as their name. */
-	:is(#attendance_table, .attendance_waitlist_table) thead { display: table-header-group; }
-	:is(#attendance_table, .attendance_waitlist_table) tbody, :is(#attendance_table, .attendance_waitlist_table) tr { break-inside: avoid; page-break-inside: avoid; }
+	:is(#attendance_table, .attendance_waitlist_table) thead {
+		display: table-header-group;
+	}
+	:is(#attendance_table, .attendance_waitlist_table) tbody,
+	:is(#attendance_table, .attendance_waitlist_table) tr {
+		break-inside: avoid;
+		page-break-inside: avoid;
+	}
 	/* Room to run a pen down the column without the rows crowding each other. Two rows a
 	   person now, so each is shorter than the single row was and the pair a little taller. */
-	:is(#attendance_table, .attendance_waitlist_table) tbody td { height: 15pt; }
+	:is(#attendance_table, .attendance_waitlist_table) tbody td {
+		height: 15pt;
+	}
 	/* Heavy enough to read as a divider at 9pt without looking like a second grid. */
-	:is(#attendance_table, .attendance_waitlist_table) tbody.attendee_group > .attendee_row > td[rowspan],
-	:is(#attendance_table, .attendance_waitlist_table) tbody.attendee_group > .attendee_row_contact > td { border-bottom-width: 2.25pt; }
+	:is(#attendance_table, .attendance_waitlist_table)
+		tbody.attendee_group
+		> .attendee_row
+		> td[rowspan],
+	:is(#attendance_table, .attendance_waitlist_table)
+		tbody.attendee_group
+		> .attendee_row_contact
+		> td {
+		border-bottom-width: 2.25pt;
+	}
 
 	/* Whatever was ticked on screen is ticked on paper - the print is taken from the live
 	   page, so the box only has to survive being printed. A browser draws the control but
@@ -1471,7 +2687,8 @@ a.rsvp_remove:hover, a.rsvp_remove:focus { opacity: 1; background: rgba(170, 51,
 	   turn a ticked box back into an empty one; accent-color puts the tick in ink rather
 	   than in the browser's blue. */
 	:is(#attendance_table, .attendance_waitlist_table) .attendee_tick {
-		width: 11pt; height: 11pt;
+		width: 11pt;
+		height: 11pt;
 		accent-color: #000;
 		-webkit-print-color-adjust: exact;
 		print-color-adjust: exact;
@@ -1480,10 +2697,14 @@ a.rsvp_remove:hover, a.rsvp_remove:focus { opacity: 1; background: rgba(170, 51,
 	/* The plugin's other pages are built on MyBB's table classes, which carry the
 	   theme's panel colours. On paper they are just content. */
 	.events_page_wrap :is(.tborder, .thead, .tcat, .trow1, .trow2) {
-		background: none !important; color: #000 !important;
+		background: none !important;
+		color: #000 !important;
 		border-color: #000 !important;
 	}
-	.events_page_wrap table.tborder { border-collapse: collapse; width: 100%; }
+	.events_page_wrap table.tborder {
+		border-collapse: collapse;
+		width: 100%;
+	}
 }
 
 /* ---------------------------------------------------------------------------
@@ -1498,15 +2719,28 @@ a.rsvp_remove:hover, a.rsvp_remove:focus { opacity: 1; background: rgba(170, 51,
 	gap: 4px 12px;
 	margin: 0 0 16px;
 }
-.events_troops_facts dt { font-weight: 600; }
-.events_troops_facts dd { margin: 0; }
+.events_troops_facts dt {
+	font-weight: 600;
+}
+.events_troops_facts dd {
+	margin: 0;
+}
 
-.events_troops_history { width: 100%; border-collapse: collapse; }
-.events_troops_history th { text-align: left; }
-.events_troops_history td { vertical-align: top; }
+.events_troops_history {
+	width: 100%;
+	border-collapse: collapse;
+}
+.events_troops_history th {
+	text-align: left;
+}
+.events_troops_history td {
+	vertical-align: top;
+}
 
 /* The history is five narrow columns; below a phone's width the region and the costumes
    are what give way, since the event and its date are what the row is. */
 @media (max-width: 480px) {
-	.events_troops_history :is(th, td):nth-child(3) { display: none; }
+	.events_troops_history :is(th, td):nth-child(3) {
+		display: none;
+	}
 }

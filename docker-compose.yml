@@ -9,7 +9,7 @@ services:
     image: mybb-events-web:php${PHP_VERSION:-7.4}
     container_name: mybb-events-web
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - '${WEB_PORT:-8080}:80'
     volumes:
       # MyBB source + the deployed plugin (see scripts/deploy.sh).
       - ./test-forum:/var/www/html
@@ -31,11 +31,11 @@ services:
       MARIADB_PASSWORD: mybbpassword
       TZ: UTC
     ports:
-      - "${DB_PORT:-3307}:3306"
+      - '${DB_PORT:-3307}:3306'
     volumes:
       - mybb-db-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
       interval: 3s
       timeout: 5s
       retries: 30
@@ -51,7 +51,7 @@ services:
       PMA_USER: root
       PMA_PASSWORD: rootpassword
     ports:
-      - "${PMA_PORT:-8081}:80"
+      - '${PMA_PORT:-8081}:80'
     depends_on: [db]
     networks: [mybb]
 
