@@ -34,6 +34,16 @@ export default defineConfig({
       // Starlight adds the title, description and URL; this adds the image. Regenerate it
       // from social/og-image.html with `node social/render.mjs`.
       head: [
+        // Marks each image once it has loaded (or failed), so custom.css can stop its
+        // loading animation. Inline in <head> so the listener exists before any <img> is
+        // parsed; load events don't bubble, hence capture.
+        {
+          tag: 'script',
+          content:
+            "document.documentElement.classList.add('img-loading');" +
+            "['load','error'].forEach(function(t){document.addEventListener(t,function(e){" +
+            "if(e.target.tagName==='IMG')e.target.classList.add('loaded')},true)});",
+        },
         { tag: 'meta', attrs: { property: 'og:image', content: 'https://events-guide.501scg.org/og-image.jpg' } },
         { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
         { tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },

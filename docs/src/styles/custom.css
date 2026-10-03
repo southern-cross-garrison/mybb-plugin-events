@@ -65,3 +65,67 @@ h1#_top {
     padding-block: 1.5rem 2rem;
   }
 }
+
+/*
+ * While a screenshot loads, its reserved box shows three pulsing dots. They are the
+ * image's own background, so the picture covers them as it paints; the head script in
+ * astro.config.mjs adds .loaded when it finishes, which stops the animation. Without
+ * script nothing is shown, rather than dots animating forever behind every image.
+ */
+@property --img-dot-1 {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 25%;
+}
+
+@property --img-dot-2 {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 25%;
+}
+
+@property --img-dot-3 {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 25%;
+}
+
+.img-loading .sl-markdown-content img:not(.loaded) {
+  --img-dot: var(--sl-color-gray-3);
+  background:
+    radial-gradient(circle closest-side, color-mix(in srgb, var(--img-dot) var(--img-dot-1), transparent) 92%, transparent)
+      calc(50% - 1rem) 50% / 0.5rem 0.5rem no-repeat,
+    radial-gradient(circle closest-side, color-mix(in srgb, var(--img-dot) var(--img-dot-2), transparent) 92%, transparent)
+      50% 50% / 0.5rem 0.5rem no-repeat,
+    radial-gradient(circle closest-side, color-mix(in srgb, var(--img-dot) var(--img-dot-3), transparent) 92%, transparent)
+      calc(50% + 1rem) 50% / 0.5rem 0.5rem no-repeat,
+    var(--sl-color-gray-6);
+  animation:
+    img-dot-1 1.2s ease-in-out infinite,
+    img-dot-2 1.2s ease-in-out 0.2s infinite,
+    img-dot-3 1.2s ease-in-out 0.4s infinite;
+}
+
+@keyframes img-dot-1 {
+  40% {
+    --img-dot-1: 100%;
+  }
+}
+
+@keyframes img-dot-2 {
+  40% {
+    --img-dot-2: 100%;
+  }
+}
+
+@keyframes img-dot-3 {
+  40% {
+    --img-dot-3: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .img-loading .sl-markdown-content img:not(.loaded) {
+    animation: none;
+  }
+}
