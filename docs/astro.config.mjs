@@ -29,6 +29,17 @@ export default defineConfig({
       },
       lastUpdated: true,
 
+      // The picture shown when a link to the guide is shared (Facebook, Discord, Slack...).
+      // Starlight adds the title, description and URL; this adds the image. Regenerate it
+      // from social/og-image.html with `node social/render.mjs`.
+      head: [
+        { tag: 'meta', attrs: { property: 'og:image', content: 'https://events-guide.501scg.org/og-image.jpg' } },
+        { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' } },
+        { tag: 'meta', attrs: { property: 'og:image:height', content: '630' } },
+        { tag: 'meta', attrs: { property: 'og:image:alt', content: 'Southern Cross Garrison Events Guide' } },
+        { tag: 'meta', attrs: { name: 'twitter:image', content: 'https://events-guide.501scg.org/og-image.jpg' } },
+      ],
+
       // One group per audience. Pages inside each folder are listed automatically, ordered
       // by `sidebar.order` in their frontmatter.
       sidebar: [
