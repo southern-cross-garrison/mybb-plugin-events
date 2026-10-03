@@ -199,6 +199,7 @@ function events_admin_settings()
                 'events_tk_id_field' => $mybb->input['tk_id_field'],
                 'events_legion_api_url' => $legion_api_url,
                 'events_wwcc_enabled' => $mybb->get_input('wwcc_enabled', MyBB::INPUT_INT) ? '1' : '0',
+                'events_preapproval_enabled' => $mybb->get_input('preapproval_enabled', MyBB::INPUT_INT) ? '1' : '0',
                 'events_wwcc_name' => $wwcc_name,
                 'events_wwcc_field' => $mybb->input['wwcc_field'],
                 'events_mobile_field' => $mybb->input['mobile_field'],
@@ -318,6 +319,12 @@ function events_admin_settings()
         "Members' costumes are fetched from here by their Legion ID when they sign up to troop, replacing the ones on their profile. Leave blank to use only the costumes on their profiles.",
         $form->generate_text_box("legion_api_url", events_admin_settings_value('legion_api_url', 'events_legion_api_url'), array("id" => "legion_api_url")),
         "legion_api_url");
+
+    $form_container->output_row("Preapproved Costumes",
+        "Lets a member signing up to troop type in a costume they are preapproved for instead of picking one from their profile",
+        $form->generate_yes_no_radio("preapproval_enabled", (string)events_admin_settings_value('preapproval_enabled', 'events_preapproval_enabled') === '1' ? '1' : '0', true,
+            array("id" => "preapproval_enabled_yes"), array("id" => "preapproval_enabled_no")),
+        "", array(), array("id" => "row_preapproval_enabled"));
 
     // Working with children checks. The name and the profile field only mean anything
     // while the check is on, so they are hidden with it - by script, with the rows left

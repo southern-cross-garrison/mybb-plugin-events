@@ -728,12 +728,13 @@ function events_calendar_grid($month_start, array $events, array $user_rsvps)
  *
  * A member with exactly one costume on file has nothing to choose, so the costumes step
  * is dropped for them too - the wizard selects that costume itself and the confirm step
- * shows it. A member with none still gets the step, because that is where they are told
- * how to get past having no costume.
+ * shows it - unless the board takes preapproved costumes, which are the other answer and
+ * are only asked for on that step. A member with none still gets the step, because that
+ * is where they are told how to get past having no costume.
  *
  * @param array $roles The roles the signup currently holds
  * @param array $missing Prerequisite fields still missing for those roles
- * @param bool $costume_choice Whether the member has more than one costume to pick from
+ * @param bool $costume_choice Whether the member has a costume choice to make
  * @return array
  */
 function events_signup_steps(array $roles, array $missing, $costume_choice = true)

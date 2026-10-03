@@ -401,6 +401,8 @@ textarea.events_input { resize: vertical; }
 }
 .events_option:hover { border-color: #bcbcbc; }
 .events_option input { margin: 0; flex: none; }
+/* The preapproval row carries its own text box, which takes whatever the row has left. */
+.costume_preapproval_option .events_input { flex: 1 1 auto; width: auto; min-width: 0; padding: 5px 8px; }
 
 /* A row of the event form's day grid: one day the event covers, and the hours it runs
    that day. The date is derived from the event's start and end dates rather than typed,

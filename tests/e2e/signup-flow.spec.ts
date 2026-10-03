@@ -733,6 +733,147 @@ test.describe('signup wizard', () => {
   });
 });
 
+// A member cleared to troop in a costume that is not on their Legion record yet says so on
+// the costumes step, when the board has preapprovals turned on. It is saved as a costume
+// named "Preapproval: ..." so everything that lists costumes shows it as it is.
+test.describe('preapproved costumes', () => {
+  const PREAPPROVED = 'Clone Trooper Phase 2';
+  let restoreSettings: () => Promise<void>;
+
+  test.beforeEach(async () => {
+    restoreSettings = await withSettings({ events_preapproval_enabled: '1' });
+  });
+
+  test.afterEach(async () => {
+    await restoreSettings();
+  });
+
+  test('a member with one costume is still shown the step, with it ticked', async ({ page }) => {
+    const eventId = await createEvent({ title: 'One Costume Preapproval Troop' });
+    await setUserField('trooper1', 'costume', TK);
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+    await page.locator('#rsvp_submit').click();
+
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'costumes');
+    await expect(page.locator(`input.costume_checkbox[value="${TK}"]`)).toBeChecked();
+    await expect(page.locator('#costume_preapproval')).not.toBeChecked();
+    await page.locator('#rsvp_submit').click();
+
+    await expect(page.locator('#confirm_costumes')).toHaveText(TK);
+  });
+
+  test('is not offered when the board has it turned off', async ({ page }) => {
+    await restoreSettings();
+    restoreSettings = await withSettings({ events_preapproval_enabled: '0' });
+    const eventId = await createEvent({ title: 'No Preapproval Troop' });
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+    await page.locator('#rsvp_submit').click();
+
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'costumes');
+    await expect(page.locator('#costume_preapproval')).toHaveCount(0);
+  });
+
+  test('a member troops in a preapproved costume instead of one on file', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Preapproval Troop' });
+    await setUserField('trooper1', 'costume', TK);
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+    await page.locator('#rsvp_submit').click();
+
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'costumes');
+    await page.locator(`input.costume_checkbox[value="${TK}"]`).uncheck();
+    // Typing ticks the box.
+    await page.locator('#costume_preapproval_text').fill(PREAPPROVED);
+    await expect(page.locator('#costume_preapproval')).toBeChecked();
+    await page.locator('#rsvp_submit').click();
+
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'confirm');
+    await expect(page.locator('#confirm_costumes')).toHaveText(`Preapproval: ${PREAPPROVED}`);
+    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_summary_costumes')).toContainText(`Preapproval: ${PREAPPROVED}`);
+
+    expect(await getRsvpCostumes(eventId, 'trooper1')).toEqual([`Preapproval: ${PREAPPROVED}`]);
+  });
+
+  test('a preapproval goes alongside costumes on file', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Preapproval And Costume Troop' });
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+    await page.locator('#rsvp_submit').click();
+
+    await page.locator(`input.costume_checkbox[value="${TK}"]`).check();
+    await page.locator('#costume_preapproval').check();
+    await page.locator('#costume_preapproval_text').fill(PREAPPROVED);
+    await page.locator('#rsvp_submit').click();
+    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_success_message')).toBeVisible();
+
+    expect((await getRsvpCostumes(eventId, 'trooper1')).sort()).toEqual([TK, `Preapproval: ${PREAPPROVED}`].sort());
+  });
+
+  test('asks for the costume when the preapproval box is ticked with nothing typed', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Empty Preapproval Troop' });
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+    await page.locator('#rsvp_submit').click();
+
+    await page.locator(`input.costume_checkbox[value="${TK}"]`).check();
+    await page.locator('#costume_preapproval').check();
+    await page.locator('#rsvp_submit').click();
+
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'costumes');
+    await expect(page.locator('#rsvp_errors')).toContainText('Please enter the costume you are preapproved for');
+    await expect(page.locator('#costume_preapproval')).toBeChecked();
+    expect(await countRsvps(eventId)).toBe(0);
+  });
+
+  test('editing the signup brings the preapproval back', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Edit Preapproval Troop' });
+    await createRsvp(eventId, 'trooper1', { costumes: [`Preapproval: ${PREAPPROVED}`] });
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/rsvp.php?id=${eventId}`);
+    await page.locator('#rsvp_submit').click();
+
+    await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'costumes');
+    await expect(page.locator('#costume_preapproval')).toBeChecked();
+    await expect(page.locator('#costume_preapproval_text')).toHaveValue(PREAPPROVED);
+    await expect(page.locator('input.costume_checkbox:checked')).toHaveCount(0);
+
+    await page.locator('#rsvp_submit').click();
+    await page.locator('#rsvp_submit').click();
+    await expect(page.locator('#rsvp_success_message')).toBeVisible();
+    expect(await getRsvpCostumes(eventId, 'trooper1')).toEqual([`Preapproval: ${PREAPPROVED}`]);
+  });
+
+  test.describe('with the script off', () => {
+    test.use({ javaScriptEnabled: false });
+
+    test('the box is ticked by hand', async ({ page }) => {
+      const eventId = await createEvent({ title: 'Scriptless Preapproval Troop' });
+
+      await loginAs(page, 'trooper1');
+      await page.goto(`/rsvp.php?id=${eventId}`);
+      await page.locator('#rsvp_submit').click();
+
+      await page.locator('#costume_preapproval').check();
+      await page.locator('#costume_preapproval_text').fill(PREAPPROVED);
+      await page.locator('#rsvp_submit').click();
+      await page.locator('#rsvp_submit').click();
+      await expect(page.locator('#rsvp_success_message')).toBeVisible();
+
+      expect(await getRsvpCostumes(eventId, 'trooper1')).toEqual([`Preapproval: ${PREAPPROVED}`]);
+    });
+  });
+});
+
 // A double-clicked Confirm is two requests racing through events_save_signup(). Both used
 // to read "no signup yet", so the second insert tripped the event_user_role key and came
 // back as an SQL error - or, editing a signup, both rewrote its costumes and left each

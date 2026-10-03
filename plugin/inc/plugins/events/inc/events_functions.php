@@ -36,6 +36,17 @@ function events_wwcc_enabled()
 }
 
 /**
+ * Whether a member signing up to troop can name a preapproved costume instead of one on
+ * their profile. Off unless the setting says otherwise.
+ *
+ * @return bool
+ */
+function events_preapproval_enabled()
+{
+    return (string)events_get_setting('preapproval_enabled') === '1';
+}
+
+/**
  * What the board calls a working with children check - "Blue Card" in Queensland, for
  * one. Every label that names the check is built from this.
  *

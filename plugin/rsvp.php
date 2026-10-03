@@ -11,7 +11,8 @@
  * Steps: attendance -> prerequisites -> costumes -> confirm. Attendance comes first
  * because it decides the rest of the sequence: the TK ID is only a prerequisite once a
  * day is being trooped, and the costumes step does not exist for a signup that is
- * wrangling throughout, or for a member with only one costume to pick. Each step POSTs
+ * wrangling throughout, or - unless the board takes preapproved costumes - for a member
+ * with only one costume to pick. Each step POSTs
  * the accumulated selections forward as hidden inputs, so nothing is lost between steps
  * and the flow survives a refresh or a back button.
  *
@@ -89,6 +90,71 @@ add_breadcrumb(htmlspecialchars_uni($event['title']), "event.php?id=" . $event_i
 add_breadcrumb($is_update ? "Update Signup" : "Sign Up", "rsvp.php?id=" . $event_id);
 
 $user_costumes = events_get_user_costumes($mybb->user['uid']);
+
+// A preapproved costume is one the member has been cleared to troop in but which is not
+// on their Legion record yet, so it cannot be picked from the profile's list. It is typed
+// in on the costumes step and stored as a costume like any other, under this prefix, which
+// is what lets the attendance sheet, the troop report and the costume filter show it with
+// no changes of their own.
+define('EVENTS_PREAPPROVAL_PREFIX', 'Preapproval: ');
+define('EVENTS_PREAPPROVAL_MAX_LENGTH', 200);
+$preapproval_enabled = events_preapproval_enabled();
+
+/**
+ * The text of a stored preapproval costume, or null for a costume from the profile.
+ *
+ * @param string $costume
+ * @return string|null
+ */
+function events_rsvp_preapproval_text($costume)
+{
+    $prefix_length = strlen(EVENTS_PREAPPROVAL_PREFIX);
+
+    return strncmp($costume, EVENTS_PREAPPROVAL_PREFIX, $prefix_length) === 0
+        ? substr($costume, $prefix_length)
+        : null;
+}
+
+/**
+ * What the costumes step starts with ticked: whatever the signup already holds that is
+ * still on the profile, or a member's only costume when they hold nothing yet.
+ *
+ * @param array $user_costumes
+ * @param array $existing_signup
+ * @param string $preapproval The preapproval already chosen, which counts as holding one
+ * @return array
+ */
+function events_rsvp_initial_costumes(array $user_costumes, array $existing_signup, $preapproval)
+{
+    $held = isset($existing_signup['trooper'])
+        ? array_values(array_intersect($existing_signup['trooper']['costumes'], $user_costumes))
+        : array();
+
+    if(empty($held) && $preapproval === '' && count($user_costumes) === 1)
+    {
+        return $user_costumes;
+    }
+
+    return $held;
+}
+
+/**
+ * Everything the member is trooping in, as it is saved: the profile's costumes they ticked
+ * and the preapproval, if they gave one.
+ *
+ * @param array $selected_costumes
+ * @param string $preapproval
+ * @return array
+ */
+function events_rsvp_signup_costumes(array $selected_costumes, $preapproval)
+{
+    if($preapproval !== '')
+    {
+        $selected_costumes[] = EVENTS_PREAPPROVAL_PREFIX . $preapproval;
+    }
+
+    return $selected_costumes;
+}
 
 // ---------------------------------------------------------------------------
 // Selections carried between steps
@@ -275,7 +341,7 @@ $roles = array_keys($role_days);
 $withdrawing = $is_update && $attendance_posted && empty($role_days)
     && ($withdraw_chosen || ($has_days && $per_day));
 
-$costumes_posted = isset($mybb->input['costumes']) || $submitted_step === 'costumes';
+$costumes_posted = isset($mybb->input['costumes']) || isset($mybb->input['costume_preapproval']) || $submitted_step === 'costumes';
 $selected_costumes = array();
 foreach((array)$mybb->get_input('costumes', MyBB::INPUT_ARRAY) as $costume)
 {
@@ -287,9 +353,31 @@ foreach((array)$mybb->get_input('costumes', MyBB::INPUT_ARRAY) as $costume)
 }
 $selected_costumes = array_values(array_unique($selected_costumes));
 
-if(!$costumes_posted && isset($existing_signup['trooper']))
+// The box says a preapproval is wanted; the text is what it is. Ticked with nothing typed
+// is caught on the costumes step, so it is kept apart from "not ticked" until then.
+$preapproval_chosen = $preapproval_enabled && $mybb->get_input('costume_preapproval', MyBB::INPUT_INT) === 1;
+$preapproval = $preapproval_chosen
+    ? my_substr(trim($mybb->get_input('costume_preapproval_text')), 0, EVENTS_PREAPPROVAL_MAX_LENGTH)
+    : '';
+
+if(!$costumes_posted)
 {
-    $selected_costumes = array_values(array_intersect($existing_signup['trooper']['costumes'], $user_costumes));
+    if($preapproval_enabled && isset($existing_signup['trooper']))
+    {
+        foreach($existing_signup['trooper']['costumes'] as $costume)
+        {
+            $text = events_rsvp_preapproval_text($costume);
+            if($text !== null && $text !== '')
+            {
+                $preapproval_chosen = true;
+                $preapproval = $text;
+            }
+        }
+    }
+
+    // Worked out again once the attendance and prerequisites steps have had their chance
+    // to change the list, since either can.
+    $selected_costumes = events_rsvp_initial_costumes($user_costumes, $existing_signup, $preapproval);
 }
 
 if(!in_array('trooper', $roles, true))
@@ -298,16 +386,21 @@ if(!in_array('trooper', $roles, true))
     // values here (rather than just skipping the step) is what stops a hand-crafted POST
     // writing rsvp_costumes rows for a wrangling-only signup.
     $selected_costumes = array();
+    $preapproval_chosen = false;
+    $preapproval = '';
 }
 
 // A member with a single costume has no choice to make, so the costumes step is skipped
-// and that costume is simply what they are trooping in. Worked out again once the
+// and that costume is simply what they are trooping in - unless the board takes
+// preapprovals, which are only asked for on that step. Worked out again once the
 // prerequisites step has saved, since that is where a member with none types theirs in.
-$costume_choice = count($user_costumes) !== 1;
+$costume_choice = $preapproval_enabled || count($user_costumes) !== 1;
 if(!$costume_choice && in_array('trooper', $roles, true))
 {
     $selected_costumes = $user_costumes;
 }
+
+$signup_costumes = events_rsvp_signup_costumes($selected_costumes, $preapproval);
 
 // Whether the costumes on screen are the Legion's, which earns them a notice saying where
 // to look if they are wrong. Decided when the attendance step is answered and carried
@@ -368,12 +461,10 @@ if($mybb->request_method === 'post')
             if($costumes_from_api)
             {
                 $user_costumes = events_get_user_costumes($mybb->user['uid']);
-                if(!$costumes_posted && isset($existing_signup['trooper']))
-                {
-                    $selected_costumes = $existing_signup['trooper']['costumes'];
-                }
-                $selected_costumes = array_values(array_intersect($selected_costumes, $user_costumes));
-                $costume_choice = count($user_costumes) !== 1;
+                $selected_costumes = $costumes_posted
+                    ? array_values(array_intersect($selected_costumes, $user_costumes))
+                    : events_rsvp_initial_costumes($user_costumes, $existing_signup, $preapproval);
+                $costume_choice = $preapproval_enabled || count($user_costumes) !== 1;
                 if(!$costume_choice)
                 {
                     $selected_costumes = $user_costumes;
@@ -412,7 +503,11 @@ if($mybb->request_method === 'post')
         // step that follows would be built from the empty list the member arrived with and
         // send them to the User CP for costumes they have just this moment typed in.
         $user_costumes = events_get_user_costumes($mybb->user['uid']);
-        $costume_choice = count($user_costumes) !== 1;
+        if(!$costumes_posted && in_array('trooper', $roles, true))
+        {
+            $selected_costumes = events_rsvp_initial_costumes($user_costumes, $existing_signup, $preapproval);
+        }
+        $costume_choice = $preapproval_enabled || count($user_costumes) !== 1;
         if(!$costume_choice && in_array('trooper', $roles, true))
         {
             $selected_costumes = $user_costumes;
@@ -439,7 +534,12 @@ if($mybb->request_method === 'post')
     }
     elseif($submitted === 'costumes')
     {
-        if(empty($selected_costumes))
+        if($preapproval_chosen && $preapproval === '')
+        {
+            $errors[] = 'Please enter the costume you are preapproved for.';
+            $render = 'costumes';
+        }
+        elseif(empty($selected_costumes) && $preapproval === '')
         {
             $errors[] = 'Please select at least one costume.';
             $render = 'costumes';
@@ -483,14 +583,14 @@ if($mybb->request_method === 'post')
             $errors[] = 'Please complete every required field.';
             $render = 'prerequisites';
         }
-        elseif(in_array('trooper', $roles, true) && empty($selected_costumes))
+        elseif(in_array('trooper', $roles, true) && empty($signup_costumes))
         {
             $errors[] = 'Please select at least one costume.';
             $render = 'costumes';
         }
         else
         {
-            $saved = events_save_signup($event_id, $mybb->user['uid'], $role_days, $selected_costumes);
+            $saved = events_save_signup($event_id, $mybb->user['uid'], $role_days, $signup_costumes);
             if($saved === 'excluded')
             {
                 error(events_signup_lock_message('excluded'));
@@ -504,6 +604,7 @@ if($mybb->request_method === 'post')
     }
 
     $steps = events_signup_steps($roles, $missing, $costume_choice);
+    $signup_costumes = events_rsvp_signup_costumes($selected_costumes, $preapproval);
 }
 
 // ---------------------------------------------------------------------------
@@ -590,9 +691,9 @@ if($render === 'success')
     // A place in a queue is not on anybody's calendar yet.
     $rsvp_calendar_menu = events_rsvp_calendar_menu($event_id, $waitlist_extent !== 'all');
 
-    if(!empty($selected_costumes))
+    if(!empty($signup_costumes))
     {
-        $rsvp_summary .= '<p id="rsvp_summary_costumes"><strong>Costumes:</strong> ' . htmlspecialchars_uni(implode(', ', $selected_costumes)) . '</p>';
+        $rsvp_summary .= '<p id="rsvp_summary_costumes"><strong>Costumes:</strong> ' . htmlspecialchars_uni(implode(', ', $signup_costumes)) . '</p>';
     }
 
     $events_print_header = events_print_header($rsvp_success_title, array($event['title']));
@@ -659,6 +760,11 @@ if($costumes_from_api)
 {
     $attendance_state .= '<input type="hidden" name="costumes_from_api" value="1" />';
 }
+
+$preapproval_state = $preapproval !== ''
+    ? '<input type="hidden" name="costume_preapproval" value="1" />'
+      . '<input type="hidden" name="costume_preapproval_text" value="' . htmlspecialchars_uni($preapproval) . '" />'
+    : '';
 
 // The Legion's record is looked up by the Legion ID on the member's profile, so a wrong ID
 // is the likely reason for a wrong list, and the profile is where it is put right.
@@ -887,17 +993,39 @@ elseif($rsvp_step === 'costumes')
             . '<a href="usercp.php?action=profile">Add your costumes</a> and then come back, or '
             . '<a href="rsvp.php?id=' . $event_id . '&amp;role=wrangler" id="rsvp_wrangle_instead">sign up to wrangle instead</a>.</p>';
     }
-    else
+
+    $rsvp_body .= '<div class="events_options">';
+    foreach($user_costumes as $index => $costume)
     {
-        $rsvp_body .= '<div class="events_options">';
-        foreach($user_costumes as $index => $costume)
-        {
-            $checked = in_array($costume, $selected_costumes, true) ? ' checked="checked"' : '';
-            $rsvp_body .= '<label class="events_option costume_option"><input type="checkbox" class="costume_checkbox" id="costume_' . $index . '" name="costumes[]" value="'
-                . htmlspecialchars_uni($costume) . '"' . $checked . ' /> ' . htmlspecialchars_uni($costume) . '</label>';
-        }
-        $rsvp_body .= '</div>' . $costumes_from_api_notice;
+        $checked = in_array($costume, $selected_costumes, true) ? ' checked="checked"' : '';
+        $rsvp_body .= '<label class="events_option costume_option"><input type="checkbox" class="costume_checkbox" id="costume_' . $index . '" name="costumes[]" value="'
+            . htmlspecialchars_uni($costume) . '"' . $checked . ' /> ' . htmlspecialchars_uni($costume) . '</label>';
     }
+
+    // The text box sits inside the row's label, where clicking it focuses it rather than
+    // toggling the box; the script ticks the box once something is typed, so nobody has
+    // to do both. With the script off the box is ticked by hand and nothing is lost.
+    if($preapproval_enabled)
+    {
+        $rsvp_body .= '<label class="events_option costume_option costume_preapproval_option">'
+            . '<input type="checkbox" id="costume_preapproval" name="costume_preapproval" value="1"' . ($preapproval_chosen ? ' checked="checked"' : '') . ' /> '
+            . '<span>Preapproval:</span>'
+            . '<input type="text" class="events_input" id="costume_preapproval_text" name="costume_preapproval_text" maxlength="' . EVENTS_PREAPPROVAL_MAX_LENGTH . '"'
+            . ' value="' . htmlspecialchars_uni($preapproval) . '" aria-label="Preapproved costume" />'
+            . '</label>'
+            . <<<'SCRIPT'
+<script type="text/javascript">
+(function() {
+	var box = document.getElementById('costume_preapproval');
+	var text = document.getElementById('costume_preapproval_text');
+	text.addEventListener('input', function() { box.checked = text.value.trim() !== ''; });
+	box.addEventListener('change', function() { if(box.checked) { text.focus(); } });
+})();
+</script>
+SCRIPT;
+    }
+
+    $rsvp_body .= '</div>' . (empty($user_costumes) ? '' : $costumes_from_api_notice);
 }
 elseif($rsvp_step === 'confirm' && $withdrawing)
 {
@@ -911,7 +1039,7 @@ elseif($rsvp_step === 'confirm' && $withdrawing)
 }
 elseif($rsvp_step === 'confirm')
 {
-    $rsvp_carried_state .= $attendance_state . events_hidden_inputs('costumes', $selected_costumes);
+    $rsvp_carried_state .= $attendance_state . events_hidden_inputs('costumes', $selected_costumes) . $preapproval_state;
 
     // The button says what pressing it does. Joining a waitlist is not signing up to
     // troop, and a button reading "Confirm Signup" over a full event would say it was.
@@ -954,9 +1082,9 @@ elseif($rsvp_step === 'confirm')
     $rsvp_body .= events_signup_summary_html($event_days, $role_days, 'confirm')
         . events_signup_waitlist_html($event_days, $outcomes, 'confirm');
 
-    if(!empty($selected_costumes))
+    if(!empty($signup_costumes))
     {
-        $rsvp_body .= '<p><strong>Costumes:</strong> <span id="confirm_costumes">' . htmlspecialchars_uni(implode(', ', $selected_costumes)) . '</span></p>'
+        $rsvp_body .= '<p><strong>Costumes:</strong> <span id="confirm_costumes">' . htmlspecialchars_uni(implode(', ', $signup_costumes)) . '</span></p>'
             . $costumes_from_api_notice;
     }
 }
