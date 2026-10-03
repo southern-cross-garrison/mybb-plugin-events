@@ -950,6 +950,92 @@ function events_attendance_day_items(array $event_days, array $role_days)
 }
 
 /**
+ * Shows who the Legion ID being typed into the prerequisites step belongs to - name,
+ * garrison and approved costumes - so a member can see what they are linking before they
+ * save it. Looked up through xmlhttp.php (events_xmlhttp_legion_lookup()) rather than from
+ * the browser, so the API's address and its CORS rules stay the server's business.
+ *
+ * An enhancement only: the step saves the same thing with the script off, and an API that
+ * cannot be asked simply shows nothing.
+ *
+ * @return string
+ */
+function events_legion_lookup_script()
+{
+    return <<<'SCRIPT'
+<script type="text/javascript">
+(function() {
+	var input = document.getElementById('prereq_tk_id');
+	var out = document.getElementById('prereq_tk_id_lookup');
+	if(!input || !out || !input.form || !window.fetch) { return; }
+
+	var key = input.form.elements['my_post_key'] ? input.form.elements['my_post_key'].value : '';
+	var timer = null;
+	var asked = null;
+	var latest = 0;
+
+	function escape(text) {
+		var node = document.createElement('div');
+		node.textContent = text;
+		return node.innerHTML;
+	}
+
+	function show(html) {
+		out.innerHTML = html;
+		out.hidden = html === '';
+	}
+
+	function render(data) {
+		if(data.status === 'not_found') {
+			return '<p class="events_legion_lookup_none">No 501st member found with this Legion ID.</p>';
+		}
+		if(data.status !== 'found') {
+			return '';
+		}
+
+		var html = '<p class="events_legion_lookup_member"><strong>' + escape(data.name) + '</strong>'
+			+ (data.garrison ? ' - ' + escape(data.garrison) : '') + '</p>';
+		if(data.costumes.length) {
+			html += '<ul class="events_legion_lookup_costumes">';
+			for(var i = 0; i < data.costumes.length; i++) {
+				html += '<li>' + escape(data.costumes[i]) + '</li>';
+			}
+			html += '</ul>';
+		} else {
+			html += '<p class="events_legion_lookup_none">No approved costumes.</p>';
+		}
+		return html;
+	}
+
+	function lookup() {
+		var id = input.value.replace(/\D/g, '').replace(/^0+/, '');
+		if(id === asked) { return; }
+		asked = id;
+
+		var mine = ++latest;
+		if(id === '') {
+			show('');
+			return;
+		}
+
+		fetch('xmlhttp.php?action=events_legion_lookup&legion_id=' + encodeURIComponent(id)
+			+ '&my_post_key=' + encodeURIComponent(key), { credentials: 'same-origin' })
+			.then(function(response) { return response.json(); })
+			.then(function(data) { if(mine === latest) { show(render(data)); } })
+			['catch'](function() { if(mine === latest) { show(''); } });
+	}
+
+	input.addEventListener('input', function() {
+		clearTimeout(timer);
+		timer = setTimeout(lookup, 400);
+	});
+	lookup();
+})();
+</script>
+SCRIPT;
+}
+
+/**
  * The script that keeps the attendance step's two questions from contradicting each other.
  *
  * "How are you attending?" and the per-day grid are two views of one answer, so the page

@@ -412,6 +412,10 @@ $plugin_settings = array(
     // in MyBB's theme logo property, so the print ribbon is pointed at the file that
     // scripts/install-theme.sh copies in.
     'events_print_logo' => 'images/scg-logo.svg',
+    // Never the real 501st API: the fixtures' Legion IDs belong to real members. This is
+    // the suite's stand-in (tests/stubs/legion-api.php, copied in by global setup), which
+    // answers "down" unless a test says otherwise.
+    'events_legion_api_url' => 'http://localhost/e2e-legion-api.php',
 );
 foreach ($plugin_settings as $name => $value) {
     $db->update_query('settings', array('value' => $db->escape_string((string)$value)), "name = '" . $db->escape_string($name) . "'");

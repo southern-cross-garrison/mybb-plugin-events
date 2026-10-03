@@ -72,6 +72,56 @@ function events_register_hooks()
     $plugins->add_hook("stats_end", "events_hide_threads_in_stats");
     $plugins->add_hook("reputation_vote", "events_hide_thread_in_reputation");
     $plugins->add_hook("class_moderation_copy_thread", "events_refuse_announcement_copy");
+
+    // The signup's prerequisites step shows who a Legion ID belongs to as it is typed.
+    $plugins->add_hook("xmlhttp", "events_xmlhttp_legion_lookup");
+}
+
+/**
+ * xmlhttp.php?action=events_legion_lookup&legion_id=N: who a Legion ID belongs to, from the
+ * 501st Legion API, so a member typing theirs in can see what they are linking.
+ *
+ * Answers {"status": "found", "name", "garrison", "costumes"}, {"status": "not_found"} or
+ * {"status": "unavailable"} when the API cannot be asked. For members only, and carrying
+ * the post key, so the board is not an open relay to the API.
+ *
+ * @return void
+ */
+function events_xmlhttp_legion_lookup()
+{
+    global $mybb, $lang, $charset;
+
+    if($mybb->get_input('action') !== 'events_legion_lookup')
+    {
+        return;
+    }
+
+    if(empty($mybb->user['uid']) || !verify_post_check($mybb->get_input('my_post_key'), true))
+    {
+        xmlhttp_error($lang->invalid_post_code);
+    }
+
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_legion_api.php";
+
+    $member = events_legion_api_member(events_legion_id_number($mybb->get_input('legion_id')));
+    if($member === null)
+    {
+        $result = array('status' => 'unavailable');
+    }
+    elseif(!$member['found'])
+    {
+        $result = array('status' => 'not_found');
+    }
+    else
+    {
+        $result = array('status' => 'found') + $member;
+        unset($result['found']);
+    }
+
+    header("Content-type: application/json; charset={$charset}");
+    echo json_encode($result);
+    exit;
 }
 
 /**
@@ -1704,6 +1754,7 @@ function events_admin_log_action(&$args)
         'status'         => 'Set ' . $edit_link . ' to {3}',
         // No link: there is nothing left to open.
         'delete'         => 'Deleted event #{1} ({2})',
+        'remove_signup'  => 'Removed {3} from ' . $edit_link . ' - {4}',
     );
 
     $action = $args['logitem']['action'];

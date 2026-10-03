@@ -1,10 +1,11 @@
 import { test as base, expect, Page } from '@playwright/test';
 import { resetPluginData, restoreBoardContent, deletePrivateMessages, alignUserActivityToClock } from './db';
 import { resetToTestNow, resetClock, readContainerClock } from './clock';
+import { resetLegionApiStub } from './legion-api';
 
 /**
- * Every test starts with no plugin data, the forums as the snapshot has them, and the
- * container clock parked at TEST_NOW, so scenarios are built from absolute dates rather
+ * Every test starts with no plugin data, the forums as the snapshot has them, the 501st
+ * API stand-in answering "down", and the container clock parked at TEST_NOW, so scenarios are built from absolute dates rather
  * than the real wall clock.
  */
 export const test = base.extend<{ cleanBoard: void }>({
@@ -13,6 +14,7 @@ export const test = base.extend<{ cleanBoard: void }>({
       await resetPluginData();
       await restoreBoardContent();
       await deletePrivateMessages();
+      resetLegionApiStub();
       await moveClock(resetToTestNow);
       await use();
     },

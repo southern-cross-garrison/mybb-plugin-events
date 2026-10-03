@@ -29,57 +29,6 @@ function events_nudge_default_subject()
 }
 
 /**
- * Why this member cannot be sent a PM from $from_uid, or '' when they can.
- *
- * Asked by the plugin rather than left to MyBB, because the PM handler waves every one of
- * these through for a sender whose group can override PM settings - which an
- * administrator's normally can - and a member who has turned PMs off has asked not to get
- * them, whoever from. The checks are MyBB's own, in the order it makes them.
- *
- * @param array $user The recipient's users row
- * @param int $from_uid
- * @return string Unescaped
- */
-function events_nudge_pm_block_reason(array $user, $from_uid)
-{
-    global $mybb;
-
-    $name = $user['username'];
-
-    if(empty($mybb->settings['enablepms']))
-    {
-        return "Private messaging is turned off on this board.";
-    }
-
-    if(empty($user['receivepms']))
-    {
-        return $name . " has turned off private messages.";
-    }
-
-    $permissions = user_permissions((int)$user['uid']);
-    if(empty($permissions['canusepms']))
-    {
-        return $name . "'s user group cannot use private messages.";
-    }
-
-    $from = ',' . (int)$from_uid . ',';
-
-    if(!empty($user['ignorelist']) && strpos(',' . $user['ignorelist'] . ',', $from) !== false)
-    {
-        return $name . " has you on their ignore list.";
-    }
-
-    // MyBB reads an empty buddy list as nobody to restrict to, and so does this.
-    if(!empty($mybb->settings['allowbuddyonly']) && !empty($user['receivefrombuddy'])
-        && !empty($user['buddylist']) && strpos(',' . $user['buddylist'] . ',', $from) === false)
-    {
-        return $name . " only accepts private messages from their buddies.";
-    }
-
-    return '';
-}
-
-/**
  * Each member's last troop, over everything counted rather than the report's filters: a
  * draft that says "your last troop was" must not name one they have since outdone.
  *
@@ -287,7 +236,7 @@ function events_admin_nudge_links(array $rows, $report_url)
             . ' data-uid="' . $uid . '"'
             . ' data-username="' . htmlspecialchars_uni($user['username']) . '"'
             . ' data-draft="' . str_replace("\n", "&#10;", htmlspecialchars_uni($draft)) . '"'
-            . ' data-pm-blocked="' . htmlspecialchars_uni(events_nudge_pm_block_reason($user, (int)$mybb->user['uid'])) . '"'
+            . ' data-pm-blocked="' . htmlspecialchars_uni(events_pm_block_reason($user, (int)$mybb->user['uid'])) . '"'
             . '>Nudge&hellip;</a>';
     }
 
@@ -316,7 +265,7 @@ function events_admin_nudge_action($return_url)
         admin_redirect($return_url);
     }
 
-    $blocked = events_nudge_pm_block_reason($user, (int)$mybb->user['uid']);
+    $blocked = events_pm_block_reason($user, (int)$mybb->user['uid']);
     $errors = array();
 
     if($mybb->request_method == "post")
@@ -368,27 +317,9 @@ function events_admin_nudge_action($return_url)
  */
 function events_nudge_send_pm(array $user, $subject, $message, array &$errors)
 {
-    global $mybb;
-
-    require_once MYBB_ROOT . "inc/datahandlers/pm.php";
-
-    $pmhandler = new PMDataHandler();
-    $pmhandler->set_data(array(
-        'subject'   => $subject,
-        'message'   => $message,
-        'fromid'    => (int)$mybb->user['uid'],
-        'toid'      => array((int)$user['uid']),
-        'ipaddress' => my_inet_pton(get_ip()),
-        // A copy in the sender's Sent Items, so there is a record of who was nudged.
-        'options'   => array('savecopy' => 1),
-    ));
-
-    if(!$pmhandler->validate_pm())
+    $pmhandler = events_member_pm($user, $subject, $message, $errors);
+    if(!$pmhandler)
     {
-        foreach($pmhandler->get_friendly_errors() as $error)
-        {
-            $errors[] = $error;
-        }
         return false;
     }
 
@@ -405,7 +336,7 @@ function events_nudge_send_pm(array $user, $subject, $message, array &$errors)
  * @param array $user
  * @param string $subject
  * @param string $message
- * @param string $blocked From events_nudge_pm_block_reason()
+ * @param string $blocked From events_pm_block_reason()
  * @param string $return_url Unescaped
  */
 function events_admin_output_nudge_page(array $user, $subject, $message, $blocked, $return_url)

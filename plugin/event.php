@@ -6,12 +6,13 @@
 define("IN_MYBB", 1);
 define("THIS_SCRIPT", "event.php");
 
-$templatelist = "events_event,events_event_card,events_rsvp_list,events_attendance";
+$templatelist = "events_event,events_event_card,events_rsvp_list,events_attendance,events_remove_signup";
 
 require_once "./global.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_event_card.php";
+require_once MYBB_ROOT . "inc/plugins/events/inc/events_remove_signup.php";
 
 if(!$mybb->user['uid'])
 {
@@ -412,6 +413,63 @@ if($action === 'attendance')
     );
 
     eval("\$page = \"" . $templates->get("events_attendance") . "\";");
+    output_page($page);
+    exit;
+}
+
+// ---------------------------------------------------------------------------
+// Removing a signup
+// ---------------------------------------------------------------------------
+// Posted from the dialog the card's X opens, or from this page, which is where the X goes
+// with the script off and where a dialog whose PM was refused comes back to.
+if($action === 'remove_signup')
+{
+    if(!$is_gec)
+    {
+        error_no_permission();
+    }
+
+    $remove_user = get_user($mybb->get_input('uid', MyBB::INPUT_INT));
+    if(!$remove_user || empty(events_get_user_signup($event_id, (int)$remove_user['uid'])))
+    {
+        error("That member is not signed up to this event.");
+    }
+
+    $remove_errors = array();
+
+    if($mybb->request_method == "post")
+    {
+        verify_post_check($mybb->get_input('my_post_key'));
+
+        $notify = $mybb->get_input('notify');
+        if(!in_array($notify, array('pm', 'copy', 'none'), true))
+        {
+            $notify = 'none';
+        }
+
+        $remove_subject = trim($mybb->get_input('remove_subject'));
+        // A textarea submits CRLF, and the draft it started from is LF.
+        $remove_message = trim(str_replace("\r\n", "\n", $mybb->get_input('remove_message')));
+
+        if(events_remove_signup_submit($event, $remove_user, $notify, $remove_subject, $remove_message, $remove_errors))
+        {
+            redirect(events_event_url($event), htmlspecialchars_uni($remove_user['username']) . " has been removed from the event.");
+        }
+    }
+    else
+    {
+        $remove_subject = events_remove_signup_subject($event);
+        $remove_message = implode('', events_remove_signup_draft($event, $remove_user, $mybb->user['username']));
+    }
+
+    $remove_username = htmlspecialchars_uni($remove_user['username']);
+    $remove_signup_form = events_remove_signup_page_form($event, $remove_user, $remove_subject, $remove_message, $remove_errors);
+
+    add_breadcrumb("Remove " . $remove_username, "event.php?id=" . $event_id . "&amp;action=remove_signup&amp;uid=" . (int)$remove_user['uid']);
+
+    $events_print_header = '';
+
+    eval("\$page = \"" . $templates->get("events_remove_signup") . "\";");
     output_page($page);
     exit;
 }

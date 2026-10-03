@@ -17,6 +17,7 @@ if(!defined("IN_MYBB"))
 
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
+require_once MYBB_ROOT . "inc/plugins/events/inc/events_remove_signup.php";
 
 /**
  * The event card: details, signup actions, who is attending and the coordinator controls.
@@ -309,6 +310,22 @@ function events_render_event_card(array $event, $thread_id = 0)
         $filter_day_select = '<label>Day: <select name="filter_day" id="filter_day" class="events_select">' . $options . '</select></label> ';
     }
 
+    // The X a coordinator removes a signup with, one per member even when they hold two
+    // rows: removing is the whole signup either way.
+    $remove_links = array();
+    $remove_link = function($uid) use ($is_gec, $event, &$remove_links) {
+        if(!$is_gec)
+        {
+            return '';
+        }
+        if(!isset($remove_links[$uid]))
+        {
+            $user = get_user($uid);
+            $remove_links[$uid] = $user ? events_remove_signup_link($event, $user) : '';
+        }
+        return $remove_links[$uid];
+    };
+
     $rsvp_rows = '';
     foreach($attendees as $attendee)
     {
@@ -346,7 +363,7 @@ function events_render_event_card(array $event, $thread_id = 0)
             $rsvp_rows .= '<span class="rsvp_detail ' . $class . '">' . $value . '</span>';
         }
 
-        $rsvp_rows .= '</li>';
+        $rsvp_rows .= $remove_link((int)$attendee['uid']) . '</li>';
     }
 
     $rsvp_list_count = count($attendees);
@@ -367,7 +384,9 @@ function events_render_event_card(array $event, $thread_id = 0)
     // panel's toggle away.
     $rsvp_filter_empty = ($filter_costume_field === '' && $filter_day_select === '') ? ' data-empty="1"' : '';
 
-    $rsvp_waitlist = events_render_card_waitlist($event_id, $event_days, $filter_costume, $filter_day);
+    $rsvp_waitlist = events_render_card_waitlist($event_id, $event_days, $filter_costume, $filter_day, $remove_link);
+
+    $rsvp_remove_dialog = $is_gec ? events_remove_signup_dialog($event) : '';
 
     eval("\$rsvp_list = \"" . $templates->get("events_rsvp_list") . "\";");
 
@@ -393,9 +412,10 @@ function events_render_event_card(array $event, $thread_id = 0)
  * @param array $event_days
  * @param string $filter_costume
  * @param int $filter_day
+ * @param callable|null $remove_link uid => the row's X, '' for none
  * @return string HTML
  */
-function events_render_card_waitlist($event_id, array $event_days, $filter_costume, $filter_day)
+function events_render_card_waitlist($event_id, array $event_days, $filter_costume, $filter_day, $remove_link = null)
 {
     $waiting = array();
     foreach(events_rsvp_roles() as $role)
@@ -440,6 +460,7 @@ function events_render_card_waitlist($event_id, array $event_days, $filter_costu
         }
 
         $rows .= '<span class="rsvp_detail rsvp_date">' . events_format_date($member['queued_at']) . '</span>'
+            . ($remove_link ? $remove_link((int)$member['uid']) : '')
             . '</li>';
     }
 

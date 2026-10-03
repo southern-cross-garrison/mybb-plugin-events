@@ -248,6 +248,32 @@ test.describe('an event is its discussion thread', () => {
     await expect(page.locator('#posts .post_body').last()).toContainText('Count me in for the Saturday.');
   });
 
+  // The card has no .post_body, so an event thread with no replies is the one page where
+  // thread.js gets through Thread.quickEdit() on load and posts quick reply over AJAX. If
+  // anything then throws after the reply lands - it did while the theme linked a jeditable
+  // file that 404s - the reply is saved but the spinner never clears.
+  test('quick reply posts into an event thread without leaving the page', async ({ page }) => {
+    const eventId = await createEvent({ title: unique('Quick Reply Troop') });
+    const threadId = await announce(eventId);
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/showthread.php?tid=${threadId}`);
+    const errors: string[] = [];
+    page.on('pageerror', error => errors.push(error.message));
+    // A full-page submit would drop this; the AJAX reply keeps it.
+    await page.evaluate(() => { (window as any).eventsQuickReplyMarker = true; });
+
+    const form = page.locator('#quick_reply_form');
+    await form.locator('textarea[name="message"]').fill('Quick reply to the event.');
+    await form.locator('#quick_reply_submit').click();
+
+    await expect(page.locator('#posts .post_body').last()).toContainText('Quick reply to the event.');
+    await expect(page.locator('#quickreply_spinner')).toBeHidden();
+    await expect(form.locator('textarea[name="message"]')).toHaveValue('');
+    expect(await page.evaluate(() => (window as any).eventsQuickReplyMarker)).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
   test('an event thread in its forum links to the top, not to the first unread reply', async ({ page }) => {
     const eventId = await createEvent({ title: unique('Unread Thread Troop') });
     const threadId = await announce(eventId);

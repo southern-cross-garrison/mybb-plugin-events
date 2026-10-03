@@ -329,6 +329,22 @@
 	border-radius: 3px;
 }
 
+/* Who the Legion ID being typed belongs to, under the field on the prerequisites step. */
+.events_legion_lookup {
+	margin-top: 8px;
+	padding: 8px 12px;
+	line-height: 1.45;
+	background: var(--events-lookup, rgba(47, 111, 159, 0.08));
+	border-left: 4px solid var(--events-accent, #2f6f9f);
+	border-radius: 3px;
+}
+.events_legion_lookup[hidden] { display: none; }
+.events_legion_lookup p { margin: 0; }
+.events_legion_lookup_costumes { margin: 4px 0 0; padding-left: 18px; }
+
+/* Under the costumes it is about, on the signup's costumes and confirm steps. */
+.rsvp_costumes_notice { margin-top: 12px; }
+
 /* The sentence the notice sits under, which is ordinary instruction rather than part of
    the box - so it keeps its own spacing and the notice does not inherit the gap. */
 .troop_report_intro { margin: 0 0 12px; }
@@ -1159,6 +1175,76 @@ a.events_feed_split_main:hover, .events_feed_split_toggle:hover { filter: bright
 #calendar_feed_copy_button[hidden] { display: none; }
 .events_feed_actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
 .events_feed_form { display: inline; margin: 0; }
+
+/* ---------------------------------------------------------------------------
+ * Removing a signup - the coordinator's X on each signup row, and the dialog it opens
+ * ------------------------------------------------------------------------ */
+a.rsvp_remove, a.rsvp_remove:link, a.rsvp_remove:visited {
+	display: inline-block; margin-left: 8px; padding: 0 7px; border-radius: 4px; vertical-align: -1px;
+	font-size: 1.3em; font-weight: bold; line-height: 1.2; color: #a33; text-decoration: none; opacity: 0.7;
+}
+a.rsvp_remove:hover, a.rsvp_remove:focus { opacity: 1; background: rgba(170, 51, 51, 0.1); color: #a33; text-decoration: none; }
+
+.events_modal {
+	position: fixed; z-index: 1000; top: 0; right: 0; bottom: 0; left: 0;
+	display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+/* `hidden` is what the script toggles, and a display rule would out-specify it. */
+.events_modal[hidden] { display: none; }
+.events_modal_backdrop { position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: rgba(0, 0, 0, 0.55); }
+.events_modal_card {
+	position: relative; box-sizing: border-box; width: 560px; max-width: 100%; max-height: 100%; overflow-y: auto;
+	margin: 0; padding: 18px 20px 16px; color: #333; background: #fff;
+	border-radius: 6px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+}
+.events_modal_head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.events_modal_title { margin: 0; font-size: 1.15em; }
+.events_modal_close {
+	flex: none; margin: -6px -8px 0 0; padding: 0 8px; border: 0; background: none;
+	font-size: 1.6em; line-height: 1.2; color: inherit; opacity: 0.6; cursor: pointer;
+}
+.events_modal_close:hover, .events_modal_close:focus { opacity: 1; }
+.events_modal_field[hidden], .events_modal_card .events_notice[hidden] { display: none; }
+.events_modal_card .events_input { box-sizing: border-box; width: 100%; }
+
+.events_remove_actions { display: flex; flex-wrap: wrap; flex-direction: row-reverse; justify-content: flex-start; gap: 8px; margin-top: 14px; }
+#remove_signup_page .events_remove_actions { flex-direction: row; }
+.events_remove_actions button.event_action { cursor: pointer; font-family: inherit; }
+.events_remove_actions [hidden] { display: none; }
+
+/* A split button: the main way to remove, and a caret that opens the others under it.
+   Buttons rather than the feed's links, so both take the fill from the same rule. */
+.events_split { display: inline-flex; position: relative; align-items: stretch; }
+.events_split_main, .events_split_toggle {
+	background: var(--events-accent, #2f6f9f); border: 1px solid var(--events-accent-border, #2a6390); color: #fff;
+	font: inherit; font-weight: 600; font-size: 0.95em; line-height: 1.2; cursor: pointer;
+}
+.events_split_main { padding: 8px 15px; border-radius: 4px 0 0 4px; }
+.events_split_main[hidden] { display: none; }
+.events_split_main:hover, .events_split_toggle:hover { filter: brightness(1.08); }
+.events_split_menu { display: flex; margin: 0; }
+.events_split_toggle {
+	display: flex; align-items: center; height: 100%; box-sizing: border-box; padding: 0 11px;
+	border-radius: 0 4px 4px 0; border-left-color: rgba(255, 255, 255, 0.45); list-style: none;
+}
+.events_split_toggle::-webkit-details-marker { display: none; }
+.events_split_toggle::after {
+	content: ""; width: 0; height: 0;
+	border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid currentColor;
+}
+.events_split_list {
+	position: absolute; top: 100%; right: 0; z-index: 10; margin-top: 4px; min-width: 100%;
+	box-sizing: border-box; padding: 4px 0; background: #fff; color: #333;
+	border: 1px solid rgba(0, 0, 0, 0.15); border-radius: 4px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.events_split_list button {
+	display: block; width: 100%; padding: 8px 14px; border: 0; background: none; color: inherit;
+	font: inherit; text-align: left; white-space: nowrap; cursor: pointer;
+}
+.events_split_list button:hover, .events_split_list button:focus { background: rgba(0, 0, 0, 0.05); }
+.events_split_list button[hidden] { display: none; }
+/* At the foot of the dialog, which scrolls and so clips anything hanging below it. */
+.events_modal .events_split_list { top: auto; bottom: 100%; margin: 0 0 4px; }
 
 @media print {
 	/* Hide everything that is neither the plugin's page nor an ancestor holding it in

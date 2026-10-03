@@ -364,6 +364,25 @@ Steps 5 and 6 only appear when they apply: the TK ID is only asked for once a da
 trooped, and the costumes step does not exist for a signup that is wrangling throughout. A
 wrangler with a complete profile therefore answers one question and confirms.
 
+### Costumes from the 501st Legion API
+
+Every time a member answers step 4 with any day trooped, their approved costumes are
+fetched from the 501st Legion's public API by the Legion ID on their profile, and written
+over their costume field one per line as `<designation> - <costume>`, e.g.
+`TK - Stormtrooper: ANH Stunt`. Steps 5 and 6 then work from that list. A comma in a
+costume's name is dropped, since the field is also read as a comma separated list.
+
+When the API is down, slow (over 5 seconds), answers with an error, has no record of the
+Legion ID or lists no costumes for it, the field is left as it is and the signup uses the
+costumes on file - or, if there are none, asks for them in step 5 as usual. Nothing is
+fetched for a member with no Legion ID on file, or for a signup that is wrangling
+throughout.
+
+The API's address is **501st Legion API** in Admin CP → Event Management → Settings, and
+starts as `https://api.501st.com`. Leave it blank to use only the costumes on members'
+profiles. The fetch needs PHP's curl extension; without it the board behaves as if the API
+were down.
+
 Signups close at the event's signup cutoff. Events with no cutoff stay open until the event
 ends, so a late signup can still be recorded.
 

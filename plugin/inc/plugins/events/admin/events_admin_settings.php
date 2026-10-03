@@ -184,11 +184,20 @@ function events_admin_settings()
             $wwcc_name = EVENTS_DEFAULT_WWCC_NAME;
         }
 
+        // Blank turns the fetch off; anything else is requested by the server, so it has
+        // to be a web address.
+        $legion_api_url = trim($mybb->get_input('legion_api_url'));
+        if($legion_api_url !== '' && !preg_match('#^https?://[^\s/]+#i', $legion_api_url))
+        {
+            $errors[] = "The 501st Legion API must be a web address starting with http:// or https://, or blank.";
+        }
+
         if($region_plan !== false && empty($errors))
         {
             $settings = array(
                 'events_costume_field' => $mybb->input['costume_field'],
                 'events_tk_id_field' => $mybb->input['tk_id_field'],
+                'events_legion_api_url' => $legion_api_url,
                 'events_wwcc_enabled' => $mybb->get_input('wwcc_enabled', MyBB::INPUT_INT) ? '1' : '0',
                 'events_wwcc_name' => $wwcc_name,
                 'events_wwcc_field' => $mybb->input['wwcc_field'],
@@ -305,6 +314,11 @@ function events_admin_settings()
         "Select the custom profile field that contains TK IDs",
         $form->generate_select_box("tk_id_field", $profile_fields, events_admin_settings_value('tk_id_field', 'events_tk_id_field')));
     
+    $form_container->output_row("501st Legion API",
+        "Members' costumes are fetched from here by their Legion ID when they sign up to troop, replacing the ones on their profile. Leave blank to use only the costumes on their profiles.",
+        $form->generate_text_box("legion_api_url", events_admin_settings_value('legion_api_url', 'events_legion_api_url'), array("id" => "legion_api_url")),
+        "legion_api_url");
+
     // Working with children checks. The name and the profile field only mean anything
     // while the check is on, so they are hidden with it - by script, with the rows left
     // showing when there is none, since they post the same either way.

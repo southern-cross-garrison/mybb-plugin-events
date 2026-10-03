@@ -9,7 +9,7 @@ import { createEvent, createRsvp, execute, getPrivateMessages, queryOne, T, uid 
  * Nudge: each member on the Reports tab's People view has a link that drafts a message
  * encouraging them back out trooping, which the admin edits and then sends as a PM or
  * copies. Sending respects the member's own PM settings, and the dialog says when it
- * cannot - see events_nudge_pm_block_reason().
+ * cannot - see events_pm_block_reason().
  */
 
 const SUBJECT = 'Come trooping with us';
@@ -179,9 +179,9 @@ $cases = array(
 );
 $mybb->settings['enablepms'] = 1;
 $mybb->settings['allowbuddyonly'] = 1;
-foreach($cases as $name => $user) { echo $name, '=', events_nudge_pm_block_reason($user, $from), "\\n"; }
+foreach($cases as $name => $user) { echo $name, '=', events_pm_block_reason($user, $from), "\\n"; }
 $mybb->settings['enablepms'] = 0;
-echo 'board=', events_nudge_pm_block_reason($base, $from), "\\n";
+echo 'board=', events_pm_block_reason($base, $from), "\\n";
 `);
     expect(output).toContain('open=\n');
     expect(output).toContain('off=trooper2 has turned off private messages.');

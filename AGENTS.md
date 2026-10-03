@@ -578,3 +578,13 @@ baseline picks the change up.
   the ignore list and buddy-only altogether, so a nudge from the Admin CP would reach a
   member who had turned PMs off. Anything else that PMs a member on an admin's behalf,
   rather than as a notice from the plugin, has to ask the same question.
+
+- Saying you will troop fetches the member's costumes from the 501st Legion API
+  (`events_sync_user_costumes()`, `events_legion_api.php`) and overwrites the costume
+  profile field, on the attendance step and before the prerequisites step reads it. Nothing
+  short of a member record *with costumes* touches the field. The suite never calls the real
+  API - the fixtures' Legion IDs belong to real members, whose costumes would replace the
+  fixtures'. Provisioning points `events_legion_api_url` at `tests/stubs/legion-api.php`,
+  which global setup copies to the forum root and which answers 503 unless a test stubs an
+  answer (`tests/helpers/legion-api.ts`); the `cleanBoard` fixture clears the stubs. The
+  fetch uses curl directly, not `fetch_remote_file()`, which refuses localhost and waits 10s.

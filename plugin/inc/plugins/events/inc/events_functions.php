@@ -86,6 +86,12 @@ define('EVENTS_DEFAULT_TIMEZONE', 'UTC');
 define('EVENTS_DEFAULT_WWCC_NAME', 'WWCC');
 
 /**
+ * The 501st Legion's public API, which members' costumes are fetched from
+ * (events_legion_api.php).
+ */
+define('EVENTS_DEFAULT_LEGION_API_URL', 'https://api.501st.com');
+
+/**
  * The configured timezone's identifier, or UTC when there is not a usable one.
  *
  * @return string
@@ -2110,6 +2116,102 @@ function events_send_waitlist_pms($event_id, array $moves, $from_uid = null, $sk
 }
 
 /**
+ * Why this member cannot be sent a PM from $from_uid, or '' when they can.
+ *
+ * Asked by the plugin rather than left to MyBB, because the PM handler waves every one of
+ * these through for a sender whose group can override PM settings - which an
+ * administrator's normally can - and a member who has turned PMs off has asked not to get
+ * them, whoever from. The checks are MyBB's own, in the order it makes them. Anything
+ * that PMs a member on somebody's behalf, rather than as a notice from the plugin, asks
+ * this first: the Reports tab's nudge and a coordinator removing a signup.
+ *
+ * @param array $user The recipient's users row
+ * @param int $from_uid
+ * @return string Unescaped
+ */
+function events_pm_block_reason(array $user, $from_uid)
+{
+    global $mybb;
+
+    $name = $user['username'];
+
+    if(empty($mybb->settings['enablepms']))
+    {
+        return "Private messaging is turned off on this board.";
+    }
+
+    if(empty($user['receivepms']))
+    {
+        return $name . " has turned off private messages.";
+    }
+
+    $permissions = user_permissions((int)$user['uid']);
+    if(empty($permissions['canusepms']))
+    {
+        return $name . "'s user group cannot use private messages.";
+    }
+
+    $from = ',' . (int)$from_uid . ',';
+
+    if(!empty($user['ignorelist']) && strpos(',' . $user['ignorelist'] . ',', $from) !== false)
+    {
+        return $name . " has you on their ignore list.";
+    }
+
+    // MyBB reads an empty buddy list as nobody to restrict to, and so does this.
+    if(!empty($mybb->settings['allowbuddyonly']) && !empty($user['receivefrombuddy'])
+        && !empty($user['buddylist']) && strpos(',' . $user['buddylist'] . ',', $from) === false)
+    {
+        return $name . " only accepts private messages from their buddies.";
+    }
+
+    return '';
+}
+
+/**
+ * A PM from the current user to one member, validated and ready for insert_pm(), or null
+ * with $errors filled with MyBB's reasons for refusing it.
+ *
+ * Validated apart from sending so that a caller can refuse to act until it knows the PM
+ * will go - a signup removed with a message the board then will not deliver is a member
+ * dropped without being told why.
+ *
+ * @param array $user The recipient's users row
+ * @param string $subject
+ * @param string $message
+ * @param array $errors
+ * @return PMDataHandler|null
+ */
+function events_member_pm(array $user, $subject, $message, array &$errors)
+{
+    global $mybb;
+
+    require_once MYBB_ROOT . "inc/datahandlers/pm.php";
+
+    $pmhandler = new PMDataHandler();
+    $pmhandler->set_data(array(
+        'subject'   => $subject,
+        'message'   => $message,
+        'fromid'    => (int)$mybb->user['uid'],
+        'toid'      => array((int)$user['uid']),
+        'ipaddress' => my_inet_pton(get_ip()),
+        // A copy in the sender's Sent Items, so there is a record of what was said.
+        'options'   => array('savecopy' => 1),
+    ));
+
+    if(!$pmhandler->validate_pm())
+    {
+        foreach($pmhandler->get_friendly_errors() as $error)
+        {
+            $errors[] = $error;
+        }
+        return null;
+    }
+
+    return $pmhandler;
+}
+
+/**
  * Remove everything the plugin holds against members who no longer exist.
  *
  * A signup left behind by a deleted member is on no attendance list - those join the
@@ -2308,6 +2410,27 @@ function events_check_prerequisites($event, $user_id = null, $roles = 'trooper')
         {
             $missing[$field] = true;
         }
+    }
+
+    return $missing;
+}
+
+/**
+ * The missing prerequisites the prerequisites step asks for this time round.
+ *
+ * Costumes wait until everything else is in: a Legion ID entered on the step is looked up
+ * in the 501st Legion API (events_sync_user_costumes()), which normally fills the costume
+ * field, so a member is only asked to type costumes in when that came up empty. The step
+ * is then shown again with the costume field alone.
+ *
+ * @param array $missing field key => true, from events_check_prerequisites()
+ * @return array field key => true
+ */
+function events_prerequisites_to_ask(array $missing)
+{
+    if(isset($missing['costume']) && count($missing) > 1)
+    {
+        unset($missing['costume']);
     }
 
     return $missing;
@@ -2826,10 +2949,12 @@ function events_can_create_troop_report($event, $user_id = null)
  *
  * The log renders a row by passing its data to $lang->sprintf() in order, so $data is a
  * plain list: see events_admin_log_action() for the wording each action gets. Only the
- * two event forms and the Admin CP's status and delete links call this; anything that
- * writes events from the command line (the demo seed, tests) is not an administrator.
+ * two event forms, the Admin CP's status and delete links and a coordinator removing a
+ * signup call this; anything that writes events from the command line (the demo seed,
+ * tests) is not an administrator.
  *
- * @param string $action add, edit, status or delete, with _frontend for manage_event.php
+ * @param string $action add, edit, status or delete, with _frontend for manage_event.php;
+ *                       or remove_signup
  * @param array $data Values for the log line's placeholders, in order
  */
 function events_log_action($action, array $data)

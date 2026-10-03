@@ -29,16 +29,17 @@ test('a member with no userfields row can still complete a signup', async ({ pag
 
   await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
   await page.locator('#prereq_tk_id').fill('12345');
-  // Deleting the row takes the costumes with it, and costumes are a trooper prerequisite,
-  // so this step asks for them too.
-  await page.locator('#prereq_costume').fill(`${TK}\n${TD}`);
   await page.locator('#prereq_preferred_name').fill('Newt');
   await page.locator('#prereq_mobile').fill('0400 111 222');
   await page.locator('#prereq_emergency_contact').fill('Next Of Kin 0400 333 444');
   await page.locator('#rsvp_submit').click();
 
-  // Reaching the next step at all is the assertion: before the fix this was MyBB's SQL
-  // error page, and the values below were never written.
+  // Getting past the step at all is the assertion: before the fix this was MyBB's SQL
+  // error page, and the values below were never written. Deleting the row took the
+  // costumes with it, and the API stand-in is down, so they are asked for next.
+  await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
+  await page.locator('#prereq_costume').fill(`${TK}\n${TD}`);
+  await page.locator('#rsvp_submit').click();
   await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'costumes');
 
   expect(await getUserField('newbie', 'tk_id')).toBe('12345');

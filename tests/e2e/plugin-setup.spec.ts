@@ -20,6 +20,7 @@ test.describe('plugin installation', () => {
       'events_event_form',
       'events_list',
       'events_postbit',
+      'events_remove_signup',
       'events_rsvp_form',
       'events_rsvp_list',
       'events_rsvp_success',

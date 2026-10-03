@@ -7,6 +7,7 @@ import { BASE_URL, DEVENV_DIR, FORUM_DIR, REPO_ROOT } from './helpers/config';
 import { resetClock, readContainerClock } from './helpers/clock';
 import { snapshotUserFields, snapshotBoardContent, closeDb } from './helpers/db';
 import { acquireSuiteLock } from './helpers/suite-lock';
+import { installLegionApiStub } from './helpers/legion-api';
 
 const run = promisify(execFile);
 
@@ -22,6 +23,9 @@ export default async function globalSetup(): Promise<void> {
   await run('./scripts/db-restore.sh', [], { cwd: REPO_ROOT, maxBuffer: 64 * 1024 * 1024 });
 
   await resetClock();
+
+  // Provisioning points the plugin at this rather than at the real 501st API.
+  installLegionApiStub();
 
   // Profile fields are mutated by the RSVP prerequisites tests; keep a pristine copy.
   await snapshotUserFields();

@@ -30,6 +30,7 @@ $templatelist = "events_rsvp_form,events_rsvp_success";
 require_once "./global.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
+require_once MYBB_ROOT . "inc/plugins/events/inc/events_legion_api.php";
 
 if(!$mybb->user['uid'])
 {
@@ -308,6 +309,11 @@ if(!$costume_choice && in_array('trooper', $roles, true))
     $selected_costumes = $user_costumes;
 }
 
+// Whether the costumes on screen are the Legion's, which earns them a notice saying where
+// to look if they are wrong. Decided when the attendance step is answered and carried
+// from there like every other selection.
+$costumes_from_api = $mybb->get_input('costumes_from_api', MyBB::INPUT_INT) === 1;
+
 $errors = array();
 $render = 'attendance';
 // Withdrawing asks nothing of the member's profile: nobody should have to fill in an
@@ -355,13 +361,35 @@ if($mybb->request_method === 'post')
         }
         else
         {
+            // Saying they will troop is when a member's costumes are fetched from the
+            // Legion, before the prerequisites step decides whether to ask for them. Like
+            // the prerequisites save below, everything read from the field is read again.
+            $costumes_from_api = in_array('trooper', $roles, true) && events_sync_user_costumes($mybb->user['uid']);
+            if($costumes_from_api)
+            {
+                $user_costumes = events_get_user_costumes($mybb->user['uid']);
+                if(!$costumes_posted && isset($existing_signup['trooper']))
+                {
+                    $selected_costumes = $existing_signup['trooper']['costumes'];
+                }
+                $selected_costumes = array_values(array_intersect($selected_costumes, $user_costumes));
+                $costume_choice = count($user_costumes) !== 1;
+                if(!$costume_choice)
+                {
+                    $selected_costumes = $user_costumes;
+                }
+                $missing = events_check_prerequisites($event, null, $roles);
+            }
+
             $render = events_signup_next_step('attendance', $roles, $missing, $costume_choice);
         }
     }
     elseif($submitted === 'prerequisites')
     {
+        $asked = events_prerequisites_to_ask($missing);
+
         $values = array();
-        foreach(array_keys($missing) as $field)
+        foreach(array_keys($asked) as $field)
         {
             if(isset($mybb->input[$field]))
             {
@@ -370,6 +398,14 @@ if($mybb->request_method === 'post')
         }
 
         events_save_user_fields($mybb->user['uid'], $values);
+
+        // A Legion ID typed in here is the first the board has known of it, so this is
+        // the attendance step's fetch, a step late - and the reason the costume field
+        // waits until now to be asked for.
+        if(isset($values['tk_id']) && in_array('trooper', $roles, true))
+        {
+            $costumes_from_api = events_sync_user_costumes($mybb->user['uid']);
+        }
 
         // Costumes are one of the prerequisites now, and they were read into
         // $user_costumes long before this POST was handled. Re-read them, or the costumes
@@ -383,9 +419,15 @@ if($mybb->request_method === 'post')
         }
 
         $missing = events_check_prerequisites($event, null, $roles);
-        if(!empty($missing))
+        if(array_intersect_key($asked, $missing))
         {
             $errors[] = 'Please complete every required field.';
+            $render = 'prerequisites';
+        }
+        elseif(!empty($missing))
+        {
+            // Only the costumes are left, held back until the Legion ID had its chance to
+            // fill them in. Asked for now, on their own.
             $render = 'prerequisites';
         }
         else
@@ -613,6 +655,17 @@ $attendance_state = $has_days
       . ($per_day ? '<input type="hidden" name="per_day" value="1" />' : '')
       . events_hidden_map('day_role', $day_choices)
     : '<input type="hidden" name="signup_role" value="' . htmlspecialchars_uni($withdrawing ? 'none' : $solo_role) . '" />';
+if($costumes_from_api)
+{
+    $attendance_state .= '<input type="hidden" name="costumes_from_api" value="1" />';
+}
+
+// The Legion's record is looked up by the Legion ID on the member's profile, so a wrong ID
+// is the likely reason for a wrong list, and the profile is where it is put right.
+$costumes_from_api_notice = $costumes_from_api
+    ? '<p class="events_notice rsvp_costumes_notice" id="rsvp_costumes_from_api">If these costumes are not correct, '
+      . '<a href="usercp.php?action=profile">check that your Legion ID is set correctly in your profile</a> and try again.</p>'
+    : '';
 
 if($rsvp_step === 'attendance')
 {
@@ -766,7 +819,9 @@ elseif($rsvp_step === 'prerequisites')
     $rsvp_carried_state .= $attendance_state;
 
     $labels = events_prerequisite_labels();
-    foreach($missing as $field => $unused)
+    $asked = events_prerequisites_to_ask($missing);
+    $legion_lookup = trim((string)events_get_setting('legion_api_url')) !== '';
+    foreach($asked as $field => $unused)
     {
         $label = $labels[$field];
         $current = htmlspecialchars_uni($mybb->get_input($field));
@@ -795,7 +850,13 @@ elseif($rsvp_step === 'prerequisites')
             . '<span class="events_required" aria-hidden="true">*</span></label>'
             . $control
             . '<span class="events_hint" id="hint_' . $field . '">' . $label['hint'] . '</span>'
+            . ($field === 'tk_id' && $legion_lookup ? '<div class="events_legion_lookup" id="prereq_tk_id_lookup" aria-live="polite" hidden></div>' : '')
             . '</div>';
+    }
+
+    if(isset($asked['tk_id']) && $legion_lookup)
+    {
+        $rsvp_body .= events_legion_lookup_script();
     }
 
     // Being asked for costumes is a fair question, and a wall for somebody who has none
@@ -803,7 +864,7 @@ elseif($rsvp_step === 'prerequisites')
     // point they have hit the problem - the costumes step used to carry this, a step later
     // and only after the field had already stopped them. Costumes are only ever missing
     // for a trooper, so this needs no separate test for the role.
-    if(isset($missing['costume']))
+    if(isset($asked['costume']))
     {
         $rsvp_body .= '<p id="rsvp_wrangle_note" class="events_hint">No costumes to list yet? '
             . '<a href="rsvp.php?id=' . $event_id . '&amp;role=wrangler" id="rsvp_wrangle_instead">'
@@ -835,7 +896,7 @@ elseif($rsvp_step === 'costumes')
             $rsvp_body .= '<label class="events_option costume_option"><input type="checkbox" class="costume_checkbox" id="costume_' . $index . '" name="costumes[]" value="'
                 . htmlspecialchars_uni($costume) . '"' . $checked . ' /> ' . htmlspecialchars_uni($costume) . '</label>';
         }
-        $rsvp_body .= '</div>';
+        $rsvp_body .= '</div>' . $costumes_from_api_notice;
     }
 }
 elseif($rsvp_step === 'confirm' && $withdrawing)
@@ -895,7 +956,8 @@ elseif($rsvp_step === 'confirm')
 
     if(!empty($selected_costumes))
     {
-        $rsvp_body .= '<p><strong>Costumes:</strong> <span id="confirm_costumes">' . htmlspecialchars_uni(implode(', ', $selected_costumes)) . '</span></p>';
+        $rsvp_body .= '<p><strong>Costumes:</strong> <span id="confirm_costumes">' . htmlspecialchars_uni(implode(', ', $selected_costumes)) . '</span></p>'
+            . $costumes_from_api_notice;
     }
 }
 
