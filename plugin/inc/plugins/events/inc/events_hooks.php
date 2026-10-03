@@ -81,7 +81,8 @@ function events_register_hooks()
  * xmlhttp.php?action=events_legion_lookup&legion_id=N: who a Legion ID belongs to, from the
  * 501st Legion API, so a member typing theirs in can see what they are linking.
  *
- * Answers {"status": "found", "name", "garrison", "costumes"}, {"status": "not_found"} or
+ * Answers {"status": "found", "name", "garrison", "costumes"}, {"status": "classified"} (a
+ * member whose details are private on 501st.com, or an ID nobody holds) or
  * {"status": "unavailable"} when the API cannot be asked. For members only, and carrying
  * the post key, so the board is not an open relay to the API.
  *
@@ -111,7 +112,7 @@ function events_xmlhttp_legion_lookup()
     }
     elseif(!$member['found'])
     {
-        $result = array('status' => 'not_found');
+        $result = array('status' => 'classified');
     }
     else
     {

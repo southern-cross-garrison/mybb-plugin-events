@@ -48,7 +48,9 @@ export function legionApiMember(legionId: number, costumes: LegionApiCostume[]):
     body: {
       legionId,
       formattedLegionId: `TK ${legionId}`,
+      fullName: 'Fixture Trooper',
       memberStatus: 'Active',
+      garrisonName: 'Fixture Garrison',
       costumes: costumes.map((costume) => ({
         designation: 'TK',
         designationName: 'Stormtrooper',

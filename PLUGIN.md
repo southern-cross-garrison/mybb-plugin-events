@@ -372,11 +372,20 @@ over their costume field one per line as `<designation> - <costume>`, e.g.
 `TK - Stormtrooper: ANH Stunt`. Steps 5 and 6 then work from that list. A comma in a
 costume's name is dropped, since the field is also read as a comma separated list.
 
-When the API is down, slow (over 5 seconds), answers with an error, has no record of the
-Legion ID or lists no costumes for it, the field is left as it is and the signup uses the
-costumes on file - or, if there are none, asks for them in step 5 as usual. Nothing is
-fetched for a member with no Legion ID on file, or for a signup that is wrangling
-throughout.
+When the API is down, slow (over 5 seconds), answers with an error, lists no costumes, or
+returns a "Classified Record", the field is left as it is and the signup uses the costumes
+on file. A classified record is a member who has made their details private on 501st.com;
+the API answers the same way for an ID nobody holds, so the two cannot be told apart.
+Nothing is fetched for a member with no Legion ID on file, or for a signup that is
+wrangling throughout.
+
+Step 5 asks for costumes last. A member missing their Legion ID is asked for it with the
+other details, it is looked up when they save, and only if that turns up no costumes is
+the step shown again with the costume field on its own. While they type the Legion ID, the
+step shows who it belongs to - name, garrison and approved costumes - looked up through
+`xmlhttp.php?action=events_legion_lookup`, so they can see what they are linking before they
+save it. That lookup needs JavaScript; without it the step works the same, just without the
+preview.
 
 The API's address is **501st Legion API** in Admin CP → Event Management → Settings, and
 starts as `https://api.501st.com`. Leave it blank to use only the costumes on members'

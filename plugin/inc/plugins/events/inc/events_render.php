@@ -986,8 +986,8 @@ function events_legion_lookup_script()
 	}
 
 	function render(data) {
-		if(data.status === 'not_found') {
-			return '<p class="events_legion_lookup_none">No 501st member found with this Legion ID.</p>';
+		if(data.status === 'classified') {
+			return '<p class="events_legion_lookup_none">No public 501st record for this Legion ID.</p>';
 		}
 		if(data.status !== 'found') {
 			return '';

@@ -40,9 +40,9 @@ function events_legion_id_number($tk_id)
  *
  * @param string $legion_id Digits only
  * @return array|null null when the API gave no usable answer (unset, down, slow, an error,
- *                    not JSON). Otherwise 'found' => false for an ID the Legion has no
- *                    public record of, or 'found' => true with 'name', 'garrison' and
- *                    'costumes' (formatted for the profile field, possibly none)
+ *                    not JSON). Otherwise 'found' => false for a classified record, or
+ *                    'found' => true with 'name', 'garrison' and 'costumes' (formatted
+ *                    for the profile field, possibly none)
  */
 function events_legion_api_member($legion_id)
 {
@@ -78,8 +78,9 @@ function events_legion_api_member($legion_id)
         return null;
     }
 
-    // An ID the Legion has no public record of comes back 200 as a bare "Classified
-    // Record": a status and nothing else.
+    // A member who has made their details private on 501st.com comes back 200 as a bare
+    // "Classified Record": a status and nothing else. So does an ID nobody holds - the API
+    // answers the two the same way, so nothing here can tell them apart.
     if(!isset($data['fullName']) || !is_string($data['fullName']))
     {
         return array('found' => false);

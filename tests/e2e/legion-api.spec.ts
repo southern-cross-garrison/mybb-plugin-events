@@ -151,7 +151,8 @@ test.describe('costumes from the 501st Legion API', () => {
   const unusable: Array<[string, Parameters<typeof stubLegionApi>[1]]> = [
     ['an error', { status: 500, body: { message: 'Internal Server Error' } }],
     ['a body that is not JSON', { raw: '<html>Bad Gateway</html>' }],
-    ['a Legion ID it has no record of', { body: { memberStatus: 'Classified Record' } }],
+    // A member who has made their record private on 501st.com, or an ID nobody holds.
+    ['a classified record', { body: { memberStatus: 'Classified Record' } }],
     ['a member with no costumes', legionApiMember(20001, [])],
   ];
   for (const [answer, response] of unusable) {
@@ -296,7 +297,8 @@ test.describe('costumes from the 501st Legion API', () => {
       ]);
 
       await page.locator('#prereq_tk_id').fill('4242');
-      await expect(lookup).toHaveText('No 501st member found with this Legion ID.');
+      // Private on 501st.com, which the API cannot tell apart from an ID nobody holds.
+      await expect(lookup).toHaveText('No public 501st record for this Legion ID.');
 
       // The API down is no answer at all, rather than a claim the ID is unknown.
       await page.locator('#prereq_tk_id').fill('777');
