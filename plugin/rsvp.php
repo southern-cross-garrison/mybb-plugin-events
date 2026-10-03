@@ -99,6 +99,10 @@ $user_costumes = events_get_user_costumes($mybb->user['uid']);
 define('EVENTS_PREAPPROVAL_PREFIX', 'Preapproval: ');
 define('EVENTS_PREAPPROVAL_MAX_LENGTH', 200);
 $preapproval_enabled = events_preapproval_enabled();
+// What a member troops in a preapproved costume under. They confirm they have followed it
+// every time they sign up with one, and the confirmation is only ever carried between the
+// steps, never stored, so an edit asks again.
+$preapproval_requirements = $preapproval_enabled ? events_preapproval_requirements() : null;
 
 /**
  * The text of a stored preapproval costume, or null for a costume from the profile.
@@ -359,6 +363,7 @@ $preapproval_chosen = $preapproval_enabled && $mybb->get_input('costume_preappro
 $preapproval = $preapproval_chosen
     ? my_substr(trim($mybb->get_input('costume_preapproval_text')), 0, EVENTS_PREAPPROVAL_MAX_LENGTH)
     : '';
+$preapproval_agreed = $mybb->get_input('costume_preapproval_agree', MyBB::INPUT_INT) === 1;
 
 if(!$costumes_posted)
 {
@@ -544,6 +549,11 @@ if($mybb->request_method === 'post')
             $errors[] = 'Please select at least one costume.';
             $render = 'costumes';
         }
+        elseif($preapproval !== '' && $preapproval_requirements && !$preapproval_agreed)
+        {
+            $errors[] = 'Please confirm you have followed the preapproval steps.';
+            $render = 'costumes';
+        }
         else
         {
             $render = events_signup_next_step('costumes', $roles, $missing, $costume_choice);
@@ -586,6 +596,11 @@ if($mybb->request_method === 'post')
         elseif(in_array('trooper', $roles, true) && empty($signup_costumes))
         {
             $errors[] = 'Please select at least one costume.';
+            $render = 'costumes';
+        }
+        elseif($preapproval !== '' && $preapproval_requirements && !$preapproval_agreed)
+        {
+            $errors[] = 'Please confirm you have followed the preapproval steps.';
             $render = 'costumes';
         }
         else
@@ -764,6 +779,7 @@ if($costumes_from_api)
 $preapproval_state = $preapproval !== ''
     ? '<input type="hidden" name="costume_preapproval" value="1" />'
       . '<input type="hidden" name="costume_preapproval_text" value="' . htmlspecialchars_uni($preapproval) . '" />'
+      . ($preapproval_agreed ? '<input type="hidden" name="costume_preapproval_agree" value="1" />' : '')
     : '';
 
 // The Legion's record is looked up by the Legion ID on the member's profile, so a wrong ID
@@ -1012,14 +1028,37 @@ elseif($rsvp_step === 'costumes')
             . '<span>Preapproval:</span>'
             . '<input type="text" class="events_input" id="costume_preapproval_text" name="costume_preapproval_text" maxlength="' . EVENTS_PREAPPROVAL_MAX_LENGTH . '"'
             . ' value="' . htmlspecialchars_uni($preapproval) . '" aria-label="Preapproved costume" />'
-            . '</label>'
-            . <<<'SCRIPT'
+            . '</label>';
+
+        // The requirements read like terms to accept: the post in a box of its own, and
+        // the box to tick under it. The script shows them only once a preapproval is
+        // chosen; without it they are always there, and asked about only for one.
+        if($preapproval_requirements)
+        {
+            $rsvp_body .= '<div id="costume_preapproval_requirements">'
+                . '<div class="events_terms" id="costume_preapproval_terms">'
+                . '<h3 class="events_terms_title"><a href="' . get_post_link((int)$preapproval_requirements['pid'], (int)$preapproval_requirements['tid']) . '#pid' . (int)$preapproval_requirements['pid'] . '">'
+                . htmlspecialchars_uni($preapproval_requirements['thread_subject']) . '</a></h3>'
+                . '<div class="events_terms_body">' . events_parse_description($preapproval_requirements['message']) . '</div>'
+                . '</div>'
+                . '<label class="events_option costume_preapproval_agree_option"><input type="checkbox" id="costume_preapproval_agree" name="costume_preapproval_agree" value="1"'
+                . ($preapproval_agreed ? ' checked="checked"' : '') . ' /> '
+                . 'I have followed these steps and have received confirmation of preapproval for this costume for this event</label>'
+                . '</div>';
+        }
+
+        $rsvp_body .= <<<'SCRIPT'
 <script type="text/javascript">
 (function() {
 	var box = document.getElementById('costume_preapproval');
 	var text = document.getElementById('costume_preapproval_text');
-	text.addEventListener('input', function() { box.checked = text.value.trim() !== ''; });
-	box.addEventListener('change', function() { if(box.checked) { text.focus(); } });
+	var requirements = document.getElementById('costume_preapproval_requirements');
+	function update() {
+		if(requirements) { requirements.hidden = !box.checked; }
+	}
+	text.addEventListener('input', function() { box.checked = text.value.trim() !== ''; update(); });
+	box.addEventListener('change', function() { if(box.checked) { text.focus(); } update(); });
+	update();
 })();
 </script>
 SCRIPT;

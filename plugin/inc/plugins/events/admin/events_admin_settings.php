@@ -77,6 +77,47 @@ function events_admin_forum_input($value)
 }
 
 /**
+ * The post id a "Preapproval Requirements" entry names: a bare id, or a link to the post
+ * as the board writes one - showthread.php?pid=, an anchor #pid, or a search-friendly
+ * post-N.html. A link to a thread names its first post.
+ *
+ * @param string $value
+ * @return int|null 0 for blank, null for something that names no post
+ */
+function events_admin_preapproval_post_id($value)
+{
+    global $db;
+
+    $value = trim((string)$value);
+    if($value === '')
+    {
+        return 0;
+    }
+
+    if(preg_match('/^\d+$/', $value))
+    {
+        $pid = (int)$value;
+    }
+    elseif(preg_match('/(?:[?&;]pid=|#pid|\bpost-)(\d+)/i', $value, $match))
+    {
+        $pid = (int)$match[1];
+    }
+    elseif(preg_match('/(?:[?&;]tid=|\bthread-)(\d+)/i', $value, $match))
+    {
+        $thread = get_thread((int)$match[1]);
+        $pid = $thread ? (int)$thread['firstpost'] : 0;
+    }
+    else
+    {
+        return null;
+    }
+
+    $query = $db->simple_select("posts", "pid", "pid = " . $pid . " AND visible = 1", array("limit" => 1));
+
+    return $pid > 0 && $db->fetch_field($query, "pid") ? $pid : null;
+}
+
+/**
  * A fingerprint of every stored plugin setting, which the settings form carries so a
  * save can tell whether it is overwriting a state it was never shown.
  *
@@ -192,6 +233,14 @@ function events_admin_settings()
             $errors[] = "The 501st Legion API must be a web address starting with http:// or https://, or blank.";
         }
 
+        // Stored as the post's id, whichever way the admin named it, so a thread moved to
+        // another forum or a board switching to search-friendly URLs still finds it.
+        $preapproval_post = events_admin_preapproval_post_id($mybb->get_input('preapproval_post'));
+        if($preapproval_post === null)
+        {
+            $errors[] = "Preapproval Requirements must be a link to a post on this board, its post ID, or blank.";
+        }
+
         if($region_plan !== false && empty($errors))
         {
             $settings = array(
@@ -200,6 +249,7 @@ function events_admin_settings()
                 'events_legion_api_url' => $legion_api_url,
                 'events_wwcc_enabled' => $mybb->get_input('wwcc_enabled', MyBB::INPUT_INT) ? '1' : '0',
                 'events_preapproval_enabled' => $mybb->get_input('preapproval_enabled', MyBB::INPUT_INT) ? '1' : '0',
+                'events_preapproval_post' => $preapproval_post ? (string)$preapproval_post : '',
                 'events_wwcc_name' => $wwcc_name,
                 'events_wwcc_field' => $mybb->input['wwcc_field'],
                 'events_mobile_field' => $mybb->input['mobile_field'],
@@ -326,6 +376,23 @@ function events_admin_settings()
             array("id" => "preapproval_enabled_yes"), array("id" => "preapproval_enabled_no")),
         "", array(), array("id" => "row_preapproval_enabled"));
 
+    // Shown back as a link to the post rather than the bare id it is stored as.
+    $preapproval_pid = (int)events_get_setting('preapproval_post');
+    if($mybb->request_method == "post")
+    {
+        $preapproval_post_value = $mybb->get_input('preapproval_post');
+    }
+    else
+    {
+        $preapproval_post_value = $preapproval_pid > 0
+            ? $mybb->settings['bburl'] . '/' . get_post_link($preapproval_pid) . '#pid' . $preapproval_pid
+            : '';
+    }
+    $form_container->output_row("Preapproval Requirements",
+        "A post setting out what a member must do to be preapproved. A member using a preapproved costume is shown it and has to confirm they have followed it each time they sign up. Paste a link to the post, or leave blank to ask for nothing.",
+        $form->generate_text_box("preapproval_post", $preapproval_post_value, array("id" => "preapproval_post")),
+        "preapproval_post", array(), array("id" => "row_preapproval_post"));
+
     // Working with children checks. The name and the profile field only mean anything
     // while the check is on, so they are hidden with it - by script, with the rows left
     // showing when there is none, since they post the same either way.
@@ -419,6 +486,19 @@ function events_admin_settings()
             if (rows[i]) { rows[i].style.display = yes.checked ? '' : 'none'; }
         }
     }
+
+    yes.addEventListener('change', update);
+    no.addEventListener('change', update);
+    update();
+})();
+
+(function () {
+    var yes = document.getElementById('preapproval_enabled_yes');
+    var no = document.getElementById('preapproval_enabled_no');
+    var row = document.getElementById('row_preapproval_post');
+    if (!yes || !no || !row) { return; }
+
+    function update() { row.style.display = yes.checked ? '' : 'none'; }
 
     yes.addEventListener('change', update);
     no.addEventListener('change', update);

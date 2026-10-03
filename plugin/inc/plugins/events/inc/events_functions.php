@@ -47,6 +47,33 @@ function events_preapproval_enabled()
 }
 
 /**
+ * The post a member troops in a preapproved costume under the terms of, or null when the
+ * board names none. A post that has since been deleted or unapproved counts as none, so a
+ * stale setting cannot leave members agreeing to steps nobody can read.
+ *
+ * @return array|null The post row, with the thread's subject as 'thread_subject'
+ */
+function events_preapproval_requirements()
+{
+    global $db;
+
+    $pid = (int)events_get_setting('preapproval_post');
+    if($pid <= 0)
+    {
+        return null;
+    }
+
+    $query = $db->write_query("SELECT p.pid, p.tid, p.fid, p.message, t.subject AS thread_subject
+        FROM `" . TABLE_PREFIX . "posts` p
+        INNER JOIN `" . TABLE_PREFIX . "threads` t ON t.tid = p.tid
+        WHERE p.pid = " . $pid . " AND p.visible = 1 AND t.visible = 1
+        LIMIT 1");
+    $post = $db->fetch_array($query);
+
+    return $post ? $post : null;
+}
+
+/**
  * What the board calls a working with children check - "Blue Card" in Queensland, for
  * one. Every label that names the check is built from this.
  *

@@ -63,7 +63,8 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
      an event saved requiring one keeps that, and requires it again if the check is
      turned back on
    - Turn **Preapproved Costumes** on to let troopers name a costume they are preapproved
-     for (see _Preapproved costumes_ below). It starts off
+     for (see _Preapproved costumes_ below). It starts off. With it on, **Preapproval
+     Requirements** takes a link to the post setting out how a member gets preapproved
    - Set GEC user groups
    - Set Garrison Members and 501st Members group IDs
    - Set troop report forum ID
@@ -376,6 +377,14 @@ from their profile, and is saved as a costume named `Preapproval: <what they typ
 attendance list, troop report and costume filter show it as it is. Step 6 is then shown to
 every trooper, including one with a single costume on file (it comes ticked). With the
 setting off, a member with one costume skips step 6 and troops in that costume.
+
+When **Preapproval Requirements** names a post, a member who fills in a preapproval is shown
+that post on step 6, rendered as it reads in its thread, and must tick "I have followed
+these steps and have received confirmation of preapproval for this costume for this event"
+before they can go on. The tick is not stored, so it is asked for every time they sign up
+or edit a signup that uses a preapproval. The setting accepts a link to the post (or to
+its thread, meaning the first post) or a post ID, and is stored as the post ID. A post
+that has since been deleted or unapproved counts as none, and nothing is asked.
 
 ### Costumes from the 501st Legion API
 

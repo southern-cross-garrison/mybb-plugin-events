@@ -556,6 +556,27 @@ export async function createThread(subject: string, forumId: number, authorUsern
   return result.insertId;
 }
 
+/**
+ * A thread with a visible first post carrying `message`, for a setting that points at a
+ * post. Returns both ids.
+ */
+export async function createThreadWithPost(
+  subject: string,
+  forumId: number,
+  authorUsername: string,
+  message: string,
+): Promise<{ tid: number; pid: number }> {
+  const tid = await createThread(subject, forumId, authorUsername);
+  const result = await execute(
+    `INSERT INTO ${T('posts')} (tid, replyto, fid, subject, icon, uid, username, dateline, message, ipaddress,
+                               includesig, smilieoff, edituid, edittime, editreason, visible)
+     VALUES (?, 0, ?, ?, 0, ?, ?, UNIX_TIMESTAMP(), ?, '', 0, 0, 0, 0, '', 1)`,
+    [tid, forumId, subject, uid(authorUsername), authorUsername, message],
+  );
+  await execute(`UPDATE ${T('threads')} SET firstpost = ? WHERE tid = ?`, [result.insertId, tid]);
+  return { tid, pid: result.insertId };
+}
+
 export async function getThread(threadId: number): Promise<RowDataPacket> {
   const row = await queryOne<RowDataPacket>(`SELECT * FROM ${T('threads')} WHERE tid = ?`, [threadId]);
   if (!row) throw new Error(`Thread ${threadId} not found`);

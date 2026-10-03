@@ -15,7 +15,7 @@ import { legionApiMember, legionApiRequests, stubLegionApi } from '../helpers/le
 const [TK, TD, TB] = [0, 1, 2].map((index) => fixtures().costumeOptions[index]);
 
 test.describe('costumes from the 501st Legion API', () => {
-  test('replaces the costumes on file with the Legion\'s, formatted one per line', async ({ page }) => {
+  test('replaces the costumes on file with the Legion\'s, formatted one per line in alphabetical order', async ({ page }) => {
     const eventId = await createEvent({ title: 'Legion Costumes Troop' });
     stubLegionApi(
       20001,
@@ -37,7 +37,7 @@ test.describe('costumes from the 501st Legion API', () => {
     await expect(page.locator(`input.costume_checkbox[value="${TK}"]`)).toHaveCount(0);
 
     expect(await getUserField('trooper1', 'costume')).toBe(
-      'TK - Stormtrooper: ANH Stunt\nID - Officer: Line Officer (Olive Drab)\nTS - Snowtrooper',
+      'ID - Officer: Line Officer (Olive Drab)\nTK - Stormtrooper: ANH Stunt\nTS - Snowtrooper',
     );
     expect(legionApiRequests()).toEqual(['/legionId/20001/costumes']);
 
@@ -92,7 +92,7 @@ test.describe('costumes from the 501st Legion API', () => {
     await page.locator('#rsvp_submit').click();
 
     await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'costumes');
-    expect(await getUserField('trooper1', 'costume')).toBe('TK - Stormtrooper\nTB - Biker Scout');
+    expect(await getUserField('trooper1', 'costume')).toBe('TB - Biker Scout\nTK - Stormtrooper');
     // The costume already signed up in is still picked.
     await expect(page.locator(`input.costume_checkbox[value="${TK}"]`)).toBeChecked();
     expect(legionApiRequests()).toHaveLength(2);
@@ -237,7 +237,7 @@ test.describe('costumes from the 501st Legion API', () => {
 
       await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'costumes');
       await expect(page.locator('#rsvp_costumes_from_api')).toBeVisible();
-      expect(await getUserField('newbie', 'costume')).toBe(`${TK}\n${TB}`);
+      expect(await getUserField('newbie', 'costume')).toBe(`${TB}\n${TK}`);
     });
 
     test('asks for the costumes on their own when the Legion has none for it', async ({ page }) => {

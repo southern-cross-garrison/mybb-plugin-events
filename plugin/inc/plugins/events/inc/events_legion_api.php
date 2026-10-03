@@ -41,8 +41,8 @@ function events_legion_id_number($tk_id)
  * @param string $legion_id Digits only
  * @return array|null null when the API gave no usable answer (unset, down, slow, an error,
  *                    not JSON). Otherwise 'found' => false for a classified record, or
- *                    'found' => true with 'name', 'garrison' and 'costumes' (formatted
- *                    for the profile field, possibly none)
+ *                    'found' => true with 'name', 'garrison' and 'costumes' (formatted,
+ *                    sorted, for the profile field, possibly none)
  */
 function events_legion_api_member($legion_id)
 {
@@ -101,11 +101,14 @@ function events_legion_api_member($legion_id)
         }
     }
 
+    $costumes = array_unique($costumes);
+    sort($costumes, SORT_NATURAL | SORT_FLAG_CASE);
+
     return array(
         'found'    => true,
         'name'     => trim(preg_replace('/\s+/u', ' ', $data['fullName'])),
         'garrison' => isset($data['garrisonName']) && is_string($data['garrisonName']) ? trim($data['garrisonName']) : '',
-        'costumes' => array_values(array_unique($costumes)),
+        'costumes' => $costumes,
     );
 }
 
