@@ -15,7 +15,8 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 - **Maximums and a Waitlist**: Cap how many troopers and wranglers an event takes; once
   it is full, signups join a waitlist that hands places out in signup order as they free up
 - **Prerequisites**: TK ID, WWCC, preferred name, mobile number, and emergency contact validation
-- **Costume Selection**: Select from user's profile costumes during signup
+- **Costume Selection**: Select from user's profile costumes during signup, or name a
+  preapproved costume when the board allows it
 - **Region Filtering**: Filter events by region. The region list is the board's own -
   add, rename and delete regions in the Admin CP
 - **Archived Events Kept Aside**: The index shows what is coming; events that have been
@@ -61,6 +62,8 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
      Turned off, events no longer offer the requirement and nobody is asked for a number;
      an event saved requiring one keeps that, and requires it again if the check is
      turned back on
+   - Turn **Preapproved Costumes** on to let troopers name a costume they are preapproved
+     for (see _Preapproved costumes_ below). It starts off
    - Set GEC user groups
    - Set Garrison Members and 501st Members group IDs
    - Set troop report forum ID
@@ -363,6 +366,16 @@ of the same flow.
 Steps 5 and 6 only appear when they apply: the TK ID is only asked for once a day is being
 trooped, and the costumes step does not exist for a signup that is wrangling throughout. A
 wrangler with a complete profile therefore answers one question and confirms.
+
+### Preapproved costumes
+
+With **Preapproved Costumes** turned on in Admin CP → Event Management → Settings, step 6
+also offers "Preapproval:" with a text box, for a costume a member has been cleared to troop
+in that is not on their Legion record yet. It can be picked on its own or alongside costumes
+from their profile, and is saved as a costume named `Preapproval: <what they typed>`, so the
+attendance list, troop report and costume filter show it as it is. Step 6 is then shown to
+every trooper, including one with a single costume on file (it comes ticked). With the
+setting off, a member with one costume skips step 6 and troops in that costume.
 
 ### Costumes from the 501st Legion API
 

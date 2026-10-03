@@ -248,7 +248,11 @@ test.describe('costumes from the 501st Legion API', () => {
       await page.goto(`/rsvp.php?id=${eventId}`);
       await page.locator('#rsvp_submit').click();
 
+      // Typing the ID sets off the lookup preview 400ms later, which asks the API too.
+      // Waited for, so the count below does not depend on how long the rest takes to fill.
+      const looked = page.waitForResponse((response) => response.url().includes('action=events_legion_lookup'));
       await page.locator('#prereq_tk_id').fill('33151');
+      await looked;
       await page.locator('#prereq_preferred_name').fill('Newt');
       await page.locator('#prereq_mobile').fill('0400 999 999');
       await page.locator('#prereq_emergency_contact').fill('Next Of Kin 0400 888 888');
@@ -260,7 +264,8 @@ test.describe('costumes from the 501st Legion API', () => {
       await expect(page.locator('#prereq_costume')).toBeVisible();
       await expect(page.locator('#prereq_tk_id')).toHaveCount(0);
       await expect(page.locator('#rsvp_wrangle_instead')).toBeVisible();
-      expect(legionApiRequests()).toEqual(['/legionId/33151/costumes']);
+      // The preview's, then the save's.
+      expect(legionApiRequests()).toEqual(['/legionId/33151/costumes', '/legionId/33151/costumes']);
 
       await page.locator('#prereq_costume').fill(TK);
       await page.locator('#rsvp_submit').click();
