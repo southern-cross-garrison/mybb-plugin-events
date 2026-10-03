@@ -17,6 +17,7 @@ export default defineConfig({
       logo: { src: './src/assets/scg-logo.svg', alt: 'Southern Cross Garrison' },
       plugins: [starlightThemeVintage(), starlightImageZoom()],
       customCss: ['./src/styles/custom.css'],
+      routeMiddleware: './src/route-data.ts',
       social: [
         {
           icon: 'github',
