@@ -87,6 +87,8 @@ test.describe('webmasters', () => {
   test('custom profile fields', async ({ page }) => {
     await loginToAdminCp(page);
     await page.goto('/admin/index.php?module=config-profile_fields&action=add');
+    // As set on the private fields.
+    await page.locator('input[name="viewableby"][value="none"]').check();
     await ring(page.locator('#row_viewableby'), page.locator('#row_editableby'));
     await shot(page.locator('#content'), 'webmasters/profile-field-visibility');
   });
