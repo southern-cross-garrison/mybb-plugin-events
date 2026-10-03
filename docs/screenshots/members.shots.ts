@@ -37,9 +37,10 @@ test.describe('members: signing up', () => {
 
     await loginAs(page, 'trooper1');
 
-    // 1. The events list, with the event to open ringed.
+    // 1. The events list, with the event to open ringed. Matched on the row rather than the
+    // link's address, which is the event's thread once it has been announced.
     await page.goto('/events.php');
-    await ring(page.locator(`#events_table a[href*="event.php?id=${eventId}"]`).first());
+    await ring(page.locator(`.event_row[data-event-id="${eventId}"] a.event_link`));
     await shot(page.locator('#events_page'), 'members/events-list');
 
     // 2. The event page and its Sign Up button.
@@ -107,6 +108,9 @@ test.describe('members: finding events', () => {
     // folds them away only appears on a phone.
     await ring(page.locator('#events_region_filter'), page.locator('label:has(#events_show_archived)'));
     await shot(page.locator('#events_page'), 'members/events-filters');
+
+    await ring(page.locator('#events_view_calendar'));
+    await shot(page.locator('#events_page'), 'members/events-calendar-button');
 
     await page.goto('/events.php?view=calendar');
     await ring(page.locator('#events_view_list'));
