@@ -1,0 +1,82 @@
+---
+title: Settings
+description: Every setting on Event Management > Settings, and what it does.
+sidebar:
+  order: 4
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Go to **Admin CP** > **Event Management** > **Settings**.
+
+## Dates
+
+| Setting | What it does |
+| --- | --- |
+| **Event Timezone** | The garrison's timezone, used for every date the plugin enters, shows and compares. Choose a named zone like `Australia/Sydney`, not a fixed offset, so daylight saving is handled. The server's timezone is ignored. |
+
+<Aside type="caution" title="Changing the timezone">
+  Existing dates keep their clock time in the new zone: an event at 18:00 stays at 18:00.
+  Set this before you start adding events.
+</Aside>
+
+## Profile fields
+
+Pick the [custom profile field](../profile-fields/) for each:
+
+- **Costume Profile Field**
+- **TK ID Profile Field**
+- **Check Profile Field** (the WWCC number)
+- **Mobile Number Profile Field**
+- **Emergency Contact Profile Field**
+- **Preferred Name Profile Field**
+
+A detail with no field picked isn't asked for.
+
+## Costumes
+
+| Setting | What it does |
+| --- | --- |
+| **501st Legion API** | Where members' approved costumes are fetched from, by Legion ID, when they sign up to troop. Starts as `https://api.501st.com`. Leave blank to use only saved costumes. Needs PHP's curl extension. |
+| **Preapproved Costumes** | Lets members type in a costume they've been preapproved for. Off by default. |
+| **Preapproval Requirements** | A link to a post explaining how to get preapproval. Members using a preapproved costume are shown it and must confirm they've followed it. Leave blank to ask nothing. |
+
+## Working With Children Checks
+
+| Setting | What it does |
+| --- | --- |
+| **Working With Children Checks** | Turn off if the garrison doesn't use them. Events then can't require one. |
+| **Check Name** | What your state calls it, for example **Blue Card** in Queensland. Defaults to WWCC. |
+
+## Groups
+
+| Setting | What it does |
+| --- | --- |
+| **Event Coordinator User Groups** | Members of these groups can create and edit events and see attendance sheets. They're also who can be picked as an event's coordinator. Primary and additional groups both count. |
+| **Garrison Members Group** | Splits attendees into groups on the troop report draft, and sets who's counted on My Troops. |
+| **501st Members Group** | Splits attendees on the troop report draft. |
+
+## Forums
+
+| Setting | What it does |
+| --- | --- |
+| **Troop Report Forum** | Where troop reports are posted. |
+| **Default Event Forum** | Where announcement threads go for regions without a forum of their own. Leave unset to not announce those events. |
+
+## Regions
+
+Events are filed under a region, which members can filter by. Each region can have its own
+announcement forum. The list starts as Sydney, Hunter, Canberra and Other.
+
+- **Rename** a region by editing its name and saving. Its events and forum go with it.
+- **Add** one with **Add Region**.
+- **Delete** one with **×**. If it has events, you're asked which region to move them to.
+
+Names can be up to 64 characters, with no commas or equals signs.
+
+## Print logo
+
+The logo on printed pages, such as attendance sheets, is set separately: **Admin CP** >
+**Configuration** > **Settings** > **Event Management Settings** > **Print Logo**. Use a
+URL or a path from the forum root, like `images/logo.png`. Leave blank to use the theme's
+logo.

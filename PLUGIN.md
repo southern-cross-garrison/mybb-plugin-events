@@ -75,7 +75,7 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 ## Requirements
 
 - MyBB 1.8.x
-- PHP 7.0+
+- PHP 7.4+ (tested on 7.4 and 8.5)
 - MySQL/MariaDB
 - Custom profile fields must be created in MyBB Admin CP before mapping them
 

@@ -250,6 +250,23 @@ Once both versions pass, the *Package the plugin* job uploads the release as the
 with no folder around them, so it expands straight over a forum root. `PLUGIN.md` is left
 out of it for the same reason it is kept out of `plugin/`.
 
+### Releasing
+
+Pushing a version tag publishes a GitHub Release. Bump `"version"` in
+`plugin/inc/plugins/events.php`, commit, then tag that commit to match:
+
+```bash
+git tag v1.3
+git push origin v1.3
+```
+
+The tag runs the whole workflow, and once both PHP versions pass, the *Publish the release*
+job attaches the zip as `mybb-plugin-events.zip` with release notes generated from the
+commits since the last tag. It fails without publishing if the tag and the plugin's
+version disagree. The asset keeps the same name every release, so
+`releases/latest/download/mybb-plugin-events.zip` always fetches the newest one; the
+user guide links to it.
+
 ## License
 
 Apache License 2.0 - see [LICENSE](LICENSE) and [NOTICE](NOTICE).

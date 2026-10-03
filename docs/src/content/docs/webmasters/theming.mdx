@@ -1,0 +1,46 @@
+---
+title: Theming
+description: Restyle the plugin's pages to match your theme.
+sidebar:
+  order: 7
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+The plugin's styles are in a theme stylesheet, `events.css`, on the master theme. Restyle
+it from your own theme's stylesheet.
+
+## Change the accent colour
+
+Buttons, highlights and the printed page header use one accent colour. Set it once:
+
+```css
+:root {
+  --events-accent: #1090d0;
+  --events-accent-border: #1090d0;
+  --events-accent-soft: rgba(16, 144, 208, 0.18); /* focus ring */
+}
+```
+
+## Restyle a control
+
+Prefix rules with `.events_page_wrap`:
+
+```css
+.events_page_wrap .events_input {
+  border-radius: 3px;
+  border-color: #ccc;
+}
+```
+
+Without the prefix, the plugin's stylesheet wins a tie, because it loads last.
+
+<Aside type="caution">
+  Don't edit `events.css` or the plugin's templates directly. Reactivating the plugin
+  replaces them.
+</Aside>
+
+## Printing
+
+Every plugin page prints as a clean document, with a header showing the logo and accent
+colour. Set the logo with **Print Logo**; see [Settings](../settings/#print-logo).

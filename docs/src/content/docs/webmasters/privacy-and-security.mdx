@@ -1,0 +1,43 @@
+---
+title: Privacy and security
+description: Where members' personal details appear, and how calendar links are protected.
+sidebar:
+  order: 8
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+## Personal details
+
+Mobile numbers, emergency contacts and WWCC numbers are stored in
+[custom profile fields](../profile-fields/). The plugin only shows them on attendance
+sheets, which only these people can open:
+
+- the event's coordinator and point of contact
+- members of the **Event Coordinator User Groups**
+- administrators
+
+Whether they also appear on profiles is up to each field's **Viewable By** setting.
+
+## Calendar subscription links
+
+Each member's [calendar subscription](../../members/calendar/) link works like a password for
+their list of signups.
+
+- Links are random and unguessable, and only a hash is stored. A database backup can't be
+  used to read anyone's calendar.
+- The link is shown to the member once. Making a new one turns the old one off.
+- Banned members' links stop working, and deleted members' links are removed.
+
+<Aside type="caution" title="Web server logs">
+  The link's token is in the URL, so it's recorded in your web server's access logs.
+  Restrict who can read them.
+</Aside>
+
+## Excluded members
+
+A member excluded from an event can't see it at all: not in the list, the calendar, its
+thread or search. Its troop report stays visible afterwards.
+
+MyBB's portal "latest discussions" block, if you use it, can still show the event's
+thread title.

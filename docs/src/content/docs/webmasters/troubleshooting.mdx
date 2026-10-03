@@ -1,0 +1,53 @@
+---
+title: Troubleshooting
+description: Fixes for common problems.
+sidebar:
+  order: 10
+---
+
+## Events isn't in the menu
+
+- Members only see **Events** when they're logged in.
+- The plugin replaces the theme's **Calendar** link. If your theme's header has no Calendar
+  link, add one to the header template.
+
+## An event wasn't announced in the forums
+
+Its region has no announcement forum, and **Default Event Forum** isn't set. The
+coordinator is told this when they save. Set a forum for the region in
+[Settings](../settings/#regions), then save the event again.
+
+Pending events are never announced; set the event to **Live**.
+
+## Costumes aren't being fetched from the 501st Legion
+
+- Check **501st Legion API** is set in [Settings](../settings/#costumes).
+- Check PHP's curl extension is installed.
+- Check the server can reach the API. Requests time out after 5 seconds, and the member's
+  saved costumes are used instead.
+- The member's Legion ID may be wrong, or their 501st record private.
+
+## Troop report reminders aren't sent
+
+Check **Event Reminder PMs** is enabled in **Tools & Maintenance** > **Task Manager**, and
+read its log. See [Reminder task](../reminder-task/).
+
+## Event times are an hour or more out
+
+Check **Event Timezone** in [Settings](../settings/#dates) is a named zone like
+`Australia/Sydney`, not a fixed offset or UTC.
+
+## Saving an event with an emoji fails
+
+The forum's tables were created before emoji support. Deactivate and reactivate the plugin
+to convert them.
+
+## Template or style changes disappeared
+
+Reactivating the plugin replaces its templates and stylesheet. Put changes in your theme
+instead. See [Theming](../theming/).
+
+## Getting help
+
+Report problems on the
+[GitHub repository](https://github.com/southern-cross-garrison/mybb-plugin-events/issues).

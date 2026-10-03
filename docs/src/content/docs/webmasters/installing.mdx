@@ -1,0 +1,105 @@
+---
+title: Installing
+description: Upload, activate and configure the plugin on a MyBB forum.
+sidebar:
+  order: 2
+---
+
+import { Aside, FileTree, Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+
+import activate from '../../../assets/screenshots/webmasters/plugins-activate.png';
+import settings from '../../../assets/screenshots/webmasters/settings-page.png';
+
+Check the [requirements](../requirements/) first.
+
+## Upload the files
+
+<Steps>
+
+1. Download [the latest release](https://github.com/southern-cross-garrison/mybb-plugin-events/releases/latest/download/mybb-plugin-events.zip).
+   Older versions and release notes are on the
+   [releases page](https://github.com/southern-cross-garrison/mybb-plugin-events/releases).
+
+2. Extract it into the forum's root folder (the one with `global.php`), merging into the
+   existing folders:
+
+   <FileTree>
+   - events.php
+   - event.php
+   - manage_event.php
+   - rsvp.php
+   - troop_report.php
+   - ical.php
+   - ical_feed.php
+   - calendar_feed.php
+   - admin/modules/events/
+   - inc/
+     - plugins/
+       - events.php
+       - events/
+     - tasks/events_reminders.php
+   - jscripts/events/
+   </FileTree>
+
+   If your Admin CP folder isn't called `admin`, put `admin/modules/events/` in your renamed
+   folder instead.
+
+</Steps>
+
+## Activate
+
+<Steps>
+
+1. Go to **Admin CP** > **Configuration** > **Plugins**.
+
+2. Find **Event Management** and click **Install & Activate**.
+
+   <Image src={activate} alt="Install & Activate circled beside Event Management" />
+
+</Steps>
+
+Activating creates the database tables, settings, templates, stylesheet and the
+[reminder task](../reminder-task/).
+
+## Configure
+
+<Steps>
+
+1. [Create the custom profile fields](../profile-fields/) if you haven't already.
+
+2. Go to **Admin CP** > **Event Management** > **Settings**.
+
+   <Image src={settings} alt="The Event Management Settings page" />
+
+3. Set at least:
+
+   - **Event Timezone**, for example `Australia/Sydney`
+   - each **Profile Field**
+   - **Event Coordinator User Groups**
+   - **Troop Report Forum**
+   - the **Regions**, and the forum each region's events are announced in
+
+   See [Settings](../settings/) for everything on the page.
+
+4. Click **Save Settings**.
+
+</Steps>
+
+## Check it works
+
+<Steps>
+
+1. Log in as a member and check **Events** is in the header.
+
+2. As a coordinator, click **Create Event**, fill it in and set its status to **Live**.
+
+3. Check the event's announcement thread was posted in its region's forum.
+
+4. Sign up to it as a member.
+
+</Steps>
+
+<Aside type="tip">
+  Delete the test event afterwards from **Admin CP** > **Event Management** > **Events**.
+</Aside>

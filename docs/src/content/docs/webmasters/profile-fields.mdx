@@ -1,0 +1,46 @@
+---
+title: Custom profile fields
+description: The six profile fields the plugin reads and writes, and how to set them up.
+sidebar:
+  order: 3
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+The plugin keeps members' details in MyBB custom profile fields, so members can also edit
+them in **User CP** > **Edit Profile**. Create them before configuring the plugin.
+
+| Field | Type | Viewable by | Notes |
+| --- | --- | --- | --- |
+| **Costumes** | Textarea | Everyone | One costume per line. Overwritten from the 501st Legion each time a member signs up to troop. A multi-select or comma-separated text field also works. |
+| **Legion ID** | Text | Everyone | For example `TK-12345`. |
+| **WWCC** | Text | Admins and coordinators | Not needed if checks are turned off. |
+| **Mobile Number** | Text | Admins and coordinators | |
+| **Emergency Contact** | Text | Admins and coordinators | |
+| **Preferred Name** | Text | Everyone | Shown on the attendance sheet. |
+
+## Create a field
+
+<Steps>
+
+1. Go to **Admin CP** > **Configuration** > **Custom Profile Fields** and click **Add New
+   Profile Field**.
+
+2. Fill in the **Title** and **Field Type** from the table above.
+
+3. Set **Editable By** to all registered groups, so members can update it.
+
+4. For the private fields, set **Viewable By** to administrators and your event
+   coordinator groups only.
+
+5. Save the field.
+
+</Steps>
+
+Then pick each field on **Event Management** > **Settings**. See [Settings](../settings/).
+
+<Aside type="caution">
+  Keep mobile numbers, emergency contacts and WWCC numbers private. The plugin only shows
+  them on attendance sheets, but MyBB shows profile fields on profiles and posts unless
+  **Viewable By** says otherwise.
+</Aside>

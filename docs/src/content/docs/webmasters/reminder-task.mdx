@@ -1,0 +1,19 @@
+---
+title: Reminder task
+description: The scheduled task that reminds troopers to post troop reports.
+sidebar:
+  order: 6
+---
+
+Activating the plugin adds a scheduled task, **Event Reminder PMs**, in **Admin CP** >
+**Tools & Maintenance** > **Task Manager**.
+
+It runs daily. For each finished troop with no troop report, it sends the troopers a
+**Troop Report Needed** private message, at most once a week, until the report is posted.
+Wranglers, waitlisted members and social events are skipped.
+
+MyBB runs tasks on the first page view after they're due, so on a quiet forum it may run
+later than midnight.
+
+To check it's working, open the task's log from the Task Manager. Deactivating the plugin
+removes the task; activating adds it back.
