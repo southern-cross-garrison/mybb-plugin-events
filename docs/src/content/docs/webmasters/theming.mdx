@@ -6,6 +6,9 @@ sidebar:
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import before from '../../../assets/screenshots/webmasters/theming-before.png';
+import after from '../../../assets/screenshots/webmasters/theming-after.png';
 
 The plugin's styles are in a theme stylesheet, `events.css`, on the master theme. Restyle
 it from your own theme's stylesheet.
@@ -21,6 +24,12 @@ Buttons, highlights and the printed page header use one accent colour. Set it on
   --events-accent-soft: rgba(16, 144, 208, 0.18); /* focus ring */
 }
 ```
+
+For example, the events list before and after setting a red accent:
+
+<Image src={before} alt="The events list with the default blue accent" />
+
+<Image src={after} alt="The events list with a red accent" />
 
 ## Restyle a control
 

@@ -6,6 +6,17 @@ sidebar:
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import timezone from '../../../assets/screenshots/webmasters/settings-timezone.png';
+import fieldsCostumes from '../../../assets/screenshots/webmasters/settings-profile-fields-costumes.png';
+import fieldsContact from '../../../assets/screenshots/webmasters/settings-profile-fields-contact.png';
+import legionApi from '../../../assets/screenshots/admins/settings-legion-api.png';
+import preapproval from '../../../assets/screenshots/admins/settings-preapproval.png';
+import wwcc from '../../../assets/screenshots/admins/settings-wwcc.png';
+import groups from '../../../assets/screenshots/webmasters/settings-groups.png';
+import forums from '../../../assets/screenshots/webmasters/settings-forums.png';
+import regions from '../../../assets/screenshots/admins/regions.png';
+import printLogo from '../../../assets/screenshots/webmasters/settings-print-logo.png';
 
 Go to **Admin CP** > **Event Management** > **Settings**.
 
@@ -20,6 +31,8 @@ Go to **Admin CP** > **Event Management** > **Settings**.
   Set this before you start adding events.
 </Aside>
 
+<Image src={timezone} alt="Event Timezone circled on the Settings page" />
+
 ## Profile fields
 
 Pick the [custom profile field](../profile-fields/) for each:
@@ -33,6 +46,10 @@ Pick the [custom profile field](../profile-fields/) for each:
 
 A detail with no field picked isn't asked for.
 
+<Image src={fieldsCostumes} alt="The costume and Legion ID profile field settings circled" />
+
+<Image src={fieldsContact} alt="The check, mobile, emergency contact and preferred name profile field settings circled" />
+
 ## Costumes
 
 | Setting | What it does |
@@ -41,12 +58,18 @@ A detail with no field picked isn't asked for.
 | **Preapproved Costumes** | Lets members type in a costume they've been preapproved for. Off by default. |
 | **Preapproval Requirements** | A link to a post explaining how to get preapproval. Members using a preapproved costume are shown it and must confirm they've followed it. Leave blank to ask nothing. |
 
+<Image src={legionApi} alt="501st Legion API circled" />
+
+<Image src={preapproval} alt="Preapproved Costumes and Preapproval Requirements circled" />
+
 ## Working With Children Checks
 
 | Setting | What it does |
 | --- | --- |
 | **Working With Children Checks** | Turn off if the garrison doesn't use them. Events then can't require one. |
 | **Check Name** | What your state calls it, for example **Blue Card** in Queensland. Defaults to WWCC. |
+
+<Image src={wwcc} alt="Working With Children Checks and Check Name circled" />
 
 ## Groups
 
@@ -56,12 +79,16 @@ A detail with no field picked isn't asked for.
 | **Garrison Members Group** | Splits attendees into groups on the troop report draft, and sets who's counted on My Troops. |
 | **501st Members Group** | Splits attendees on the troop report draft. |
 
+<Image src={groups} alt="The coordinator, Garrison Members and 501st Members group settings circled" />
+
 ## Forums
 
 | Setting | What it does |
 | --- | --- |
 | **Troop Report Forum** | Where troop reports are posted. |
 | **Default Event Forum** | Where announcement threads go for regions without a forum of their own. Leave unset to not announce those events. |
+
+<Image src={forums} alt="Troop Report Forum and Default Event Forum circled" />
 
 ## Regions
 
@@ -74,9 +101,14 @@ announcement forum. The list starts as Sydney, Hunter, Canberra and Other.
 
 Names can be up to 64 characters, with no commas or equals signs.
 
+<Image src={regions} alt="The region rows and Add Region circled" />
+
 ## Print logo
 
 The logo on printed pages, such as attendance sheets, is set separately: **Admin CP** >
 **Configuration** > **Settings** > **Event Management Settings** > **Print Logo**. Use a
 URL or a path from the forum root, like `images/logo.png`. Leave blank to use the theme's
 logo.
+
+<Image src={printLogo} alt="Print Logo circled in the Event Management Settings group" />
+

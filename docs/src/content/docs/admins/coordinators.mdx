@@ -6,6 +6,9 @@ sidebar:
 ---
 
 import { Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import coordGroups from '../../../assets/screenshots/admins/settings-coordinator-groups.png';
+import coordDropdown from '../../../assets/screenshots/coordinators/coordinator-dropdown.png';
 
 Coordinators can create, edit and manage any event from the forum, and see attendance
 sheets. Administrators always can.
@@ -24,6 +27,8 @@ To choose which groups count:
 2. Select the groups in **Event Coordinator User Groups**. Hold Ctrl (or Cmd on a Mac) to
    select more than one.
 
+   <Image src={coordGroups} alt="Event Coordinator User Groups circled on the Settings page" />
+
 3. Click **Save Settings**.
 
 </Steps>
@@ -32,6 +37,8 @@ To choose which groups count:
 
 An event's **Coordinator** list is everyone in the coordinator groups, plus whoever is
 filling in the form, plus the event's current coordinator.
+
+<Image src={coordDropdown} alt="The Coordinator list on the event form circled" />
 
 If an event's coordinator has been deleted, the list shows **Choose a coordinator** and
 the event can't be saved until someone is picked.

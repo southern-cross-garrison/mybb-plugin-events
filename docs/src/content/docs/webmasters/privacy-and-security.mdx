@@ -6,6 +6,8 @@ sidebar:
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import contactColumns from '../../../assets/screenshots/coordinators/attendance-contact-columns.png';
 
 ## Personal details
 
@@ -19,6 +21,8 @@ sheets, which only these people can open:
 - administrators
 
 Whether they also appear on profiles is up to each field's **Viewable By** setting.
+
+<Image src={contactColumns} alt="The Mobile and Emergency Contact columns circled on an attendance sheet" />
 
 ## Calendar subscription links
 

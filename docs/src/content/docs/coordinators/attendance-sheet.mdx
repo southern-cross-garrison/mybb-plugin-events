@@ -5,10 +5,13 @@ sidebar:
   order: 7
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, Steps } from '@astrojs/starlight/components';
 import { Image } from 'astro:assets';
 
 import sheet from '../../../assets/screenshots/coordinators/attendance-sheet.png';
+import sheetPrint from '../../../assets/screenshots/coordinators/attendance-sheet-print.png';
+import dayFilter from '../../../assets/screenshots/coordinators/attendance-day-filter.png';
+import oneDay from '../../../assets/screenshots/coordinators/attendance-one-day.png';
 
 Open the event and click **View Attendance Sheet** at the bottom. The event's point of contact
 can open it too.
@@ -24,12 +27,29 @@ people are in a separate table, numbered **W1**, **W2** and so on.
 Press **Ctrl+P** (or **Cmd+P** on a Mac). It prints as a clean sheet, with the event
 details at the top and the column headings repeated on every page.
 
+<Image src={sheetPrint} alt="The attendance sheet as it prints, with two people ticked as attended" />
+
 Tick the **Attended** boxes on screen before printing, or leave them blank to tick by hand on
 the day.
 
 ## Show one day
 
-On a multi-day event, choose from **Day** to show only the people coming that day.
+On a multi-day event, you can show only the people coming on one day.
+
+<Steps>
+
+1. Choose the day from **Day**, then click **Show**.
+
+   <Image src={dayFilter} alt="The Day list and Show button circled" />
+
+2. The sheet lists only that day's people, with the day as a heading. Print it the same
+   way.
+
+   <Image src={oneDay} alt="The attendance sheet showing one day" />
+
+</Steps>
+
+Choose **All days** and click **Show** to see everyone again.
 
 <Aside type="caution" title="Personal details">
   The sheet has members' phone numbers and emergency contacts. Keep printed copies safe,

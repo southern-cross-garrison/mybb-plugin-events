@@ -7,9 +7,14 @@ sidebar:
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import asked from '../../../assets/screenshots/members/prerequisites-step.png';
+import columns from '../../../assets/screenshots/coordinators/attendance-contact-columns.png';
 
 Troopers and wranglers are asked for a **mobile number** and an **emergency contact** the
 first time they sign up.
+
+<Image src={asked} alt="The signup step asking for a mobile number and emergency contact" />
 
 ## Your mobile number
 
@@ -46,6 +51,8 @@ signed up to, which only these people can open:
 - forum administrators
 
 Coordinators often bring a printed copy to the event.
+
+<Image src={columns} alt="The Mobile and Emergency Contact columns circled on an attendance sheet" />
 
 Social events don't ask for these details, but show them on the attendance sheet if
 they're on your profile.

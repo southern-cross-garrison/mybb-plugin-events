@@ -6,9 +6,14 @@ sidebar:
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import needsReport from '../../../assets/screenshots/coordinators/needs-troop-report.png';
+import posted from '../../../assets/screenshots/coordinators/troop-report-posted.png';
 
 Once the event ends, it shows **Needs Troop Report** until someone posts one. Anyone who
 signed up to troop can write it; see [Writing a troop report](../../members/troop-reports/).
+
+<Image src={needsReport} alt="Needs Troop Report circled in the events list" />
 
 The report decides who's credited with the troop. Make sure it:
 
@@ -16,6 +21,8 @@ The report decides who's credited with the troop. Make sure it:
 - doesn't list anyone who didn't turn up
 
 Posting the report archives the event.
+
+<Image src={posted} alt="A posted troop report" />
 
 ## Reminders
 

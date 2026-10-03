@@ -6,6 +6,11 @@ sidebar:
 ---
 
 import { Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import legionApi from '../../../assets/screenshots/admins/settings-legion-api.png';
+import preapprovalSettings from '../../../assets/screenshots/admins/settings-preapproval.png';
+import preapprovalMember from '../../../assets/screenshots/admins/preapproval-requirements.png';
+import wwcc from '../../../assets/screenshots/admins/settings-wwcc.png';
 
 All of these are on **Admin CP** > **Event Management** > **Settings**.
 
@@ -15,6 +20,8 @@ When a member signs up to troop, their approved costumes are fetched from the 50
 by their Legion ID and saved to their profile. **501st Legion API** is set to
 `https://api.501st.com` by default. Clear it to use only the costumes on members'
 profiles.
+
+<Image src={legionApi} alt="501st Legion API circled on the Settings page" />
 
 ## Preapproved costumes
 
@@ -28,6 +35,8 @@ Let members troop in a costume that's preapproved but not yet on their Legion re
 
 3. Paste a link to your post into **Preapproval Requirements**.
 
+   <Image src={preapprovalSettings} alt="Preapproved Costumes and Preapproval Requirements circled" />
+
 4. Click **Save Settings**.
 
 </Steps>
@@ -35,9 +44,13 @@ Let members troop in a costume that's preapproved but not yet on their Legion re
 Members using a preapproved costume are shown your post and must confirm they've followed
 it, every time.
 
+<Image src={preapprovalMember} alt="The preapproval post shown to a member signing up, circled" />
+
 ## Working With Children Checks
 
 Coordinators can require attendees to have a check on file for an event.
+
+<Image src={wwcc} alt="Working With Children Checks and Check Name circled" />
 
 - Untick **Working With Children Checks** if the garrison doesn't use them.
 - Set **Check Name** to what your state calls it, for example **Blue Card** in Queensland.

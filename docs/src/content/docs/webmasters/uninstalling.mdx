@@ -6,6 +6,8 @@ sidebar:
 ---
 
 import { Aside } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import uninstall from '../../../assets/screenshots/webmasters/plugins-uninstall.png';
 
 Go to **Admin CP** > **Configuration** > **Plugins**.
 
@@ -16,6 +18,10 @@ Go to **Admin CP** > **Configuration** > **Plugins**.
 | Templates and stylesheet | Kept | Deleted |
 | Reminder task | Removed | Removed |
 | Announcement threads and troop reports | Kept | Kept (they're ordinary forum threads) |
+
+Click **Deactivate** or **Uninstall** beside **Event Management**.
+
+<Image src={uninstall} alt="Uninstall circled beside Event Management" />
 
 <Aside type="danger">
   Uninstalling can't be undone. Back up the database first.

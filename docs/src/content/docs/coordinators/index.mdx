@@ -7,11 +7,15 @@ sidebar:
 ---
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import controls from '../../../assets/screenshots/coordinators/edit-event-button.png';
 
 For members of the garrison's event coordinator groups. Everything here is done from the
 forum; you don't need Admin CP access.
 
 You can create events, and edit and manage any event, not just your own.
+
+<Image src={controls} alt="An event with the coordinator buttons" />
 
 <CardGrid>
   <LinkCard title="Creating an event" description="Fill in the form and open signups." href="creating-events/" />

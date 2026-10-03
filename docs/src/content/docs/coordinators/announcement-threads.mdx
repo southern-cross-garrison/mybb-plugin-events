@@ -5,12 +5,20 @@ sidebar:
   order: 3
 ---
 
+import { Image } from 'astro:assets';
+import forum from '../../../assets/screenshots/coordinators/announcement-forum.png';
+import thread from '../../../assets/screenshots/coordinators/announcement-thread.png';
+
 When an event goes **Live**, a thread is posted for it in its region's forum. It's built
 from the event: dates, address, coordinator, cutoff, requirements, the day-by-day
 schedule and the description. You don't write it.
 
+<Image src={forum} alt="The event's announcement thread circled in its forum" />
+
 Members see the event details at the top of the thread, with the discussion as replies
 underneath.
+
+<Image src={thread} alt="An announcement thread, with the event at the top" />
 
 ## When you edit the event
 

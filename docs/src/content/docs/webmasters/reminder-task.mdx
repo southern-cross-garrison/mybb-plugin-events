@@ -5,12 +5,20 @@ sidebar:
   order: 6
 ---
 
+import { Image } from 'astro:assets';
+import task from '../../../assets/screenshots/webmasters/task-manager.png';
+import message from '../../../assets/screenshots/webmasters/reminder-message.png';
+
 Activating the plugin adds a scheduled task, **Event Reminder PMs**, in **Admin CP** >
 **Tools & Maintenance** > **Task Manager**.
+
+<Image src={task} alt="Event Reminder PMs circled in the Task Manager" />
 
 It runs daily. For each finished troop with no troop report, it sends the troopers a
 **Troop Report Needed** private message, at most once a week, until the report is posted.
 Wranglers, waitlisted members and social events are skipped.
+
+<Image src={message} alt="A Troop Report Needed message as a trooper receives it" />
 
 MyBB runs tasks on the first page view after they're due, so on a quiet forum it may run
 later than midnight.

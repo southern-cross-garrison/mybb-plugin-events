@@ -7,8 +7,12 @@ sidebar:
 ---
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import signup from '../../../assets/screenshots/members/event-signup-button.png';
 
 For troopers (in costume) and wranglers (helpers out of costume).
+
+<Image src={signup} alt="An event with the Sign Up to Attend button circled" />
 
 <CardGrid>
   <LinkCard title="Finding events" description="The events list, calendar and filters." href="finding-events/" />

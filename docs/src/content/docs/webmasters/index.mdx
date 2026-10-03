@@ -7,8 +7,12 @@ sidebar:
 ---
 
 import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import plugins from '../../../assets/screenshots/webmasters/plugins-deactivate.png';
 
 For whoever looks after the forum's hosting and MyBB install.
+
+<Image src={plugins} alt="Event Management on the Admin CP Plugins page" />
 
 <CardGrid>
   <LinkCard title="Installing" description="Upload, activate and configure the plugin." href="installing/" />

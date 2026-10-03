@@ -6,6 +6,9 @@ sidebar:
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import regions from '../../../assets/screenshots/admins/regions.png';
+import regionsDelete from '../../../assets/screenshots/admins/regions-delete.png';
 
 Every event is filed under a region. Members filter the events list by region, and each
 region can have its own forum for announcement threads.
@@ -17,6 +20,8 @@ Regions are at the bottom of **Admin CP** > **Event Management** > **Settings**.
 <Steps>
 
 1. Click **Add Region**, enter its name and save.
+
+   <Image src={regions} alt="The region rows and the Add Region button circled" />
 
 2. Choose its announcement forum on its row and click **Save Settings**.
 
@@ -30,6 +35,8 @@ Edit its name and click **Save Settings**. Its events and announcement forum go 
 
 Click **×** at the end of its row. If it has events, choose which region to move them to.
 There must always be at least one region.
+
+<Image src={regionsDelete} alt="The delete dialog asking which region to move the events to" />
 
 ## Announcement forums
 

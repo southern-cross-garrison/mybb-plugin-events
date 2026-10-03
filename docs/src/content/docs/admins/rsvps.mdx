@@ -5,11 +5,32 @@ sidebar:
   order: 2
 ---
 
-Go to **Admin CP** > **Event Management** > **RSVPs**, or click **Actions** > **View
-RSVPs** on an event.
+import { Aside, Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
 
-Choose an **Event**, then optionally filter by **Costume** (matches part of a name) or
-**Day**. Signups and the waitlist are listed separately.
+import action from '../../../assets/screenshots/admins/rsvps-action.png';
+import filters from '../../../assets/screenshots/admins/rsvps-filters.png';
+import list from '../../../assets/screenshots/admins/rsvps-list.png';
 
-For contact details and a printable roll, use the event's
-[attendance sheet](../../coordinators/attendance-sheet/) on the forum.
+<Steps>
+
+1. Go to **Admin CP** > **Event Management** > **RSVPs**. Or, on the **Events** tab, click
+   **Actions** > **View RSVPs** beside an event.
+
+   <Image src={action} alt="The Actions menu open on an event, with View RSVPs circled" />
+
+2. Choose an **Event**. To narrow the list, type part of a costume name in **Costume**, or
+   choose a **Day**. Click **Apply Filters**.
+
+   <Image src={filters} alt="The RSVP filters circled" />
+
+3. Signups are listed first, then the waitlist in queue order.
+
+   <Image src={list} alt="An event's RSVPs and waitlist" />
+
+</Steps>
+
+<Aside>
+  For contact details and a printable roll, click **View Attendance Sheet** below the list.
+  See [The attendance sheet](../../coordinators/attendance-sheet/).
+</Aside>

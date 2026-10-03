@@ -6,6 +6,8 @@ sidebar:
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import deactivate from '../../../assets/screenshots/webmasters/plugins-deactivate.png';
 
 <Steps>
 
@@ -22,6 +24,8 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 4. Go to **Admin CP** > **Configuration** > **Plugins**.
 
 5. Click **Deactivate** beside **Event Management**, then **Activate**.
+
+   <Image src={deactivate} alt="Deactivate circled beside Event Management" />
 
 </Steps>
 
