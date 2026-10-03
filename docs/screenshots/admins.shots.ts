@@ -45,9 +45,27 @@ test.describe('admins', () => {
       await page.waitForURL(/showthread\.php/);
     }
 
+    // Something coming up, for the nudge's draft to suggest.
+    await createAnnouncedEvent({
+      title: 'Royal North Shore Hospital Visit',
+      start: relativeToTestNow({ days: 10 }),
+      end: relativeToTestNow({ days: 10, hours: 4 }),
+    });
+
     await loginToAdminCp(page);
     await gotoEventsAdmin(page, '&action=reports&view=people');
     await shot(page.locator('#content'), 'admins/reports-people');
+
+    const nudge = page.locator('a.events_nudge[data-username="trooper2"]');
+    await ring(nudge);
+    await shot(page.locator('#content'), 'admins/reports-nudge-link', { include: [nudge.locator('xpath=ancestor::tr[1]')] });
+
+    await nudge.click();
+    const dialog = page.locator('.events_nudge_dialog');
+    await expect(dialog).toBeVisible();
+    await ring(page.locator('#events_nudge_send'), page.locator('#events_nudge_copy'));
+    // The whole dialog: the minimums are bigger than it, and a crop never leaves the area.
+    await shot(dialog, 'admins/reports-nudge-dialog', { minWidth: 2000, minHeight: 2000 });
   });
 
   test('RSVPs', async ({ page }) => {

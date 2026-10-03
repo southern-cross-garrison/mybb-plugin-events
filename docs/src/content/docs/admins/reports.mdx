@@ -9,6 +9,8 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 import { Image } from 'astro:assets';
 
 import reports from '../../../assets/screenshots/admins/reports-people.png';
+import nudgeLink from '../../../assets/screenshots/admins/reports-nudge-link.png';
+import nudgeDialog from '../../../assets/screenshots/admins/reports-nudge-dialog.png';
 
 Go to **Admin CP** > **Event Management** > **Reports**. Coordinators with Admin CP access
 can use it too.
@@ -48,9 +50,13 @@ Encourage a member who hasn't trooped lately to come back out.
 
 2. Click **Nudge…** beside the member.
 
+   <Image src={nudgeLink} alt="The Nudge link circled beside a member in the People view" />
+
 3. Edit the drafted message, which mentions their last troop.
 
-4. Click **Send PM**, or copy the message to send another way.
+4. Click **Send PM**, or click **Copy** to send it another way.
+
+   <Image src={nudgeDialog} alt="The nudge dialog with its drafted message, and the Send PM and Copy buttons circled" />
 
 </Steps>
 
