@@ -539,6 +539,28 @@ function events_is_event_gec($event_id, $user_id = null)
 }
 
 /**
+ * May the user open the event's attendance sheet?
+ *
+ * Its coordinators can, and so can its point of contact, who is the one the sheet's
+ * mobile numbers are for on the day. Only the sheet: a point of contact edits nothing.
+ *
+ * @param array $event
+ * @param int|null $user_id
+ * @return bool
+ */
+function events_can_view_attendance_sheet($event, $user_id = null)
+{
+    $user = events_get_user($user_id);
+    if(empty($user['uid']))
+    {
+        return false;
+    }
+
+    return events_is_event_gec($event['id'], $user['uid'])
+        || (!empty($event['poc_user_id']) && (int)$event['poc_user_id'] === (int)$user['uid']);
+}
+
+/**
  * The kinds of event, token => label.
  *
  * A troop is what the plugin was built for: troopers in costume, wranglers helping, a

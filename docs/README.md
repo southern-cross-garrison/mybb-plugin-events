@@ -62,14 +62,19 @@ around the thing to click is drawn by the script, not by hand, so after a UI cha
 re-run the script rather than re-taking and re-annotating pictures.
 
 ```bash
-./scripts/bootstrap.sh            # if the dev forum isn't up
-npm run docs:screenshots          # from the repo root; all guides
-npm run docs:screenshots -- members
+../scripts/bootstrap.sh    # if the dev forum isn't up
+pnpm screenshots           # all guides
+pnpm screenshots members   # one guide
 ```
+
+This runs the repo root's Playwright, so it needs the root's `npm install` as well as this
+folder's `pnpm install`.
 
 Each `screenshots/<guide>.shots.ts` builds the state it needs with the same helpers as the
 e2e specs, then calls `ring(locator)` and `shot(area, '<guide>/<name>')` from
-`screenshots/annotate.ts`. Commit the resulting PNGs with the page change. A new
+`screenshots/annotate.ts`. A shot with rings is cropped to them with some context around,
+like Scribe; one without is the whole `area`. Pass `{ crop: false }` when the whole area is
+the point and the ring is only a pointer, or `minWidth` / `minHeight` for more context. Commit the resulting PNGs with the page change. A new
 screenshot needs a line in the script; until it's taken, a placeholder image is fine.
 
 ## Publishing

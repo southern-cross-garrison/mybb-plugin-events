@@ -269,12 +269,20 @@ function events_render_event_card(array $event, $thread_id = 0)
     // On the same bar as the signup actions rather than in a block of their own: they are
     // two more buttons, and only the people who can use them ever see them. Grouped so the
     // stylesheet can push them to the far end of the bar, away from the signup.
+    // The point of contact gets the sheet without the rest, so the group is built from
+    // whichever of the two the viewer may use.
+    $gec_controls = '';
     if($is_gec)
     {
-        $event_actions .= '<span id="gec_controls" class="gec_actions">'
-            . '<a class="event_action event_action_secondary" href="manage_event.php?id=' . $event_id . '" id="gec_edit">Edit Event</a>'
-            . '<a class="event_action event_action_secondary" href="event.php?id=' . $event_id . '&amp;action=attendance" id="gec_attendance">View Attendance Sheet</a>'
-            . '</span>';
+        $gec_controls .= '<a class="event_action event_action_secondary" href="manage_event.php?id=' . $event_id . '" id="gec_edit">Edit Event</a>';
+    }
+    if(events_can_view_attendance_sheet($event))
+    {
+        $gec_controls .= '<a class="event_action event_action_secondary" href="event.php?id=' . $event_id . '&amp;action=attendance" id="gec_attendance">View Attendance Sheet</a>';
+    }
+    if($gec_controls !== '')
+    {
+        $event_actions .= '<span id="gec_controls" class="gec_actions">' . $gec_controls . '</span>';
     }
 
     // -----------------------------------------------------------------------
@@ -283,7 +291,7 @@ function events_render_event_card(array $event, $thread_id = 0)
     // Anyone who can see the event can see who is going, so the list is part of the card
     // rather than something to go and fetch. It carries no contact details - mobile and
     // emergency contact live on the attendance sheet, which stays behind
-    // events_is_event_gec().
+    // events_can_view_attendance_sheet().
     // The costume filter can only ever match troopers, so wranglers drop out of a
     // filtered list by definition. That is intended, not an oversight. Nobody at a social
     // event is in costume, so there it is not offered at all.

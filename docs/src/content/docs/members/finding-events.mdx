@@ -5,7 +5,7 @@ sidebar:
   order: 1
 ---
 
-import { Aside, Steps } from '@astrojs/starlight/components';
+import { Aside } from '@astrojs/starlight/components';
 import { Image } from 'astro:assets';
 
 import eventsList from '../../../assets/screenshots/members/events-list-overview.png';
@@ -48,21 +48,17 @@ Use the arrows beside the month to change months.
 
 ## Filter by region
 
-<Steps>
+Choose a region from the list in the toolbar. The events update straight away. On a phone,
+tap **Filter** first.
 
-1. Click **Filter**.
-
-   <Image src={filters} alt="The Filter button and region list circled" />
-
-2. Choose a region. The list updates straight away.
-
-</Steps>
+<Image src={filters} alt="The region list and Show archived circled in the toolbar" />
 
 Choose **All Regions** to clear the filter.
 
 ## Show past events
 
-Click **Filter** and tick **Show archived**. This resets when you leave the page.
+Tick **Show archived** in the toolbar (on a phone, tap **Filter** first). This resets when
+you leave the page.
 
 ## Open an event
 

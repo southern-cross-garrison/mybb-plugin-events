@@ -51,7 +51,7 @@ $filter_day = $mybb->get_input('filter_day', MyBB::INPUT_INT);
 // ---------------------------------------------------------------------------
 if($action === 'attendance')
 {
-    if(!$is_gec)
+    if(!events_can_view_attendance_sheet($event))
     {
         error_no_permission();
     }

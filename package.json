@@ -11,8 +11,7 @@
     "test": "playwright test",
     "test:ui": "playwright test --ui",
     "test:headed": "playwright test --headed",
-    "test:report": "playwright show-report",
-    "docs:screenshots": "playwright test --config playwright.docs.config.ts"
+    "test:report": "playwright show-report"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",

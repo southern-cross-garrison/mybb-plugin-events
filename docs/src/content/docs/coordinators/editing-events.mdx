@@ -1,0 +1,39 @@
+---
+title: Editing an event
+description: Change an event's details, dates, limits or status.
+sidebar:
+  order: 4
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+
+import editButton from '../../../assets/screenshots/coordinators/edit-event-button.png';
+
+<Steps>
+
+1. Open the event and click **Edit Event** at the bottom.
+
+   <Image src={editButton} alt="Edit Event circled at the bottom of an event" />
+
+2. Make your changes and click **Save Changes**.
+
+</Steps>
+
+The [announcement thread](../announcement-threads/) updates to match.
+
+## Changes that affect signups
+
+If a change would move people, the form lists who and asks you to confirm before saving:
+
+- **Removing a day** removes those days from people's signups.
+- **Lowering a limit** moves the latest signups back onto the waitlist.
+
+Raising a limit gives places to people on the waitlist, in signup order. Anyone moved is
+sent a private message from you.
+
+You can't change **Type** once anyone has signed up.
+
+<Aside title="Deleting an event">
+  Coordinators can't delete events. Ask an administrator.
+</Aside>

@@ -1,0 +1,36 @@
+---
+title: Multi-day events
+description: Set the hours for each day of an event that runs over several days.
+sidebar:
+  order: 2
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+
+import days from '../../../assets/screenshots/coordinators/event-days.png';
+
+When the start and end dates are on different days, the form adds an **Event Days** row for
+each day. Set the start and end time for each.
+
+<Image src={days} alt="The Event Days rows on the event form" />
+
+Members can then troop, wrangle or skip each day separately, and
+[limits](../managing-signups/#limits-and-the-waitlist) apply to each day.
+
+## Overnight events
+
+An event that runs past midnight isn't a second day. A day whose end time is earlier than
+its start time runs overnight, and must finish before the next day's start time.
+
+For example, two nights of 22:00 to 01:00 are two rows, not four.
+
+<Aside>
+  Two sessions on the same date, like a morning and an afternoon, are one day. Members
+  sign up for the day.
+</Aside>
+
+## Removing a day
+
+If you shorten an event and a removed day has signups, the form lists who's affected and
+asks you to confirm before saving.

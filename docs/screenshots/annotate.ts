@@ -10,7 +10,7 @@ const RING = '#e11d48';
 /**
  * Draw a Scribe-style ring around each target. The ring is a plain absolutely positioned
  * div added to the page, so it is captured by the screenshot and gone on the next
- * navigation. Call `clearRings()` to remove them without navigating.
+ * navigation, or as soon as `shot()` has captured them.
  */
 export async function ring(...targets: Locator[]): Promise<void> {
   for (const target of targets) {
@@ -49,17 +49,96 @@ export async function clearRings(page: Page): Promise<void> {
   await page.evaluate(() => document.querySelectorAll('.docs-ring').forEach((el) => el.remove()));
 }
 
+export interface ShotOptions {
+  /**
+   * Crop to the rings drawn since the last shot, Scribe-style, rather than capturing the
+   * whole area. On by default whenever there is a ring; a shot with no rings is always of
+   * the whole area. Turn it off for a picture whose point is the page itself (a filled-in
+   * form, a full list) and whose ring is only a pointer.
+   */
+  crop?: boolean;
+  /** Smallest crop, in CSS pixels, so the ringed control keeps enough around it to be found. */
+  minWidth?: number;
+  minHeight?: number;
+  /** Room left around the rings. */
+  padding?: number;
+}
+
 /**
- * Save a screenshot of `area` (a container element, so the image shows the relevant part
- * of the page rather than the whole browser window) as `<guide>/<name>.png`.
+ * Save a screenshot as `<guide>/<name>.png`.
  *
- * Rings drawn right at the edge of `area` can be clipped, so pick an area with a little
- * room around whatever is ringed.
+ * With rings on the page it is cropped to them plus some context, which is what makes the
+ * control readable at the width the guide shows images at; the crop never leaves `area`,
+ * so the board's header and footer stay out. Without rings it is the whole of `area` (a
+ * container element, so the image is the relevant part of the page rather than the whole
+ * browser window).
  */
-export async function shot(area: Locator, name: string): Promise<void> {
+export async function shot(area: Locator, name: string, options: ShotOptions = {}): Promise<void> {
+  const { crop = true, minWidth = 560, minHeight = 240, padding = 48 } = options;
+  const page = area.page();
   const file = path.join(SCREENSHOT_DIR, `${name}.png`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  await area.screenshot({ path: file, animations: 'disabled', caret: 'hide' });
+
+  const areaBox = await area.boundingBox();
+  if (!areaBox) {
+    throw new Error(`shot(): ${area} has no bounding box - is it visible?`);
+  }
+
+  // Everything in page (document) coordinates, which is what a full-page clip takes, so
+  // the crop is right wherever the page happens to be scrolled.
+  const clip = crop
+    ? await page.evaluate(
+        ({ areaBox, minWidth, minHeight, padding }) => {
+          const rings = Array.from(document.querySelectorAll<HTMLElement>('.docs-ring'));
+          if (rings.length === 0) {
+            return null;
+          }
+
+          // A little past the area's edges, so a ring around a control sitting right at
+          // the edge isn't cut through.
+          const bleed = 12;
+          const a = {
+            left: areaBox.x + window.scrollX - bleed,
+            top: areaBox.y + window.scrollY - bleed,
+            right: areaBox.x + window.scrollX + areaBox.width + bleed,
+            bottom: areaBox.y + window.scrollY + areaBox.height + bleed,
+          };
+
+          const r = rings.map((el) => el.getBoundingClientRect());
+          let left = Math.min(...r.map((b) => b.left)) + window.scrollX - padding;
+          let top = Math.min(...r.map((b) => b.top)) + window.scrollY - padding;
+          let right = Math.max(...r.map((b) => b.right)) + window.scrollX + padding;
+          let bottom = Math.max(...r.map((b) => b.bottom)) + window.scrollY + padding;
+
+          // Grow to the minimum around the rings' centre, then slide back inside the area.
+          const grow = (lo: number, hi: number, min: number, floor: number, ceiling: number) => {
+            if (hi - lo < min) {
+              const centre = (lo + hi) / 2;
+              lo = centre - min / 2;
+              hi = centre + min / 2;
+            }
+            if (lo < floor) { hi += floor - lo; lo = floor; }
+            if (hi > ceiling) { lo -= hi - ceiling; hi = ceiling; }
+            return [Math.max(lo, floor), Math.min(hi, ceiling)];
+          };
+          [left, right] = grow(left, right, minWidth, a.left, a.right);
+          [top, bottom] = grow(top, bottom, minHeight, a.top, a.bottom);
+
+          return { x: Math.round(left), y: Math.round(top), width: Math.round(right - left), height: Math.round(bottom - top) };
+        },
+        { areaBox, minWidth, minHeight, padding },
+      )
+    : null;
+
+  if (clip) {
+    await page.screenshot({ path: file, clip, fullPage: true, animations: 'disabled', caret: 'hide' });
+  } else {
+    await area.screenshot({ path: file, animations: 'disabled', caret: 'hide' });
+  }
+
+  // Rings belong to the picture they were drawn for. Without this, a second shot of the
+  // same page (no navigation in between) carries the first one's rings as well.
+  await clearRings(page);
 }
 
 /** The clickable chip for a radio or checkbox, which is what a reader looks for. */

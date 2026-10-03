@@ -1,0 +1,41 @@
+---
+title: Regions
+description: Add, rename or delete regions, and set where each region's events are announced.
+sidebar:
+  order: 5
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+Every event is filed under a region. Members filter the events list by region, and each
+region can have its own forum for announcement threads.
+
+Regions are at the bottom of **Admin CP** > **Event Management** > **Settings**.
+
+## Add a region
+
+<Steps>
+
+1. Click **Add Region**, enter its name and save.
+
+2. Choose its announcement forum on its row and click **Save Settings**.
+
+</Steps>
+
+## Rename a region
+
+Edit its name and click **Save Settings**. Its events and announcement forum go with it.
+
+## Delete a region
+
+Click **×** at the end of its row. If it has events, choose which region to move them to.
+There must always be at least one region.
+
+## Announcement forums
+
+Each region's events are announced in the forum on its row. Regions set to **None** use the
+**Default Event Forum**. If that isn't set either, their events aren't announced.
+
+<Aside>
+  Names can be up to 64 characters, with no commas or equals signs.
+</Aside>

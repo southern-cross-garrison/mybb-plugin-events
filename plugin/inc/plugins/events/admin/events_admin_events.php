@@ -288,7 +288,7 @@ function events_admin_edit_event()
         $container->output_row("Requires " . $wwcc_name, "Attendees must have a " . $wwcc_name . " on file", $form->generate_check_box("requires_wwcc", 1, "This event requires a " . $wwcc_name, array("id" => "requires_wwcc", "checked" => !empty($values['requires_wwcc']))), "requires_wwcc");
     }
     $container->output_row("Coordinator", "The member who manages this event", $form->generate_select_box("gec_user_id", events_coordinator_select_options($coordinators), $values['gec_user_id'], array("id" => "gec_user_id")), "gec_user_id");
-    $container->output_row("Point of Contact", "Optional. Who attendees should contact about the event - yourself, or anybody signed up to it. Shown on the event page.", $form->generate_select_box("poc_user_id", events_poc_options($event), $values['poc_user_id'], array("id" => "poc_user_id")), "poc_user_id");
+    $container->output_row("Point of Contact", "Optional. Who attendees should contact about the event - yourself, or anybody signed up to it. Shown on the event page, and can open the attendance sheet.", $form->generate_select_box("poc_user_id", events_poc_options($event), $values['poc_user_id'], array("id" => "poc_user_id")), "poc_user_id");
 
     // Event days: one row per day between the start and end dates, worked out rather than
     // typed, and nothing at all for a single-day event - see events_event_days_grid().

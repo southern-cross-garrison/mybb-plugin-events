@@ -2,17 +2,17 @@ name: docs
 
 # Builds the user guide in docs/ and publishes it to GitHub Pages. Screenshots are not
 # taken here: they need the dev forum, so they are taken locally with
-# `npm run docs:screenshots` and committed alongside the pages that use them.
+# `pnpm run screenshots` and committed alongside the pages that use them.
 on:
   push:
     branches: [main]
     paths:
-      - 'docs/**'
-      - '.github/workflows/docs.yml'
+      - "docs/**"
+      - ".github/workflows/docs.yml"
   pull_request:
     paths:
-      - 'docs/**'
-      - '.github/workflows/docs.yml'
+      - "docs/**"
+      - ".github/workflows/docs.yml"
   workflow_dispatch:
 
 permissions:

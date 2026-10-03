@@ -5,22 +5,23 @@
  * real member's details ever appear in the public guide. Each test builds the state its
  * pictures need, the same way the e2e specs do.
  *
- *   npm run docs:screenshots            # every guide
- *   npm run docs:screenshots -- members # just this file
+ *   pnpm screenshots          # every guide, from docs/
+ *   pnpm screenshots members  # just this file
  */
 import { test, expect } from '../../tests/helpers/fixtures';
 import { loginAs } from '../../tests/helpers/auth';
-import { createEvent, createRsvp, fixtures, getEventDays, getUserField, setUserField } from '../../tests/helpers/db';
+import { createRsvp, fixtures, getEventDays, getUserField, setUserField } from '../../tests/helpers/db';
+import { createAnnouncedEvent } from './events';
 import { relativeToTestNow } from '../../tests/helpers/clock';
 import { withSettings } from '../../tests/helpers/settings';
 import { signUpThroughWizard } from '../../tests/helpers/rsvp';
-import { choice, clearRings, ring, shot } from './annotate';
+import { choice, ring, shot } from './annotate';
 
 const [TK, TD] = [0, 1].map((index) => fixtures().costumeOptions[index]);
 
 /** An event that finished yesterday, ready for its troop report. */
 async function finishedEvent(title: string, daysAgo = 2): Promise<number> {
-  return createEvent({
+  return createAnnouncedEvent({
     title,
     start: relativeToTestNow({ days: -daysAgo }),
     end: relativeToTestNow({ days: -daysAgo, hours: 6 }),
@@ -30,9 +31,9 @@ async function finishedEvent(title: string, daysAgo = 2): Promise<number> {
 
 test.describe('members: signing up', () => {
   test('sign up to troop', async ({ page }) => {
-    await createEvent({ title: 'Westfield Parramatta Charity Troop', start: { days: 9 }, end: { days: 9, hours: 6 } });
-    const eventId = await createEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 12 }, end: { days: 12, hours: 6 } });
-    await createEvent({ title: 'Star Wars Day Cinema Screening', start: { days: 20 }, end: { days: 20, hours: 6 }, eventType: 'social' });
+    await createAnnouncedEvent({ title: 'Westfield Parramatta Charity Troop', start: { days: 9 }, end: { days: 9, hours: 6 } });
+    const eventId = await createAnnouncedEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 12 }, end: { days: 12, hours: 6 } });
+    await createAnnouncedEvent({ title: 'Star Wars Day Cinema Screening', start: { days: 20 }, end: { days: 20, hours: 6 }, eventType: 'social' });
 
     await loginAs(page, 'trooper1');
 
@@ -68,7 +69,7 @@ test.describe('members: signing up', () => {
   });
 
   test('change or withdraw a signup', async ({ page }) => {
-    const eventId = await createEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 12 }, end: { days: 12, hours: 6 } });
+    const eventId = await createAnnouncedEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 12 }, end: { days: 12, hours: 6 } });
 
     await loginAs(page, 'trooper1');
     await signUpThroughWizard(page, eventId, { costumes: [TK] });
@@ -87,10 +88,10 @@ test.describe('members: signing up', () => {
 
 test.describe('members: finding events', () => {
   test('list, filters, calendar and social events', async ({ page }) => {
-    const signedUp = await createEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 5 }, end: { days: 5, hours: 4 }, address: 'Reserve Rd, St Leonards NSW' });
-    await createEvent({ title: 'Westfield Parramatta Charity Troop', start: { days: 9 }, end: { days: 9, hours: 6 } });
-    await createEvent({ title: 'Newcastle Comic Con', region: 'Hunter', start: { days: 16 }, end: { days: 17, hours: 8 } });
-    const social = await createEvent({ title: 'Garrison Christmas Dinner', eventType: 'social', start: { days: 23 }, end: { days: 23, hours: 4 } });
+    const signedUp = await createAnnouncedEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 5 }, end: { days: 5, hours: 4 }, address: 'Reserve Rd, St Leonards NSW' });
+    await createAnnouncedEvent({ title: 'Westfield Parramatta Charity Troop', start: { days: 9 }, end: { days: 9, hours: 6 } });
+    await createAnnouncedEvent({ title: 'Newcastle Comic Con', region: 'Hunter', start: { days: 16 }, end: { days: 17, hours: 8 } });
+    const social = await createAnnouncedEvent({ title: 'Garrison Christmas Dinner', eventType: 'social', start: { days: 23 }, end: { days: 23, hours: 4 } });
     await createRsvp(signedUp, 'trooper1', { costumes: [TK] });
     await createRsvp(signedUp, 'trooper2', { costumes: [TD] });
     await createRsvp(signedUp, 'wrangler', { role: 'wrangler' });
@@ -101,19 +102,20 @@ test.describe('members: finding events', () => {
 
     await ring(page.locator(`.event_row[data-event-id="${social}"] .event_pill_social`));
     await shot(page.locator('#events_page'), 'members/social-event-list');
-    await clearRings(page);
 
-    await page.locator('.events_filter_button').click();
-    await ring(page.locator('.events_filter_button'), page.locator('#events_region_filter'));
+    // On a desktop-width page the filters sit in the toolbar; the Filter button that
+    // folds them away only appears on a phone.
+    await ring(page.locator('#events_region_filter'), page.locator('label:has(#events_show_archived)'));
     await shot(page.locator('#events_page'), 'members/events-filters');
 
     await page.goto('/events.php?view=calendar');
     await ring(page.locator('#events_view_list'));
-    await shot(page.locator('#events_page'), 'members/events-calendar');
+    // Tall enough to show it's the calendar, not just the button.
+    await shot(page.locator('#events_page'), 'members/events-calendar', { minHeight: 420 });
   });
 
   test('who is attending', async ({ page }) => {
-    const eventId = await createEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 5 }, end: { days: 5, hours: 4 }, maxTroopers: 2 });
+    const eventId = await createAnnouncedEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 5 }, end: { days: 5, hours: 4 }, maxTroopers: 2 });
     await createRsvp(eventId, 'trooper1', { costumes: [TK] });
     await createRsvp(eventId, 'trooper2', { costumes: [TD] });
     await createRsvp(eventId, 'wrangler', { role: 'wrangler' });
@@ -127,7 +129,7 @@ test.describe('members: finding events', () => {
 
 test.describe('members: signup details', () => {
   test('per-day choices on a multi-day event', async ({ page }) => {
-    const eventId = await createEvent({
+    const eventId = await createAnnouncedEvent({
       title: 'Supanova Sydney',
       start: '2026-10-10 09:00:00',
       end: '2026-10-11 17:00:00',
@@ -144,7 +146,7 @@ test.describe('members: signup details', () => {
   });
 
   test('prerequisites step', async ({ page }) => {
-    const eventId = await createEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 5 }, end: { days: 5, hours: 4 } });
+    const eventId = await createAnnouncedEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 5 }, end: { days: 5, hours: 4 } });
     const saved = { mobile: await getUserField('trooper1', 'mobile'), emergency_contact: await getUserField('trooper1', 'emergency_contact') };
     await setUserField('trooper1', 'mobile', '');
     await setUserField('trooper1', 'emergency_contact', '');
@@ -165,7 +167,7 @@ test.describe('members: signup details', () => {
   test('preapproved costume', async ({ page }) => {
     const restore = await withSettings({ events_preapproval_enabled: '1', events_preapproval_post: '' });
     try {
-      const eventId = await createEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 5 }, end: { days: 5, hours: 4 } });
+      const eventId = await createAnnouncedEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 5 }, end: { days: 5, hours: 4 } });
       await loginAs(page, 'trooper1');
       await page.goto(`/rsvp.php?id=${eventId}`);
       await page.locator('#rsvp_submit').click();
@@ -181,7 +183,7 @@ test.describe('members: signup details', () => {
 
 test.describe('members: waitlists and calendars', () => {
   test('join a waitlist', async ({ page }) => {
-    const eventId = await createEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 5 }, end: { days: 5, hours: 4 }, maxTroopers: 1 });
+    const eventId = await createAnnouncedEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 5 }, end: { days: 5, hours: 4 }, maxTroopers: 1 });
     await createRsvp(eventId, 'trooper2', { costumes: [TD] });
 
     await loginAs(page, 'trooper1');
@@ -196,7 +198,7 @@ test.describe('members: waitlists and calendars', () => {
   });
 
   test('add to calendar and subscribe', async ({ page }) => {
-    const eventId = await createEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 5 }, end: { days: 5, hours: 4 } });
+    const eventId = await createAnnouncedEvent({ title: 'Royal North Shore Hospital Visit', start: { days: 5 }, end: { days: 5, hours: 4 } });
     await createRsvp(eventId, 'trooper1', { costumes: [TK] });
 
     await loginAs(page, 'trooper1');
@@ -238,7 +240,8 @@ test.describe('members: troop reports', () => {
 
     await page.locator('#event_troop_report').click();
     await ring(page.locator('#troop_report_submit'));
-    await shot(page.locator('#troop_report_page'), 'members/troop-report-form');
+    // The draft is the point of this one; the ring only shows where to post it.
+    await shot(page.locator('#troop_report_page'), 'members/troop-report-form', { crop: false });
 
     await page.goto('/usercp.php?action=events_troops');
     await shot(page.locator('#events_troops_page'), 'members/my-troops');

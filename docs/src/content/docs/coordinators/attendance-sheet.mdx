@@ -1,0 +1,37 @@
+---
+title: The attendance sheet
+description: Contact details for everyone signed up, and a printable roll for the day.
+sidebar:
+  order: 7
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+
+import sheet from '../../../assets/screenshots/coordinators/attendance-sheet.png';
+
+Open the event and click **View Attendance Sheet** at the bottom. The event's point of contact
+can open it too.
+
+<Image src={sheet} alt="The attendance sheet" />
+
+It has one row per person, with their preferred name, username, role, Legion ID, WWCC
+number, costumes, mobile number and emergency contact. Multi-day events have a **Days** column. Waitlisted
+people are in a separate table, numbered **W1**, **W2** and so on.
+
+## Print it
+
+Press **Ctrl+P** (or **Cmd+P** on a Mac). It prints as a clean sheet, with the event
+details at the top and the column headings repeated on every page.
+
+Tick the **Attended** boxes on screen before printing, or leave them blank to tick by hand on
+the day.
+
+## Show one day
+
+On a multi-day event, choose from **Day** to show only the people coming that day.
+
+<Aside type="caution" title="Personal details">
+  The sheet has members' phone numbers and emergency contacts. Keep printed copies safe,
+  and dispose of them after the event.
+</Aside>

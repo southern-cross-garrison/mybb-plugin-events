@@ -1,0 +1,34 @@
+---
+title: Excluding members
+description: Hide an event from specific members.
+sidebar:
+  order: 6
+---
+
+import { Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+
+import exclusions from '../../../assets/screenshots/coordinators/excluded-members.png';
+
+Excluded members can't see the event at all: it's not in their events list or calendar,
+and they can't open its page or announcement thread. They aren't told.
+
+<Steps>
+
+1. [Edit the event](../editing-events/).
+
+2. Under **Excluded Members**, type part of a username and pick the member from the list.
+
+   <Image src={exclusions} alt="The Excluded Members field with a member added" />
+
+3. Click **Save Changes**.
+
+</Steps>
+
+To un-exclude someone, click the **×** on their name and save.
+
+- If they'd already signed up, their signup is withdrawn without a message. The save
+  confirms how many signups were removed.
+- They can still read the troop report after the event.
+- Coordinators and admins can always see the event, even if excluded, but an excluded
+  coordinator can't sign up.

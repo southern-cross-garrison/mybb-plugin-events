@@ -1,0 +1,52 @@
+---
+title: Managing events
+description: The Admin CP events list, changing an event's status, and deleting events.
+sidebar:
+  order: 1
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+
+import list from '../../../assets/screenshots/admins/events-list.png';
+
+Go to **Admin CP** > **Event Management** > **Events**.
+
+<Image src={list} alt="The Admin CP events list" />
+
+The list shows every event with its status, type, region, start, signup counts and
+coordinator. Coordinators with Admin CP access only see their own events here.
+
+Click **Actions** on an event for:
+
+| Option | Does |
+| --- | --- |
+| **Edit** | Opens the [event form](../../coordinators/creating-events/#the-event-form). |
+| **View RSVPs** | Opens the event on the [RSVPs](../rsvps/) tab. |
+| **Make Live** | Opens signups and posts the announcement thread. |
+| **Archive** | Closes the event out and hides it from the events list. |
+| **Delete** | See below. |
+
+To add an event, click **Add New Event**. It's the same form coordinators use on the forum.
+
+## Delete an event
+
+Deleting removes the event and everything attached to it:
+
+- its signups and waitlist
+- its **announcement thread and every reply**
+- the troop counts from its report, from Reports and My Troops
+
+The troop report thread itself stays in the troop reports forum.
+
+<Aside type="caution">
+  Deleting can't be undone. To close out an event that happened, archive it instead.
+</Aside>
+
+<Steps>
+
+1. Click **Actions** > **Delete** on the event.
+
+2. Confirm.
+
+</Steps>

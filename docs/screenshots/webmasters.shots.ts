@@ -1,7 +1,7 @@
 /**
  * Screenshots for the webmasters' guide (docs/src/content/docs/webmasters/).
  *
- *   npm run docs:screenshots -- webmasters
+ *   pnpm screenshots webmasters   # from docs/
  */
 import { test, expect } from '../../tests/helpers/fixtures';
 import { gotoEventsAdmin, loginToAdminCp } from '../../tests/helpers/auth';

@@ -8,7 +8,8 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "start": "astro dev"
+    "start": "astro dev",
+    "screenshots": "../node_modules/.bin/playwright test --config screenshots/playwright.config.ts"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.42.5",

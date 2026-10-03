@@ -18,6 +18,20 @@ test.describe('coordinator controls on the event page', () => {
     await expect(page.locator('body')).toContainText(/not have permission|no permission/i);
   });
 
+  test('the point of contact gets the attendance sheet and nothing else', async ({ page }) => {
+    const eventId = await createEvent({ title: 'Contact Point Troop', coordinator: 'gec', pointOfContact: 'trooper1' });
+    await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+
+    await loginAs(page, 'trooper1');
+    await page.goto(`/event.php?id=${eventId}`);
+    await expect(page.locator('#gec_edit')).toHaveCount(0);
+    await page.locator('#gec_attendance').click();
+    await expect(page.locator('#attendance_sheet')).toBeVisible();
+
+    await page.goto(`/manage_event.php?id=${eventId}`);
+    await expect(page.locator('body')).toContainText(/not have permission|no permission/i);
+  });
+
   test('the signup list is open to everyone who can see the event, with no click', async ({ page }) => {
     const eventId = await createEvent({ title: 'Open List Troop', coordinator: 'gec' });
     await createRsvp(eventId, 'trooper1', { costumes: [TK] });

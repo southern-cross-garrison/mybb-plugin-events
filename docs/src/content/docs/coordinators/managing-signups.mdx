@@ -1,0 +1,53 @@
+---
+title: Managing signups
+description: See who's signed up, remove someone, and how limits and the waitlist work.
+sidebar:
+  order: 5
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+
+import removeDialog from '../../../assets/screenshots/coordinators/remove-signup.png';
+
+## Who's signed up
+
+**Who is Attending** on the event lists everyone, with the waitlist underneath. Click
+**Filter** to show one costume or one day.
+
+For contact details, use the [attendance sheet](../attendance-sheet/).
+
+## Remove someone
+
+<Steps>
+
+1. On the event, click **×** beside their name in **Who is Attending**.
+
+2. A message to them is drafted. Add your reason.
+
+   <Image src={removeDialog} alt="The Remove dialog with a drafted message" />
+
+3. Click **Send PM & Remove**. Or use the arrow beside it to **Copy Text & Remove** (to send
+   another way) or **Remove Without Notifying**.
+
+</Steps>
+
+This removes their whole signup, all days and roles. If there's a waitlist, the next
+person gets the place.
+
+## Limits and the waitlist
+
+Set **Maximum Troopers**, **Maximum Wranglers** or **Maximum Attendees** on the
+[event form](../creating-events/#the-event-form). Once a limit is reached, new signups join a
+waitlist.
+
+- Places go in signup order. When someone drops out, the next person gets their place and
+  is sent a private message.
+- On multi-day events, each day has its own limit and waitlist.
+- Waitlisted people are listed on the attendance sheet as **W1**, **W2** and so on, so you
+  can call down the list on the day.
+
+<Aside type="tip" title="Someone came off the waitlist on the day?">
+  Add them to the troop report so their troop is counted. See
+  [After the event](../after-the-event/).
+</Aside>

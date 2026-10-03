@@ -903,6 +903,9 @@ re-activating the plugin converts them in place, data included.
   history (and only their own) in the User CP
 - **Wranglers**: No membership or TK ID required; may sign up to any event they can see, but
   may not author troop reports
+- **Point of Contact**: Whoever an event names as its point of contact can open that event's
+  attendance sheet, from "View Attendance Sheet" on the event, whether or not they are a
+  coordinator. They cannot edit the event or manage its signups
 
 ## Development
 
