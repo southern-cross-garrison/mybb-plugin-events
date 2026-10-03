@@ -69,7 +69,7 @@ function events_profile_field_settings()
 {
     return array(
         'events_costume_field',
-        'events_tk_id_field',
+        'events_legion_id_field',
         'events_wwcc_field',
         'events_mobile_field',
         'events_emergency_contact_field',
@@ -154,9 +154,21 @@ function events_install_settings()
             "name = 'events_scg_members_group'");
     }
 
+    // Likewise the Legion ID field, which used to be called the TK ID. Its title and
+    // description go too, since the loop below leaves an existing setting's alone.
+    if($db->num_rows($db->simple_select("settings", "sid", "name = 'events_tk_id_field'")) > 0
+        && $db->num_rows($db->simple_select("settings", "sid", "name = 'events_legion_id_field'")) == 0)
+    {
+        $db->update_query("settings", array(
+            "name"        => "events_legion_id_field",
+            "title"       => $db->escape_string("Legion ID Profile Field"),
+            "description" => $db->escape_string("The custom profile field that holds a member's Legion ID"),
+        ), "name = 'events_tk_id_field'");
+    }
+
     $settings = array(
         array("name" => "events_costume_field", "title" => "Costume Profile Field", "description" => "The custom profile field that holds a member's costumes", "optionscode" => "text", "disporder" => 1),
-        array("name" => "events_tk_id_field", "title" => "TK ID Profile Field", "description" => "The custom profile field that holds a member's TK ID", "optionscode" => "text", "disporder" => 2),
+        array("name" => "events_legion_id_field", "title" => "Legion ID Profile Field", "description" => "The custom profile field that holds a member's Legion ID", "optionscode" => "text", "disporder" => 2),
         array("name" => "events_wwcc_field", "title" => "WWCC Profile Field", "description" => "The custom profile field that holds a member's WWCC number", "optionscode" => "text", "disporder" => 3),
         array("name" => "events_mobile_field", "title" => "Mobile Number Profile Field", "description" => "The custom profile field that holds a member's mobile number", "optionscode" => "text", "disporder" => 4),
         array("name" => "events_emergency_contact_field", "title" => "Emergency Contact Profile Field", "description" => "The custom profile field that holds a member's emergency contact", "optionscode" => "text", "disporder" => 5),

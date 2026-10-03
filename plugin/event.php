@@ -156,7 +156,7 @@ if($action === 'attendance')
     );
     if(!$is_social)
     {
-        $attendance_identity_columns['attendee_tkid'] = 'Legion ID';
+        $attendance_identity_columns['attendee_legion_id'] = 'Legion ID';
     }
 
     // Beside the Legion ID, since it is the other number a coordinator checks a card
@@ -244,9 +244,9 @@ if($action === 'attendance')
                 $attendee_role .= ' - waitlisted';
             }
             $attendees_rows .= '<td class="attendee_role">' . htmlspecialchars_uni($attendee_role) . '</td>';
-            if(isset($attendance_identity_columns['attendee_tkid']))
+            if(isset($attendance_identity_columns['attendee_legion_id']))
             {
-                $attendees_rows .= '<td class="attendee_tkid">' . htmlspecialchars_uni($attendee['tk_id']) . '</td>';
+                $attendees_rows .= '<td class="attendee_legion_id">' . htmlspecialchars_uni($attendee['legion_id']) . '</td>';
             }
 
             if(isset($attendance_identity_columns['attendee_wwcc']))

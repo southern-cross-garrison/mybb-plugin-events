@@ -270,10 +270,10 @@ test.describe("troop reports", () => {
   }) => {
     const eventId = await finishedEvent("Injected Troop");
     await createRsvp(eventId, "trooper1", { costumes: [TK] });
-    // The TK ID is a free-text profile field, so it is the easiest injection vector.
+    // The Legion ID is a free-text profile field, so it is the easiest injection vector.
     await setUserField(
       "trooper1",
-      "tk_id",
+      "legion_id",
       "TK-1[/b][url=http://evil.test]click me[/url]",
     );
 

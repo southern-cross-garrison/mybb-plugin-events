@@ -350,7 +350,7 @@ function events_render_event_card(array $event, $thread_id = 0)
         // The Legion ID comes off the profile, so an attendee at a social event would carry
         // one too; it says nothing about who is coming to a barbecue.
         $details = array(
-            'rsvp_tkid'     => $is_social ? '' : htmlspecialchars_uni($attendee['tk_id']),
+            'rsvp_legion_id'     => $is_social ? '' : htmlspecialchars_uni($attendee['legion_id']),
             'rsvp_costumes' => htmlspecialchars_uni(implode(', ', $attendee['costumes'])),
             'rsvp_days'     => htmlspecialchars_uni(implode(', ', $day_labels)),
             'rsvp_date'     => events_format_date($attendee['rsvp_date']),

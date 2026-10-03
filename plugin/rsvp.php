@@ -9,7 +9,7 @@
  * wrangled on the Sunday, or be sat out on the Sunday altogether.
  *
  * Steps: attendance -> prerequisites -> costumes -> confirm. Attendance comes first
- * because it decides the rest of the sequence: the TK ID is only a prerequisite once a
+ * because it decides the rest of the sequence: the Legion ID is only a prerequisite once a
  * day is being trooped, and the costumes step does not exist for a signup that is
  * wrangling throughout, or - unless the board takes preapproved costumes - for a member
  * with only one costume to pick. Each step POSTs
@@ -498,7 +498,7 @@ if($mybb->request_method === 'post')
         // A Legion ID typed in here is the first the board has known of it, so this is
         // the attendance step's fetch, a step late - and the reason the costume field
         // waits until now to be asked for.
-        if(isset($values['tk_id']) && in_array('trooper', $roles, true))
+        if(isset($values['legion_id']) && in_array('trooper', $roles, true))
         {
             $costumes_from_api = events_sync_user_costumes($mybb->user['uid']);
         }
@@ -975,11 +975,11 @@ elseif($rsvp_step === 'prerequisites')
             . '<span class="events_required" aria-hidden="true">*</span></label>'
             . $control
             . '<span class="events_hint" id="hint_' . $field . '">' . $label['hint'] . '</span>'
-            . ($field === 'tk_id' && $legion_lookup ? '<div class="events_legion_lookup" id="prereq_tk_id_lookup" aria-live="polite" hidden></div>' : '')
+            . ($field === 'legion_id' && $legion_lookup ? '<div class="events_legion_lookup" id="prereq_legion_id_lookup" aria-live="polite" hidden></div>' : '')
             . '</div>';
     }
 
-    if(isset($asked['tk_id']) && $legion_lookup)
+    if(isset($asked['legion_id']) && $legion_lookup)
     {
         $rsvp_body .= events_legion_lookup_script();
     }

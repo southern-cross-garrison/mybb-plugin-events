@@ -43,7 +43,7 @@ test.describe('signing up to a social event', () => {
     await expect(page.locator('#prereq_preferred_name')).toBeVisible();
     await expect(page.locator('#prereq_mobile')).toHaveCount(0);
     await expect(page.locator('#prereq_emergency_contact')).toHaveCount(0);
-    await expect(page.locator('#prereq_tk_id')).toHaveCount(0);
+    await expect(page.locator('#prereq_legion_id')).toHaveCount(0);
     await expect(page.locator('#prereq_costume')).toHaveCount(0);
 
     await page.locator('#prereq_preferred_name').fill('Newt');
@@ -201,7 +201,7 @@ test.describe('the social event page', () => {
 
     // Nobody is in costume, and a Legion ID on somebody's profile says nothing here.
     await expect(page.locator('#filter_costume')).toHaveCount(0);
-    await expect(page.locator('#rsvp_rows .rsvp_tkid')).toHaveCount(0);
+    await expect(page.locator('#rsvp_rows .rsvp_legion_id')).toHaveCount(0);
     await expect(page.locator('#rsvp_rows .rsvp_role').first()).toHaveText('Attendee');
 
     await page.goto('/events.php');
@@ -219,7 +219,7 @@ test.describe('the social event page', () => {
     await page.goto(`/event.php?id=${eventId}&action=attendance`);
 
     await expect(page.locator('#attendance_table')).toHaveClass(/is_social/);
-    await expect(page.locator('#attendance_table th.attendee_tkid')).toHaveCount(0);
+    await expect(page.locator('#attendance_table th.attendee_legion_id')).toHaveCount(0);
     await expect(page.locator('#attendance_table th.attendee_costumes')).toHaveCount(0);
 
     const row = page.locator('#attendance_table tbody.attendee_group').first();

@@ -28,7 +28,7 @@ require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
  * be a mention of somebody who did not come. A wrangler holds no ID, so the name is it.
  *
  * @param string $text The report as plain text (events_attendance_text())
- * @param array $attendee username, role, tk_id
+ * @param array $attendee username, role, legion_id
  * @return bool
  */
 function events_attendance_matches($text, array $attendee)
@@ -46,7 +46,7 @@ function events_attendance_matches($text, array $attendee)
         return true;
     }
 
-    $number = ltrim(preg_replace('/\D/', '', (string)$attendee['tk_id']), '0');
+    $number = ltrim(preg_replace('/\D/', '', (string)$attendee['legion_id']), '0');
     if($number === '')
     {
         return true;

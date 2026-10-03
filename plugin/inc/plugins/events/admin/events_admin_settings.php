@@ -245,7 +245,7 @@ function events_admin_settings()
         {
             $settings = array(
                 'events_costume_field' => $mybb->input['costume_field'],
-                'events_tk_id_field' => $mybb->input['tk_id_field'],
+                'events_legion_id_field' => $mybb->input['legion_id_field'],
                 'events_legion_api_url' => $legion_api_url,
                 'events_wwcc_enabled' => $mybb->get_input('wwcc_enabled', MyBB::INPUT_INT) ? '1' : '0',
                 'events_preapproval_enabled' => $mybb->get_input('preapproval_enabled', MyBB::INPUT_INT) ? '1' : '0',
@@ -360,10 +360,10 @@ function events_admin_settings()
         "Select the custom profile field that contains user costumes",
         $form->generate_select_box("costume_field", $profile_fields, events_admin_settings_value('costume_field', 'events_costume_field')));
     
-    // TK ID field
-    $form_container->output_row("TK ID Profile Field",
-        "Select the custom profile field that contains TK IDs",
-        $form->generate_select_box("tk_id_field", $profile_fields, events_admin_settings_value('tk_id_field', 'events_tk_id_field')));
+    // Legion ID field
+    $form_container->output_row("Legion ID Profile Field",
+        "Select the custom profile field that contains Legion IDs",
+        $form->generate_select_box("legion_id_field", $profile_fields, events_admin_settings_value('legion_id_field', 'events_legion_id_field')));
     
     $form_container->output_row("501st Legion API",
         "Members' costumes are fetched from here by their Legion ID when they sign up to troop, replacing the ones on their profile. Leave blank to use only the costumes on their profiles.",

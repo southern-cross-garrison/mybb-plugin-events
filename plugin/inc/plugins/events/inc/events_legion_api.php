@@ -27,12 +27,12 @@ define('EVENTS_LEGION_API_TIMEOUT', 5);
 /**
  * The digits of a Legion ID as members type it: "TK-12345", "TK 12345" or "12345".
  *
- * @param string $tk_id
+ * @param string $legion_id
  * @return string Empty when there is no number in it
  */
-function events_legion_id_number($tk_id)
+function events_legion_id_number($legion_id)
 {
-    return ltrim(preg_replace('/\D/', '', (string)$tk_id), '0');
+    return ltrim(preg_replace('/\D/', '', (string)$legion_id), '0');
 }
 
 /**
@@ -176,7 +176,7 @@ function events_sync_user_costumes($user_id)
         return false;
     }
 
-    $costumes = events_legion_api_costumes(events_legion_id_number(events_get_user_field($user_id, 'tk_id')));
+    $costumes = events_legion_api_costumes(events_legion_id_number(events_get_user_field($user_id, 'legion_id')));
     if($costumes === null)
     {
         return false;

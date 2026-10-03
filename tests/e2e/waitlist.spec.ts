@@ -177,11 +177,11 @@ test.describe('signing up to a full event', () => {
     await page.locator('#signup_role_trooper').check();
     await page.locator('#rsvp_submit').click();
     await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
-    await expect(page.locator('#prereq_tk_id')).toBeVisible();
+    await expect(page.locator('#prereq_legion_id')).toBeVisible();
 
     await signUpThroughWizard(page, eventId, {
       prerequisites: {
-        tk_id: 'TK-99001',
+        legion_id: 'TK-99001',
         preferred_name: 'Newt',
         mobile: '0400 999 111',
         emergency_contact: 'Next Of Kin 0400 999 222',
@@ -980,7 +980,7 @@ interface WeekendSignup {
  *
  * trooper1 is the only fixture member with two costumes, so the only one the wizard asks
  * which to wear. Nobody here meets the prerequisites step: the event asks for no WWCC,
- * and a wrangler is never asked for a TK ID.
+ * and a wrangler is never asked for a Legion ID.
  */
 const WEEKEND_SIGNUPS: WeekendSignup[] = [
   {

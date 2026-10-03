@@ -28,7 +28,7 @@ test('a member with no userfields row can still complete a signup', async ({ pag
   await page.locator('#rsvp_submit').click();
 
   await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
-  await page.locator('#prereq_tk_id').fill('12345');
+  await page.locator('#prereq_legion_id').fill('12345');
   await page.locator('#prereq_preferred_name').fill('Newt');
   await page.locator('#prereq_mobile').fill('0400 111 222');
   await page.locator('#prereq_emergency_contact').fill('Next Of Kin 0400 333 444');
@@ -42,7 +42,7 @@ test('a member with no userfields row can still complete a signup', async ({ pag
   await page.locator('#rsvp_submit').click();
   await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'costumes');
 
-  expect(await getUserField('newbie', 'tk_id')).toBe('12345');
+  expect(await getUserField('newbie', 'legion_id')).toBe('12345');
   expect(await getUserField('newbie', 'preferred_name')).toBe('Newt');
   expect(await getUserField('newbie', 'mobile')).toBe('0400 111 222');
   expect(await getUserField('newbie', 'emergency_contact')).toBe('Next Of Kin 0400 333 444');

@@ -102,7 +102,7 @@ test.describe('webmasters', () => {
     await ring(row('#timezone'));
     await shot(content, 'webmasters/settings-timezone');
 
-    await ring(row('select[name="costume_field"]'), row('select[name="tk_id_field"]'));
+    await ring(row('select[name="costume_field"]'), row('select[name="legion_id_field"]'));
     await shot(content, 'webmasters/settings-profile-fields-costumes');
 
     await ring(

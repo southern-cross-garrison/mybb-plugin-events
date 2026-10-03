@@ -137,14 +137,14 @@ test.describe('signup wizard', () => {
     await page.locator('#rsvp_submit').click();
 
     await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
-    await expect(page.locator('#prereq_tk_id')).toBeVisible();
+    await expect(page.locator('#prereq_legion_id')).toBeVisible();
     await expect(page.locator('#prereq_preferred_name')).toBeVisible();
     await expect(page.locator('#prereq_mobile')).toBeVisible();
     await expect(page.locator('#prereq_emergency_contact')).toBeVisible();
     // The event does not require a WWCC, so it must not be asked for.
     await expect(page.locator('#prereq_wwcc')).toHaveCount(0);
 
-    await page.locator('#prereq_tk_id').fill('TK-99999');
+    await page.locator('#prereq_legion_id').fill('TK-99999');
     await page.locator('#prereq_preferred_name').fill('Newt');
     await page.locator('#prereq_mobile').fill('0400 999 999');
     await page.locator('#prereq_emergency_contact').fill('Next Of Kin 0400 888 888');
@@ -154,7 +154,7 @@ test.describe('signup wizard', () => {
     // must not be skipped along with it.
     await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'costumes');
 
-    expect(await getUserField('newbie', 'tk_id')).toBe('TK-99999');
+    expect(await getUserField('newbie', 'legion_id')).toBe('TK-99999');
     expect(await getUserField('newbie', 'preferred_name')).toBe('Newt');
     expect(await getUserField('newbie', 'mobile')).toBe('0400 999 999');
     expect(await getUserField('newbie', 'emergency_contact')).toBe('Next Of Kin 0400 888 888');
@@ -169,17 +169,17 @@ test.describe('signup wizard', () => {
     await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
 
     // The hint is the input's accessible description, not loose text beside it.
-    await expect(page.locator('#prereq_tk_id')).toHaveClass(/events_input/);
-    await expect(page.locator('#prereq_tk_id')).toHaveAttribute('aria-describedby', 'hint_tk_id');
-    await expect(page.locator('#hint_tk_id')).toHaveText(
+    await expect(page.locator('#prereq_legion_id')).toHaveClass(/events_input/);
+    await expect(page.locator('#prereq_legion_id')).toHaveAttribute('aria-describedby', 'hint_legion_id');
+    await expect(page.locator('#hint_legion_id')).toHaveText(
       'Your 501st legion ID, e.g. if you are TK-12345 then type "12345" here.',
     );
-    await expect(page.locator('label[for="prereq_tk_id"]')).toHaveClass(/events_label/);
-    await expect(page.locator('label[for="prereq_tk_id"]')).toContainText('Legion ID');
+    await expect(page.locator('label[for="prereq_legion_id"]')).toHaveClass(/events_label/);
+    await expect(page.locator('label[for="prereq_legion_id"]')).toContainText('Legion ID');
 
     // The asterisk is decoration - the required attribute is what states the rule.
-    await expect(page.locator('#prereq_tk_id')).toHaveAttribute('required', 'required');
-    await expect(page.locator('label[for="prereq_tk_id"] .events_required')).toHaveAttribute('aria-hidden', 'true');
+    await expect(page.locator('#prereq_legion_id')).toHaveAttribute('required', 'required');
+    await expect(page.locator('label[for="prereq_legion_id"] .events_required')).toHaveAttribute('aria-hidden', 'true');
   });
 
   test('re-prompts when a prerequisite is left blank', async ({ page }) => {
@@ -190,7 +190,7 @@ test.describe('signup wizard', () => {
     await page.locator('#rsvp_submit').click();
     await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
 
-    await page.locator('#prereq_tk_id').fill('TK-12345');
+    await page.locator('#prereq_legion_id').fill('TK-12345');
     // Leave the preferred name, mobile and emergency contact empty. The browser would block the submit on
     // the required attributes, so drop them: the server must do its own validation.
     await page.locator('#rsvp_form').evaluate((form: HTMLFormElement) => {
@@ -219,7 +219,7 @@ test.describe('signup wizard', () => {
     await page.locator('#rsvp_submit').click();
     await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
     await expect(page.locator('#prereq_wwcc')).toBeVisible();
-    await expect(page.locator('#prereq_tk_id')).toHaveCount(0);
+    await expect(page.locator('#prereq_legion_id')).toHaveCount(0);
 
     await page.locator('#prereq_wwcc').fill('WWCC-54321');
     await page.locator('#rsvp_submit').click();

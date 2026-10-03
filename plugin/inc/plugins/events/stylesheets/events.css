@@ -986,16 +986,88 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 /* ---------------------------------------------------------------------------
  * Calendar view
  * ------------------------------------------------------------------------ */
-#events_calendar { width: 100%; border-collapse: collapse; }
-#events_calendar td { border: 1px solid #ccc; vertical-align: top; height: 80px; width: 14%; padding: 4px; }
-#events_calendar td.other_month { background: #f5f5f5; }
-#events_calendar .calendar_event { display: block; font-size: 11px; margin: 2px 0; padding: 2px; background: #4CAF50; color: #fff; }
-#events_calendar .calendar_event.rsvped { background: #2196F3; }
+/* Rules and tints are the surrounding text colour at low alpha rather than fixed greys, so
+   the grid reads the same on a light theme and a dark one. Events are chips edged in the
+   accent; the ones the viewer is signed up to are filled with it. */
+#events_calendar {
+	width: 100%; table-layout: fixed;
+	border-collapse: separate; border-spacing: 0;
+	border: 1px solid rgba(127, 127, 127, 0.25); border-radius: 8px; overflow: hidden;
+}
+#events_calendar th {
+	padding: 8px; border-bottom: 1px solid rgba(127, 127, 127, 0.25); background: none;
+	font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+	text-align: left; opacity: 0.7;
+}
+#events_calendar td {
+	height: 104px; padding: 6px; vertical-align: top;
+	border-right: 1px solid rgba(127, 127, 127, 0.18); border-bottom: 1px solid rgba(127, 127, 127, 0.18);
+}
+#events_calendar tr > :last-child { border-right: 0; }
+#events_calendar tr:last-child td { border-bottom: 0; }
+#events_calendar td.is_weekend { background: rgba(127, 127, 127, 0.03); }
+#events_calendar td.other_month { background: rgba(127, 127, 127, 0.07); }
+#events_calendar .calendar_empty { display: none; }
+
+#events_calendar .calendar_date { display: flex; align-items: center; gap: 4px; }
+#events_calendar .calendar_weekday { display: none; }
+#events_calendar .calendar_day_number {
+	display: inline-flex; align-items: center; justify-content: center;
+	min-width: 24px; height: 24px; border-radius: 12px;
+	font-size: 12px; font-weight: 600; line-height: 1;
+}
+#events_calendar .is_today .calendar_day_number {
+	background: var(--events-accent, #2f6f9f); color: #fff;
+	-webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+
+#events_calendar .calendar_events { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+#events_calendar .calendar_event {
+	display: block; padding: 3px 6px; border-radius: 4px;
+	border-left: 3px solid var(--events-accent, #2f6f9f);
+	background: var(--events-accent-soft, rgba(47, 111, 159, 0.14)); color: inherit;
+	font-size: 11px; font-weight: 600; line-height: 1.3; text-decoration: none; overflow-wrap: anywhere;
+}
+#events_calendar .calendar_event.rsvped {
+	background: var(--events-accent, #2f6f9f); border-left-color: var(--events-accent-border, #2a6390); color: #fff;
+	-webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+#events_calendar .calendar_event:hover { text-decoration: none; filter: brightness(0.94); }
+#events_calendar .calendar_event:focus-visible { outline: 2px solid var(--events-accent, #2f6f9f); outline-offset: 1px; }
 /* The address under the chip, not inside it: one anchor cannot go to two places, and in a
    cell this size the venue has to give way to the event it belongs to. */
 #events_calendar .calendar_event_address {
-	display: block; font-size: 10px; line-height: 1.25; margin: 0 0 4px; padding: 0 2px;
-	opacity: 0.8; word-break: break-word;
+	display: block; margin: -1px 0 2px; padding: 0 0 0 9px;
+	font-size: 10px; line-height: 1.25; opacity: 0.75; word-break: break-word;
+}
+
+/* Seven columns of 50px cannot hold an event title, so on a phone the month becomes an
+   agenda: the days that have something on, one to a row, with the date down the left.
+   `screen and` so a phone's print dialog still gets the grid. */
+@media screen and (max-width: 700px) {
+	#events_calendar, #events_calendar tbody, #events_calendar tr { display: block; }
+	#events_calendar { border: 0; border-radius: 0; overflow: visible; }
+	#events_calendar .calendar_weekdays, #events_calendar td { display: none; }
+
+	#events_calendar .calendar_empty { display: block; }
+	#events_calendar .calendar_empty td { display: block; height: auto; padding: 24px 0; border: 0; text-align: center; opacity: 0.7; }
+
+	#events_calendar td.has_events {
+		display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 12px;
+		height: auto; padding: 12px 0; border: 0; background: none;
+	}
+	#events_calendar tr:not(:last-child) td.has_events,
+	#events_calendar td.has_events:not(:last-child) { border-bottom: 1px solid rgba(127, 127, 127, 0.18); }
+
+	#events_calendar .calendar_date { flex-direction: column; gap: 2px; }
+	#events_calendar .calendar_weekday {
+		display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.7;
+	}
+	#events_calendar .calendar_day_number { min-width: 34px; height: 34px; border-radius: 17px; font-size: 17px; }
+
+	#events_calendar .calendar_events { gap: 6px; margin-top: 0; }
+	#events_calendar .calendar_event { padding: 9px 12px; border-radius: 6px; font-size: 14px; }
+	#events_calendar .calendar_event_address { margin: -2px 0 2px; padding-left: 15px; font-size: 12px; }
 }
 
 /* ---------------------------------------------------------------------------
@@ -1031,7 +1103,7 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 :is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_preferred_name { width: 22%; }
 :is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_username { width: 21%; }
 :is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_role { width: 18%; }
-:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_tkid { width: 24%; }
+:is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_legion_id { width: 24%; }
 :is(#attendance_table, .attendance_waitlist_table) .attendance_identity_head .attendee_attended { width: 10%; }
 
 /* Seven columns instead of six: everything gives a little back to make room for Days. */
@@ -1039,7 +1111,7 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 :is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_preferred_name { width: 16%; }
 :is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_username { width: 16%; }
 :is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_role { width: 17%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_tkid { width: 15%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_legion_id { width: 15%; }
 :is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_days { width: 22%; }
 :is(#attendance_table, .attendance_waitlist_table).has_days .attendance_identity_head .attendee_attended { width: 10%; }
 
@@ -1059,14 +1131,14 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
 :is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_preferred_name { width: 20%; }
 :is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_username { width: 18%; }
 :is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_role { width: 15%; }
-:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_tkid { width: 14%; }
+:is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_legion_id { width: 14%; }
 :is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_wwcc { width: 18%; }
 :is(#attendance_table, .attendance_waitlist_table).has_wwcc .attendance_identity_head .attendee_attended { width: 10%; }
 :is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_num { width: 4%; }
 :is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_preferred_name { width: 14%; }
 :is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_username { width: 13%; }
 :is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_role { width: 13%; }
-:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_tkid { width: 12%; }
+:is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_legion_id { width: 12%; }
 :is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_wwcc { width: 14%; }
 :is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_days { width: 20%; }
 :is(#attendance_table, .attendance_waitlist_table).has_days.has_wwcc .attendance_identity_head .attendee_attended { width: 10%; }
@@ -1115,7 +1187,7 @@ a.event_action:hover { text-decoration: none; filter: brightness(1.08); }
    sized to hold it, and which reads badly broken over two lines. The value only - the
    heading has to be free to wrap, or at a narrow width "Legion ID" runs out over the
    column beside it, which is the very thing the rule above is avoiding. */
-:is(#attendance_table, .attendance_waitlist_table) td.attendee_tkid { white-space: nowrap; }
+:is(#attendance_table, .attendance_waitlist_table) td.attendee_legion_id { white-space: nowrap; }
 
 /* ---------------------------------------------------------------------------
  * Print

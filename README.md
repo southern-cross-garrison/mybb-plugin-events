@@ -211,7 +211,7 @@ users are shaped around the scenarios:
 | `trooper2` | 501st member with a complete profile |
 | `newbie` | No profile details at all - drives the prerequisites step |
 | `nowwcc` | Everything except a WWCC - drives the WWCC-required branch |
-| `wrangler` | Contact details but no TK ID and no costumes - the wrangling-only path |
+| `wrangler` | Contact details but no Legion ID and no costumes - the wrangling-only path |
 | `excluded` | Used for per-event exclusions |
 
 All of them use the password `testpass123`.

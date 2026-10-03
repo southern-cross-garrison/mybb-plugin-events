@@ -86,12 +86,17 @@ $profile_field_specs = array(
         'description' => 'Costumes you own and can deploy, one per line',
         'type' => 'textarea',
     ),
-    'tk_id' => array('name' => 'TK ID', 'description' => 'Your 501st legion ID', 'type' => 'text'),
+    'legion_id' => array('name' => 'Legion ID', 'description' => 'Your 501st legion ID', 'type' => 'text'),
     'wwcc' => array('name' => 'WWCC Number', 'description' => 'Working With Children Check number', 'type' => 'text'),
     'mobile' => array('name' => 'Mobile Number', 'description' => 'Contact number for event days', 'type' => 'text'),
     'emergency_contact' => array('name' => 'Emergency Contact', 'description' => 'Who to call in an emergency', 'type' => 'text'),
     'preferred_name' => array('name' => 'Preferred Name', 'description' => 'What to call you on the day', 'type' => 'text'),
 );
+
+// The Legion ID field was provisioned as "TK ID"; rename it rather than adding a second one.
+if (!$db->num_rows($db->simple_select('profilefields', 'fid', "name = 'Legion ID'"))) {
+    $db->update_query('profilefields', array('name' => 'Legion ID'), "name = 'TK ID'");
+}
 
 $field_ids = array();
 $disporder = 1;
@@ -245,18 +250,18 @@ $users = array(
     'gec' => array(
         'usergroup' => 2,
         'additionalgroups' => array($groups['gec'], $groups['garrison']),
-        'fields' => array('tk_id' => 'TK-10001', 'wwcc' => 'WWCC-1001', 'mobile' => '0400 000 001', 'emergency_contact' => 'Jane Coordinator 0400 111 001', 'preferred_name' => 'Jan', 'costume' => array($costume_options[0])),
+        'fields' => array('legion_id' => 'TK-10001', 'wwcc' => 'WWCC-1001', 'mobile' => '0400 000 001', 'emergency_contact' => 'Jane Coordinator 0400 111 001', 'preferred_name' => 'Jan', 'costume' => array($costume_options[0])),
     ),
     // Fully-provisioned members: can RSVP without touching the prerequisites step.
     'trooper1' => array(
         'usergroup' => 2,
         'additionalgroups' => array($groups['garrison']),
-        'fields' => array('tk_id' => 'TK-20001', 'wwcc' => 'WWCC-2001', 'mobile' => '0400 000 002', 'emergency_contact' => 'Kin Trooper 0400 111 002', 'preferred_name' => 'Ash', 'costume' => array($costume_options[0], $costume_options[2])),
+        'fields' => array('legion_id' => 'TK-20001', 'wwcc' => 'WWCC-2001', 'mobile' => '0400 000 002', 'emergency_contact' => 'Kin Trooper 0400 111 002', 'preferred_name' => 'Ash', 'costume' => array($costume_options[0], $costume_options[2])),
     ),
     'trooper2' => array(
         'usergroup' => 2,
         'additionalgroups' => array($groups['legion']),
-        'fields' => array('tk_id' => 'TK-20002', 'wwcc' => 'WWCC-2002', 'mobile' => '0400 000 003', 'emergency_contact' => 'Kin Trooper 0400 111 003', 'preferred_name' => 'Bex', 'costume' => array($costume_options[1])),
+        'fields' => array('legion_id' => 'TK-20002', 'wwcc' => 'WWCC-2002', 'mobile' => '0400 000 003', 'emergency_contact' => 'Kin Trooper 0400 111 003', 'preferred_name' => 'Bex', 'costume' => array($costume_options[1])),
     ),
     // Deliberately missing every prerequisite - drives the prerequisites form tests.
     'newbie' => array(
@@ -268,9 +273,9 @@ $users = array(
     'nowwcc' => array(
         'usergroup' => 2,
         'additionalgroups' => array($groups['garrison']),
-        'fields' => array('tk_id' => 'TK-20004', 'mobile' => '0400 000 004', 'emergency_contact' => 'Kin Trooper 0400 111 004', 'preferred_name' => 'Cass', 'costume' => array($costume_options[4])),
+        'fields' => array('legion_id' => 'TK-20004', 'mobile' => '0400 000 004', 'emergency_contact' => 'Kin Trooper 0400 111 004', 'preferred_name' => 'Cass', 'costume' => array($costume_options[4])),
     ),
-    // A non-costumed helper: contactable, but no TK ID, no WWCC and no costumes. Drives
+    // A non-costumed helper: contactable, but no Legion ID, no WWCC and no costumes. Drives
     // the wrangler flow, and proves the costume step is skipped rather than empty.
     'wrangler' => array(
         'usergroup' => 2,
@@ -281,7 +286,7 @@ $users = array(
     'excluded' => array(
         'usergroup' => 2,
         'additionalgroups' => array($groups['garrison']),
-        'fields' => array('tk_id' => 'TK-20005', 'wwcc' => 'WWCC-2005', 'mobile' => '0400 000 005', 'emergency_contact' => 'Kin Trooper 0400 111 005', 'preferred_name' => 'Eli', 'costume' => array($costume_options[0])),
+        'fields' => array('legion_id' => 'TK-20005', 'wwcc' => 'WWCC-2005', 'mobile' => '0400 000 005', 'emergency_contact' => 'Kin Trooper 0400 111 005', 'preferred_name' => 'Eli', 'costume' => array($costume_options[0])),
     ),
 );
 
@@ -389,7 +394,7 @@ provision_activate_plugin('smartlink', 'run scripts/install-smartlink.sh');
 // ---------------------------------------------------------------------------
 $plugin_settings = array(
     'events_costume_field' => $field_ids['costume'],
-    'events_tk_id_field' => $field_ids['tk_id'],
+    'events_legion_id_field' => $field_ids['legion_id'],
     'events_wwcc_field' => $field_ids['wwcc'],
     'events_mobile_field' => $field_ids['mobile'],
     'events_emergency_contact_field' => $field_ids['emergency_contact'],

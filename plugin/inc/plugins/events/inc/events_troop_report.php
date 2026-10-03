@@ -269,9 +269,9 @@ function events_troop_report_roster_line(array $attendee, $with_id = true)
 
     $parts[] = $attendee['username'];
 
-    if($with_id && trim($attendee['tk_id']) !== '')
+    if($with_id && trim($attendee['legion_id']) !== '')
     {
-        $parts[] = trim($attendee['tk_id']);
+        $parts[] = trim($attendee['legion_id']);
     }
 
     return events_escape_bbcode(implode(' - ', $parts));

@@ -217,7 +217,7 @@ update_theme_stylesheet_list(${tid}, false, true);
     const f = fixtures();
 
     expect(await getSetting('events_costume_field')).toBe(String(f.profileFields.costume));
-    expect(await getSetting('events_tk_id_field')).toBe(String(f.profileFields.tk_id));
+    expect(await getSetting('events_legion_id_field')).toBe(String(f.profileFields.legion_id));
     expect(await getSetting('events_event_coordinator_groups')).toBe(String(f.groups.gec));
     expect(await getSetting('events_troop_report_forum')).toBe(String(f.forums.troop_reports));
 

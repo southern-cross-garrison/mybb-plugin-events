@@ -96,7 +96,7 @@ function events_admin_rsvps()
             return "<a href=\"index.php?module=user-users&amp;action=edit&amp;uid=" . $member['uid'] . "\">" . htmlspecialchars_uni($member['username']) . "</a>";
         }),
         'role'     => array("Role", 8, function($member) { return events_role_label($member['role']); }),
-        'tk_id'    => array("Legion ID", 12, function($member) { return htmlspecialchars_uni($member['tk_id']); }),
+        'legion_id'    => array("Legion ID", 12, function($member) { return htmlspecialchars_uni($member['legion_id']); }),
         'costumes' => array("Costumes", 26, function($member) { return htmlspecialchars_uni(implode(', ', $member['costumes'])); }),
         'days'     => array("Days Attending", 18, function($member) use ($event_days) {
             $day_ids = array();
@@ -111,7 +111,7 @@ function events_admin_rsvps()
     );
     if($is_social)
     {
-        unset($columns['tk_id'], $columns['costumes']);
+        unset($columns['legion_id'], $columns['costumes']);
         $columns['user'][1] = 30;
         $columns['days'][1] = 26;
     }

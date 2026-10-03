@@ -1,6 +1,7 @@
 import { Locator, Page } from '@playwright/test';
 import fs from 'node:fs';
 import path from 'node:path';
+import sharp from 'sharp';
 
 /** Screenshots land where the guide's pages import them from. */
 export const SCREENSHOT_DIR = path.resolve(__dirname, '../src/assets/screenshots');
@@ -82,6 +83,36 @@ async function clearRings(page: Page): Promise<void> {
   await page.evaluate(() => document.querySelectorAll('.docs-ring').forEach((el) => el.remove()));
 }
 
+/**
+ * How far apart two captures of the same screen can be and still count as the same picture.
+ *
+ * Chromium's text anti-aliasing is not quite stable between runs: a page that has not
+ * changed comes back with a few hundred pixels off by up to ~15 levels in a channel, which
+ * nobody could see but which rewrites the file and puts it in the diff. A pixel counts as
+ * changed only past `CHANNEL_TOLERANCE` in some channel; a real change - different text, a
+ * moved control, a new colour - moves far more than that.
+ */
+const CHANNEL_TOLERANCE = 32;
+
+/** Whether `next` shows something the PNG already at `file` doesn't. */
+async function differs(file: string, next: Buffer): Promise<boolean> {
+  if (!fs.existsSync(file)) {
+    return true;
+  }
+  const [a, b] = await Promise.all(
+    [fs.readFileSync(file), next].map((png) => sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true })),
+  );
+  if (a.info.width !== b.info.width || a.info.height !== b.info.height) {
+    return true;
+  }
+  for (let i = 0; i < a.data.length; i++) {
+    if (Math.abs(a.data[i] - b.data[i]) > CHANNEL_TOLERANCE) {
+      return true;
+    }
+  }
+  return false;
+}
+
 async function boxOf(locator: Locator): Promise<Box> {
   const box = await locator.boundingBox();
   if (!box) {
@@ -92,6 +123,8 @@ async function boxOf(locator: Locator): Promise<Box> {
 
 /**
  * Save a screenshot as `<guide>/<name>.png`, with the rings marked since the last shot.
+ * The file is left alone when the picture in it is the same, so a rerun only touches the
+ * screenshots whose pages changed.
  *
  * With rings it is cropped to them plus some context, which is what makes the control
  * readable at the width the guide shows images at. The crop never leaves `area`, so the
@@ -107,12 +140,23 @@ export async function shot(area: Locator, name: string, options: ShotOptions = {
 
   const file = path.join(SCREENSHOT_DIR, `${name}.png`);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const capture = { path: file, animations: 'disabled', caret: 'hide' } as const;
+  const image = await capture(area, targets, { crop, minWidth, minHeight, padding, include });
+  if (await differs(file, image)) {
+    fs.writeFileSync(file, image);
+  }
+}
 
+/** Take the picture `shot()` describes, rings and all, as PNG bytes. */
+async function capture(
+  area: Locator,
+  targets: Locator[],
+  { crop, minWidth, minHeight, padding, include }: Required<ShotOptions>,
+): Promise<Buffer> {
+  const page = area.page();
+  const options = { animations: 'disabled', caret: 'hide' } as const;
   try {
     if (targets.length === 0) {
-      await area.screenshot(capture);
-      return;
+      return await area.screenshot(options);
     }
 
     if (!crop) {
@@ -120,8 +164,7 @@ export async function shot(area: Locator, name: string, options: ShotOptions = {
       // coordinates and the element screenshot scrolls as it needs to.
       await area.scrollIntoViewIfNeeded();
       await drawRings(page, await Promise.all(targets.map(boxOf)), 'absolute');
-      await area.screenshot(capture);
-      return;
+      return await area.screenshot(options);
     }
 
     // Bring the first ringed control to the middle of the screen, so there is context on
@@ -164,8 +207,8 @@ export async function shot(area: Locator, name: string, options: ShotOptions = {
     // Fixed to the screen, which is what a non-full-page clip captures, so the rings land
     // on the controls however the page scrolls.
     await drawRings(page, boxes, 'fixed');
-    await page.screenshot({
-      ...capture,
+    return await page.screenshot({
+      ...options,
       clip: { x: Math.round(left), y: Math.round(top), width: Math.round(right - left), height: Math.round(bottom - top) },
     });
   } finally {

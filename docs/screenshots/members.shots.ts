@@ -113,6 +113,8 @@ test.describe('members: finding events', () => {
     await shot(page.locator('#events_page'), 'members/events-calendar-button');
 
     await page.goto('/events.php?view=calendar');
+    // The home page's hero: the whole calendar, nothing ringed.
+    await shot(page.locator('#events_page'), 'members/events-calendar-overview');
     await ring(page.locator('#events_view_list'));
     // Tall enough to show it's the calendar, not just the button.
     await shot(page.locator('#events_page'), 'members/events-calendar', { minHeight: 420 });

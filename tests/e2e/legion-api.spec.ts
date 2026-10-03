@@ -224,12 +224,12 @@ test.describe('costumes from the 501st Legion API', () => {
 
       // Costumes wait until the Legion ID has had its chance to fill them in.
       await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
-      await expect(page.locator('#prereq_tk_id')).toBeVisible();
+      await expect(page.locator('#prereq_legion_id')).toBeVisible();
       await expect(page.locator('#prereq_costume')).toHaveCount(0);
       await expect(page.locator('#rsvp_wrangle_note')).toHaveCount(0);
       expect(legionApiRequests()).toEqual([]);
 
-      await page.locator('#prereq_tk_id').fill('TK-33151');
+      await page.locator('#prereq_legion_id').fill('TK-33151');
       await page.locator('#prereq_preferred_name').fill('Newt');
       await page.locator('#prereq_mobile').fill('0400 999 999');
       await page.locator('#prereq_emergency_contact').fill('Next Of Kin 0400 888 888');
@@ -251,7 +251,7 @@ test.describe('costumes from the 501st Legion API', () => {
       // Typing the ID sets off the lookup preview 400ms later, which asks the API too.
       // Waited for, so the count below does not depend on how long the rest takes to fill.
       const looked = page.waitForResponse((response) => response.url().includes('action=events_legion_lookup'));
-      await page.locator('#prereq_tk_id').fill('33151');
+      await page.locator('#prereq_legion_id').fill('33151');
       await looked;
       await page.locator('#prereq_preferred_name').fill('Newt');
       await page.locator('#prereq_mobile').fill('0400 999 999');
@@ -262,7 +262,7 @@ test.describe('costumes from the 501st Legion API', () => {
       await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
       await expect(page.locator('#rsvp_errors')).toHaveCount(0);
       await expect(page.locator('#prereq_costume')).toBeVisible();
-      await expect(page.locator('#prereq_tk_id')).toHaveCount(0);
+      await expect(page.locator('#prereq_legion_id')).toHaveCount(0);
       await expect(page.locator('#rsvp_wrangle_instead')).toBeVisible();
       // The preview's, then the save's.
       expect(legionApiRequests()).toEqual(['/legionId/33151/costumes', '/legionId/33151/costumes']);
@@ -291,25 +291,25 @@ test.describe('costumes from the 501st Legion API', () => {
       await page.goto(`/rsvp.php?id=${eventId}`);
       await page.locator('#rsvp_submit').click();
 
-      const lookup = page.locator('#prereq_tk_id_lookup');
+      const lookup = page.locator('#prereq_legion_id_lookup');
       await expect(lookup).toBeHidden();
 
-      await page.locator('#prereq_tk_id').fill('TK-33151');
+      await page.locator('#prereq_legion_id').fill('TK-33151');
       await expect(lookup.locator('.events_legion_lookup_member')).toHaveText('Newt Trooper - Southern Cross Garrison');
       await expect(lookup.locator('.events_legion_lookup_costumes li')).toHaveText([
         'TK - Stormtrooper: ANH Stunt',
         'TS - Snowtrooper',
       ]);
 
-      await page.locator('#prereq_tk_id').fill('4242');
+      await page.locator('#prereq_legion_id').fill('4242');
       // Private on 501st.com, which the API cannot tell apart from an ID nobody holds.
       await expect(lookup).toHaveText('No public 501st record for this Legion ID.');
 
       // The API down is no answer at all, rather than a claim the ID is unknown.
-      await page.locator('#prereq_tk_id').fill('777');
+      await page.locator('#prereq_legion_id').fill('777');
       await expect(lookup).toBeHidden();
 
-      await page.locator('#prereq_tk_id').fill('');
+      await page.locator('#prereq_legion_id').fill('');
       await expect(lookup).toBeHidden();
     });
 

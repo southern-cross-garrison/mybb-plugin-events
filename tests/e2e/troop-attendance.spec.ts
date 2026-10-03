@@ -625,27 +625,27 @@ $handler->delete_user(array(${throwaway}));
   });
 
   test('matching holds at the edges of a username and a number', async () => {
-    const cases: Array<[string, { username: string; role: string; tk_id: string }, boolean]> = [
+    const cases: Array<[string, { username: string; role: string; legion_id: string }, boolean]> = [
       // The number alone, no prefix at all.
-      ['trooper1 20001', { username: 'trooper1', role: 'trooper', tk_id: 'TK-20001' }, true],
+      ['trooper1 20001', { username: 'trooper1', role: 'trooper', legion_id: 'TK-20001' }, true],
       // A longer username is not this one, and neither is one run on with an underscore.
-      ['trooper10 - TK-20001', { username: 'trooper1', role: 'trooper', tk_id: 'TK-20001' }, false],
-      ['trooper1_old - TK-20001', { username: 'trooper1', role: 'trooper', tk_id: 'TK-20001' }, false],
+      ['trooper10 - TK-20001', { username: 'trooper1', role: 'trooper', legion_id: 'TK-20001' }, false],
+      ['trooper1_old - TK-20001', { username: 'trooper1', role: 'trooper', legion_id: 'TK-20001' }, false],
       // Part of a number is not the number, either way round.
-      ['trooper1 - TK-200011', { username: 'trooper1', role: 'trooper', tk_id: 'TK-20001' }, false],
-      ['trooper1 - TK-2000', { username: 'trooper1', role: 'trooper', tk_id: 'TK-20001' }, false],
+      ['trooper1 - TK-200011', { username: 'trooper1', role: 'trooper', legion_id: 'TK-20001' }, false],
+      ['trooper1 - TK-2000', { username: 'trooper1', role: 'trooper', legion_id: 'TK-20001' }, false],
       // Leading zeros are the same number.
-      ['rex - TK-0042', { username: 'rex', role: 'trooper', tk_id: '42' }, true],
-      ['rex - TK-42', { username: 'rex', role: 'trooper', tk_id: 'TK-0042' }, true],
+      ['rex - TK-0042', { username: 'rex', role: 'trooper', legion_id: '42' }, true],
+      ['rex - TK-42', { username: 'rex', role: 'trooper', legion_id: 'TK-0042' }, true],
       // A username is text, not a pattern.
-      ['a-b.c here', { username: 'a-b.c', role: 'trooper', tk_id: '' }, true],
-      ['a-bxc here', { username: 'a-b.c', role: 'trooper', tk_id: '' }, false],
+      ['a-b.c here', { username: 'a-b.c', role: 'trooper', legion_id: '' }, true],
+      ['a-bxc here', { username: 'a-b.c', role: 'trooper', legion_id: '' }, false],
       // Letters beyond ASCII still bound a word.
-      ['Zoë - TK-7', { username: 'Zoë', role: 'trooper', tk_id: '7' }, true],
-      ['Zoëy - TK-7', { username: 'Zoë', role: 'trooper', tk_id: '7' }, false],
+      ['Zoë - TK-7', { username: 'Zoë', role: 'trooper', legion_id: '7' }, true],
+      ['Zoëy - TK-7', { username: 'Zoë', role: 'trooper', legion_id: '7' }, false],
       // A wrangler needs no number, even with one on file.
-      ['Dev - wrangler', { username: 'wrangler', role: 'wrangler', tk_id: 'TK-99' }, true],
-      ['[b]Wranglers:[/b]', { username: 'wrangler', role: 'wrangler', tk_id: '' }, false],
+      ['Dev - wrangler', { username: 'wrangler', role: 'wrangler', legion_id: 'TK-99' }, true],
+      ['[b]Wranglers:[/b]', { username: 'wrangler', role: 'wrangler', legion_id: '' }, false],
     ];
 
     const output = await runPhp(`

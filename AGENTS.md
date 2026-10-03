@@ -204,24 +204,34 @@ baseline picks the change up.
   and then start your run. Sessions that all wait this way serialise cleanly; sessions that
   each decide the lock is stale corrupt each other's runs and their own.
 
-- Wait on that pid, and not on `pgrep -f "playwright test"`. `-f` matches whole command
-  lines, and a shell sitting in a wait loop *has that string in its own command line* - so
-  every waiting session sees every other one, including itself, and none of them ever starts.
-  Three sessions deadlocked on exactly this, each holding a 15-minute wait for runs that had
-  already finished, while the lock sat free the whole time. It shows up as a run that never
-  produces output rather than as an error. If you must match a process rather than read the
-  lock, match the runner itself:
-
-      pgrep -f "node.*\.bin/playwright"
-
-  which matches the Playwright process and not the shells queued behind it.
+- Read the pid from the lock, and never look for a run by matching process names. A
+  `pgrep -f "playwright test"` matches the shells sitting in wait loops too, since that
+  string is in their own command lines - three sessions deadlocked on exactly that, waiting
+  on each other while the lock sat free. Narrowing it to `node.*\.bin/playwright` swapped
+  that for the opposite failure: pnpm starts the runner as
+  `node_modules/.bin/../.pnpm/.../cli.js test`, which that pattern does not match, so a
+  live run - the docs screenshot suite included - read as nothing running and its database
+  was restored out from under it. The lock is written by whatever started the suite, however
+  it was started, so its pid is the only answer that does not depend on the command line.
 
 - The lock only guards `npx playwright test`. It does **not** guard `scripts/db-restore.sh`,
   `scripts/db-snapshot.sh` or `scripts/provision.php`, and every one of them will wreck a run
   in flight - restoring the database mid-suite empties the tables the running tests are
   asserting on. The failures land on whoever happens to be running, not on whoever ran the
-  script, so it reads as flakiness rather than as interference. Check the lock before those
-  three exactly as you would before a test run.
+  script, so it reads as flakiness rather than as interference. Gate those three on the
+  lock's pid in the same command, so a held lock stops them rather than being printed on
+  the way past:
+
+      pid=$(sed -n 's/.*"pid": *\([0-9]*\).*/\1/p' .devenv/suite.lock 2>/dev/null)
+      if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+        echo "suite running as pid $pid" >&2
+      else
+        ./scripts/db-restore.sh && ...
+      fi
+
+  A lock file whose pid is dead is normal - nothing removes it when a run ends - and does
+  not need clearing. A snapshot taken while a run is going is wrong as well: it records that
+  run's clock and content, and every later run starts from them.
 
 - The region list is a setting the board edits, not a constant. `events_regions()` reads
   it, the `region` column is a `varchar` rather than the enum it shipped as, and the

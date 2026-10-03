@@ -415,7 +415,7 @@ function events_signup_counts(array $counts, $spell_out = false, $with_ids = fal
  *
  * The troop report draft is a BBCode document that a human then edits and posts, so the
  * document itself has to stay authorable - only the data interpolated into it is
- * neutralised. Usernames, TK IDs and costumes are all user-controlled, and a value
+ * neutralised. Usernames, Legion IDs and costumes are all user-controlled, and a value
  * containing "[/b]" or "[url=...]" would otherwise be parsed as markup in the posted
  * thread.
  *
@@ -669,9 +669,14 @@ function events_calendar_grid($month_start, array $events, array $user_rsvps)
         }
     }
 
-    // Monday-first grid.
-    $lead = ((int)events_date('N', $month_start)) - 1;
+    // Today in the board's event timezone, not the server's, so the highlighted cell is
+    // the one the garrison is living in.
+    $today = events_date('Y-m-d');
+
+    // Sunday-first grid: 'w' is 0 for Sunday, so it is the number of cells before the 1st.
+    $lead = (int)events_date('w', $month_start);
     $cells = array();
+    $has_events = false;
     for($i = 0; $i < $lead; $i++)
     {
         $cells[] = '<td class="other_month"></td>';
@@ -680,10 +685,29 @@ function events_calendar_grid($month_start, array $events, array $user_rsvps)
     for($day = 1; $day <= $days_in_month; $day++)
     {
         $date = sprintf('%04d-%02d-%02d', $year, $month, $day);
-        $content = '<strong>' . $day . '</strong>';
+        $timestamp = events_strtotime($date);
+
+        // The weekday is only shown on a phone, where the grid becomes a list of the days
+        // that have something on and the column heading is no longer above the date.
+        $content = '<span class="calendar_date"><span class="calendar_weekday">' . events_date('D', $timestamp) . '</span>'
+                 . '<span class="calendar_day_number">' . $day . '</span></span>';
+
+        $classes = array('calendar_day');
+        if($date === $today)
+        {
+            $classes[] = 'is_today';
+        }
+        if((int)events_date('N', $timestamp) >= 6)
+        {
+            $classes[] = 'is_weekend';
+        }
 
         if(isset($by_date[$date]))
         {
+            $classes[] = 'has_events';
+            $has_events = true;
+            $content .= '<div class="calendar_events">';
+
             foreach($by_date[$date] as $event)
             {
                 $class = in_array($event['id'], $user_rsvps) ? 'calendar_event rsvped' : 'calendar_event';
@@ -698,9 +722,11 @@ function events_calendar_grid($month_start, array $events, array $user_rsvps)
                     $content .= events_address_link($event['address'], 'calendar_event_address');
                 }
             }
+
+            $content .= '</div>';
         }
 
-        $cells[] = '<td data-date="' . $date . '">' . $content . '</td>';
+        $cells[] = '<td class="' . implode(' ', $classes) . '" data-date="' . $date . '">' . $content . '</td>';
     }
 
     while(count($cells) % 7 !== 0)
@@ -708,7 +734,15 @@ function events_calendar_grid($month_start, array $events, array $user_rsvps)
         $cells[] = '<td class="other_month"></td>';
     }
 
+    // An empty grid says as much on its own, but a phone shows only the days with events,
+    // so a quiet month there would be a blank page. Ahead of the weeks so that the last
+    // row of the table is still the last week, which is what the grid's borders key on.
     $rows = '';
+    if(!$has_events)
+    {
+        $rows .= '<tr class="calendar_empty"><td colspan="7">There are no events to show.</td></tr>';
+    }
+
     foreach(array_chunk($cells, 7) as $week)
     {
         $rows .= '<tr>' . implode('', $week) . '</tr>';
@@ -722,7 +756,7 @@ function events_calendar_grid($month_start, array $events, array $user_rsvps)
  *
  * The sequence is recomputed on every request rather than fixed up front, because the
  * attendance step is what decides the rest of it: a signup with no trooping day never
- * shows the costumes step, and the TK ID only becomes a prerequisite once one day is
+ * shows the costumes step, and the Legion ID only becomes a prerequisite once one day is
  * being trooped. Attendance therefore always comes first and is always shown - it is
  * where the member chooses what they are signing up to.
  *
@@ -966,8 +1000,8 @@ function events_legion_lookup_script()
     return <<<'SCRIPT'
 <script type="text/javascript">
 (function() {
-	var input = document.getElementById('prereq_tk_id');
-	var out = document.getElementById('prereq_tk_id_lookup');
+	var input = document.getElementById('prereq_legion_id');
+	var out = document.getElementById('prereq_legion_id_lookup');
 	if(!input || !out || !input.form || !window.fetch) { return; }
 
 	var key = input.form.elements['my_post_key'] ? input.form.elements['my_post_key'].value : '';

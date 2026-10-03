@@ -45,8 +45,8 @@ test.describe('choosing how to attend', () => {
     expect(await getRsvpCostumes(eventId, 'wrangler', 'wrangler')).toEqual([]);
   });
 
-  test('never asks for a TK ID when nothing is being trooped', async ({ page }) => {
-    const eventId = await createEvent({ title: 'No TKID Wrangle' });
+  test('never asks for a Legion ID when nothing is being trooped', async ({ page }) => {
+    const eventId = await createEvent({ title: 'No Legion ID Wrangle' });
 
     await loginAs(page, 'newbie');
     await page.goto(`/rsvp.php?id=${eventId}`);
@@ -54,7 +54,7 @@ test.describe('choosing how to attend', () => {
     await page.locator('#rsvp_submit').click();
 
     await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
-    await expect(page.locator('#prereq_tk_id')).toHaveCount(0);
+    await expect(page.locator('#prereq_legion_id')).toHaveCount(0);
     // A wrangler is on the attendance sheet too, so they are still asked how to be
     // greeted and reached on the day.
     await expect(page.locator('#prereq_preferred_name')).toBeVisible();
@@ -79,7 +79,7 @@ test.describe('choosing how to attend', () => {
     expect(await getUserField('newbie', 'mobile')).toBe('0400 999 111');
     expect(await getUserField('newbie', 'emergency_contact')).toBe('Next Of Kin 0400 999 222');
     // Still no Legion ID: wranglers are not full members.
-    expect(await getUserField('newbie', 'tk_id')).toBe('');
+    expect(await getUserField('newbie', 'legion_id')).toBe('');
   });
 
   test('still asks a wrangler for a WWCC when the event requires one', async ({ page }) => {
@@ -92,7 +92,7 @@ test.describe('choosing how to attend', () => {
 
     await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
     await expect(page.locator('#prereq_wwcc')).toBeVisible();
-    await expect(page.locator('#prereq_tk_id')).toHaveCount(0);
+    await expect(page.locator('#prereq_legion_id')).toHaveCount(0);
 
     await page.locator('#prereq_wwcc').fill('WWCC-9001');
     await page.locator('#rsvp_submit').click();
@@ -373,7 +373,7 @@ test.describe('wranglers on coordinator surfaces', () => {
     await expect(rows.nth(1).locator('.rsvp_role')).toHaveText('Wrangler');
     // A wrangler has neither, so the bullet simply leaves them out rather than carrying
     // two empty slots and the separators between them.
-    await expect(rows.nth(1).locator('.rsvp_tkid')).toHaveCount(0);
+    await expect(rows.nth(1).locator('.rsvp_legion_id')).toHaveCount(0);
     await expect(rows.nth(1).locator('.rsvp_costumes')).toHaveCount(0);
   });
 
@@ -389,7 +389,7 @@ test.describe('wranglers on coordinator surfaces', () => {
     await expect(page.locator('li.rsvp_row .rsvp_username')).toHaveText('trooper1');
   });
 
-  test('are on the attendance sheet with contact details but no TK ID or costume', async ({ page }) => {
+  test('are on the attendance sheet with contact details but no Legion ID or costume', async ({ page }) => {
     const eventId = await createEvent({ title: 'Attendance Wrangle' });
     await createRsvp(eventId, 'trooper1', { costumes: [TK] });
     await createRsvp(eventId, 'wrangler', { role: 'wrangler' });
@@ -401,7 +401,7 @@ test.describe('wranglers on coordinator surfaces', () => {
 
     const row = page.locator('tbody.attendee_group').filter({ hasText: 'wrangler' });
     await expect(row.locator('.attendee_role')).toHaveText('Wrangler');
-    await expect(row.locator('.attendee_tkid')).toHaveText('');
+    await expect(row.locator('.attendee_legion_id')).toHaveText('');
     await expect(row.locator('.attendee_costumes')).toHaveText('');
     await expect(row.locator('.attendee_preferred_name')).toHaveText(WRANGLER_CONTACT.preferred_name);
     await expect(row.locator('.attendee_mobile')).toHaveText(WRANGLER_CONTACT.mobile);

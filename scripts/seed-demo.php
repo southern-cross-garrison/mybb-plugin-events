@@ -238,7 +238,7 @@ function demo_member($username, array $spec)
     // demo writes them by the same names rather than by field id.
     $field_map = array(
         'costume'           => (int)events_get_setting('costume_field'),
-        'tk_id'             => (int)events_get_setting('tk_id_field'),
+        'legion_id'             => (int)events_get_setting('legion_id_field'),
         'wwcc'              => (int)events_get_setting('wwcc_field'),
         'mobile'            => (int)events_get_setting('mobile_field'),
         'emergency_contact' => (int)events_get_setting('emergency_contact_field'),
@@ -520,7 +520,7 @@ $uids = array();
 foreach($TROOPERS as $index => $username)
 {
     $fields = array(
-        'tk_id'             => sprintf('TK-%05d', 31000 + $index),
+        'legion_id'             => sprintf('TK-%05d', 31000 + $index),
         'preferred_name'    => $PREFERRED_NAMES[$username],
         'mobile'            => sprintf('0400 %03d %03d', 200 + $index, 400 + $index),
         'emergency_contact' => 'Kin ' . $username . sprintf(' 0400 %03d %03d', 900 + $index, 100 + $index),
@@ -1538,7 +1538,7 @@ foreach($HISTORY as $index => $spec)
         }));
 
         // Their number is in the report and their name is not, so they are not counted.
-        $number = preg_replace('/\D/', '', events_get_user_field(demo_uid($no_show), 'tk_id'));
+        $number = preg_replace('/\D/', '', events_get_user_field(demo_uid($no_show), 'legion_id'));
         if($index === 2 && $number !== '')
         {
             $write_up .= ' Raffle ticket ' . $number . ' won the signed helmet.';

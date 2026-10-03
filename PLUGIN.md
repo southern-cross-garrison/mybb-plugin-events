@@ -14,7 +14,7 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
   attendees, no costumes or contact details asked for, and no troop report
 - **Maximums and a Waitlist**: Cap how many troopers and wranglers an event takes; once
   it is full, signups join a waitlist that hands places out in signup order as they free up
-- **Prerequisites**: TK ID, WWCC, preferred name, mobile number, and emergency contact validation
+- **Prerequisites**: Legion ID, WWCC, preferred name, mobile number, and emergency contact validation
 - **Costume Selection**: Select from user's profile costumes during signup, or name a
   preapproved costume when the board allows it
 - **Region Filtering**: Filter events by region. The region list is the board's own -
@@ -56,7 +56,7 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 4. Go to Admin CP → Event Management → Settings
 5. Configure the plugin settings:
    - Set the event timezone (see _Event Timezone_ below)
-   - Map custom profile fields (costume, TK ID, WWCC, preferred name, mobile, emergency contact)
+   - Map custom profile fields (costume, Legion ID, WWCC, preferred name, mobile, emergency contact)
    - Turn working with children checks off if the garrison does not use them, or name the
      check the way your state does (e.g. "Blue Card" in Queensland; the default is "WWCC").
      Turned off, events no longer offer the requirement and nobody is asked for a number;
@@ -364,7 +364,7 @@ of the same flow.
 6. Select costumes
 7. Confirm
 
-Steps 5 and 6 only appear when they apply: the TK ID is only asked for once a day is being
+Steps 5 and 6 only appear when they apply: the Legion ID is only asked for once a day is being
 trooped, and the costumes step does not exist for a signup that is wrangling throughout. A
 wrangler with a complete profile therefore answers one question and confirms.
 
@@ -455,7 +455,7 @@ cutoff, a member who can't make it still has to ask the coordinator.
 ### Roles
 
 A wrangler is a non-costumed helper - a partner, friend or handler who assists on the day.
-Wranglers are not required to be full members, so they are never asked for a TK ID and never
+Wranglers are not required to be full members, so they are never asked for a Legion ID and never
 pick a costume.
 
 Roles are recorded per day, so a weekend event can be trooped on the Saturday and wrangled
@@ -851,7 +851,7 @@ equally specific rule in the theme's own sheet would lose the tie and silently d
 ## Generated Content
 
 The troop report draft is a BBCode document that the author edits before posting, so the
-document stays authorable while the data interpolated into it does not. Usernames, TK IDs,
+document stays authorable while the data interpolated into it does not. Usernames, Legion IDs,
 costumes and the event title all pass through `events_escape_bbcode()`, which rewrites
 brackets as `&#91;`/`&#93;` - MyBB's parser preserves numeric character references, so they
 render as literal brackets instead of opening a tag.
@@ -901,7 +901,7 @@ re-activating the plugin converts them in place, data included.
 - **Users**: Can view live events, sign up to attend (trooping and/or wrangling), update
   their own signup while signups are open, create troop reports, and see their own troop
   history (and only their own) in the User CP
-- **Wranglers**: No membership or TK ID required; may sign up to any event they can see, but
+- **Wranglers**: No membership or Legion ID required; may sign up to any event they can see, but
   may not author troop reports
 - **Point of Contact**: Whoever an event names as its point of contact can open that event's
   attendance sheet, from "View Attendance Sheet" on the event, whether or not they are a

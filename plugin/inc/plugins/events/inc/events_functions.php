@@ -2350,7 +2350,7 @@ function events_delete_member_data(array $user_ids)
  * Read one of the mapped custom profile fields for a user.
  *
  * @param int $user_id
- * @param string $field_name One of costume, tk_id, wwcc, mobile, emergency_contact
+ * @param string $field_name One of costume, legion_id, wwcc, mobile, emergency_contact
  * @return string
  */
 function events_get_user_field($user_id, $field_name)
@@ -2405,13 +2405,13 @@ function events_get_user_costumes($user_id)
 /**
  * Which prerequisite profile fields is the user missing for this event?
  *
- * Wranglers are not required to be full members, so they are never asked for a TK ID.
+ * Wranglers are not required to be full members, so they are never asked for a Legion ID.
  * They are still asked for the details a coordinator needs on the day - a preferred name
  * and the two contact numbers - because a wrangler is on the attendance sheet and has to
  * be greeted and reached like anybody else on it.
  *
  * A signup can hold both roles at once (trooping one day, wrangling the next), so the
- * role argument is a set: the TK ID is asked for as soon as one day is being trooped.
+ * role argument is a set: the Legion ID is asked for as soon as one day is being trooped.
  *
  * @param int|array $event
  * @param int|null $user_id
@@ -2449,7 +2449,7 @@ function events_check_prerequisites($event, $user_id = null, $roles = 'trooper')
         // is what keeps a member with an empty costume field inside the wizard - before,
         // the costumes step could only send them to the User CP to fill the field in and
         // start the signup again.
-        array_unshift($required, 'tk_id', 'costume');
+        array_unshift($required, 'legion_id', 'costume');
     }
 
     if(events_event_requires_wwcc($event))
@@ -2563,7 +2563,7 @@ function events_prerequisite_labels()
     // is a textarea, matching the profile field they are saved to. The labels are HTML;
     // the check's name is the one an admin typed.
     return array(
-        'tk_id'             => array('label' => 'Legion ID', 'hint' => 'Your 501st legion ID, e.g. if you are TK-12345 then type "12345" here.'),
+        'legion_id'             => array('label' => 'Legion ID', 'hint' => 'Your 501st legion ID, e.g. if you are TK-12345 then type "12345" here.'),
         'costume'           => array('label' => 'Approved Costumes', 'hint' => 'One per line. These are saved to your profile, and you pick from them on the next step.', 'multiline' => true),
         'preferred_name'    => array('label' => 'Preferred Name', 'hint' => 'What the coordinator should call you on the day. A first name is fine.'),
         'wwcc'              => array('label' => htmlspecialchars_uni(events_wwcc_name()) . ' Number', 'hint' => 'Required for this event.'),
@@ -2678,7 +2678,7 @@ function events_get_attendees($event_id, array $filters = array())
     // The profile fields come off the userfields row already joined above; which column
     // holds each is a setting, and a field left unmapped reads as blank.
     $field_columns = array();
-    foreach(array('preferred_name', 'tk_id', 'mobile', 'emergency_contact', 'wwcc') as $field)
+    foreach(array('preferred_name', 'legion_id', 'mobile', 'emergency_contact', 'wwcc') as $field)
     {
         $field_id = (int)events_get_setting($field . '_field');
         $field_columns[$field] = $field_id ? 'fid' . $field_id : null;
