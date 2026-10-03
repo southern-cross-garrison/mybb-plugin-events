@@ -45,11 +45,14 @@ test.describe('webmasters', () => {
 
     try {
       await page.goto('/admin/index.php?module=config-plugins');
-      const row = page.locator('tr', { hasText: 'Event Management' }).first();
-      const install = row.getByRole('link', { name: 'Install & Activate' });
+      const plugins = page.locator('table.general').first();
+      const install = plugins.getByRole('link', { name: 'Install & Activate' });
       await expect(install).toBeVisible();
       await ring(install);
-      await shot(page.locator('table.general').first(), 'webmasters/plugins-activate');
+      // Keep the plugin's name in the picture, so it's clear which row the link is on.
+      await shot(plugins, 'webmasters/plugins-activate', {
+        include: [plugins.getByText('Event Management', { exact: true })],
+      });
     } finally {
       await restoreInstalled();
     }

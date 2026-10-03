@@ -5,19 +5,19 @@ sidebar:
   order: 3
 ---
 
-import { Aside, Steps } from '@astrojs/starlight/components';
+import { Aside, Steps } from "@astrojs/starlight/components";
 
 The plugin keeps members' details in MyBB custom profile fields, so members can also edit
 them in **User CP** > **Edit Profile**. Create them before configuring the plugin.
 
-| Field | Type | Viewable by | Notes |
-| --- | --- | --- | --- |
-| **Costumes** | Textarea | Everyone | One costume per line. Overwritten from the 501st Legion each time a member signs up to troop. A multi-select or comma-separated text field also works. |
-| **Legion ID** | Text | Everyone | For example `TK-12345`. |
-| **WWCC** | Text | Admins and coordinators | Not needed if checks are turned off. |
-| **Mobile Number** | Text | Admins and coordinators | |
-| **Emergency Contact** | Text | Admins and coordinators | |
-| **Preferred Name** | Text | Everyone | Shown on the attendance sheet. |
+| Field                 | Type     | Viewable by             | Notes                                                                                                                                                  |
+| --------------------- | -------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Costumes**          | Textarea | Everyone                | One costume per line. Overwritten from the 501st Legion each time a member signs up to troop. A multi-select or comma-separated text field also works. |
+| **Legion ID**         | Text     | Everyone                | For example if you are `TK-12345`, enter `12345`.                                                                                                      |
+| **WWCC**              | Text     | Admins and coordinators | Not needed if checks are turned off.                                                                                                                   |
+| **Mobile Number**     | Text     | Admins and coordinators |                                                                                                                                                        |
+| **Emergency Contact** | Text     | Admins and coordinators |                                                                                                                                                        |
+| **Preferred Name**    | Text     | Everyone                | Shown on the attendance sheet.                                                                                                                         |
 
 ## Create a field
 
@@ -40,7 +40,7 @@ them in **User CP** > **Edit Profile**. Create them before configuring the plugi
 Then pick each field on **Event Management** > **Settings**. See [Settings](../settings/).
 
 <Aside type="caution">
-  Keep mobile numbers, emergency contacts and WWCC numbers private. The plugin only shows
-  them on attendance sheets, but MyBB shows profile fields on profiles and posts unless
-  **Viewable By** says otherwise.
+  Keep mobile numbers, emergency contacts and WWCC numbers private. The plugin
+  only shows them on attendance sheets, but MyBB shows profile fields on
+  profiles and posts unless **Viewable By** says otherwise.
 </Aside>
