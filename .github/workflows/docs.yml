@@ -8,10 +8,14 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
+      # The front page's version number is read from events_info().
+      - 'plugin/inc/plugins/events.php'
       - '.github/workflows/docs.yml'
   pull_request:
     paths:
       - 'docs/**'
+      # The front page's version number is read from events_info().
+      - 'plugin/inc/plugins/events.php'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
