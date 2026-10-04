@@ -264,11 +264,11 @@ git push origin v1.3
 ```
 
 The tag runs the whole workflow, and once both PHP versions pass, the _Publish the release_
-job attaches the zip as `mybb-plugin-events.zip` with release notes generated from the
-commits since the last tag. It fails without publishing if the tag and the plugin's
-version disagree. The asset keeps the same name every release, so
-`releases/latest/download/mybb-plugin-events.zip` always fetches the newest one; the
-user guide links to it.
+job attaches the zip as `mybb-plugin-events-<tag>.zip` (`mybb-plugin-events-v1.3.zip`
+for the tag above) with release notes generated from the commits since the last tag. It
+fails without publishing if the tag and the plugin's version disagree. Since the asset's
+name changes every release, the user guide links to `releases/latest`, the newest
+release's page, rather than to the file.
 
 ## License
 

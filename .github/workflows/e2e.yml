@@ -129,10 +129,11 @@ jobs:
           path: plugin/
           if-no-files-found: error
 
-  # A version tag publishes a GitHub Release with the zip attached, under the same name
-  # every time so the guide can link to the latest one:
-  # releases/latest/download/mybb-plugin-events.zip. It waits for the package job, and so
-  # for both PHP versions, so a release is always one the suite passed on.
+  # A version tag publishes a GitHub Release with the zip attached, named for the tag
+  # (mybb-plugin-events-v1.2.1.zip) so a downloaded copy says which version it is. The
+  # guide links to releases/latest rather than to the asset for that reason. It waits for
+  # the package job, and so for both PHP versions, so a release is always one the suite
+  # passed on.
   release:
     name: Publish the release
     if: startsWith(github.ref, 'refs/tags/v')
@@ -157,13 +158,13 @@ jobs:
       # Same contents as the package job's artifact: plugin/ with no folder around it.
       - name: Build the zip
         working-directory: plugin
-        run: zip -r -X ../mybb-plugin-events.zip . -x '*.DS_Store'
+        run: zip -r -X "../mybb-plugin-events-${GITHUB_REF_NAME}.zip" . -x '*.DS_Store'
 
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "${GITHUB_REF_NAME}" mybb-plugin-events.zip \
+          gh release create "${GITHUB_REF_NAME}" "mybb-plugin-events-${GITHUB_REF_NAME}.zip" \
             --title "${GITHUB_REF_NAME}" \
             --generate-notes \
             --verify-tag
