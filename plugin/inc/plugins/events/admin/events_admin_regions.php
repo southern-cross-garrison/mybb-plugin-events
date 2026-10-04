@@ -258,12 +258,19 @@ function events_admin_save_region_settings(array $regions, array $forums)
 /**
  * Add a region to the end of the list.
  *
+ * A board's first region also takes every event it already has: until now they were
+ * filed under no region, which is not something a board with regions can have.
+ *
  * @param string $name
  * @param array $errors Appended to
- * @return bool
+ * @param array|null $thread_errors Set to the announcements that could not follow their
+ *        events, which does not stop the addition
+ * @return int|false events filed under it, or false when nothing was done
  */
-function events_admin_add_region($name, array &$errors)
+function events_admin_add_region($name, array &$errors, &$thread_errors = null)
 {
+    $thread_errors = array();
+
     $regions = events_regions();
 
     $error = events_admin_region_name_error($name, $regions);
@@ -273,14 +280,28 @@ function events_admin_add_region($name, array &$errors)
         return false;
     }
 
+    $moves = $regions ? array() : array('' => $name);
+    $former_forum_ids = events_announcement_forum_ids();
+    $announced = events_admin_announced_event_ids($moves);
+
     $regions[] = $name;
     events_admin_save_region_settings($regions, events_region_forums());
 
-    return true;
+    // The list first, the reverse of a deletion, for the same reason: interrupted between
+    // the two, the events are left with no region - still listed - rather than filed under
+    // one the board does not have yet.
+    $moved = events_admin_apply_region_moves($moves);
+
+    $thread_errors = events_admin_sync_region_threads($announced, $former_forum_ids);
+
+    return $moved;
 }
 
 /**
  * Delete a region, moving any events filed under it somewhere else.
+ *
+ * The last region has nowhere else for its events to go, so they are left with none -
+ * the same as on a board that never had regions.
  *
  * @param string $region
  * @param string $move_to Where its events go; ignored when it has none
@@ -301,16 +322,14 @@ function events_admin_delete_region($region, $move_to, array &$errors, &$thread_
         return false;
     }
 
-    if(count($regions) < 2)
-    {
-        $errors[] = "The board needs at least one region: every event has to be filed under one.";
-        return false;
-    }
-
     $counts = events_admin_region_event_counts();
     $count = isset($counts[$region]) ? (int)$counts[$region] : 0;
 
-    if($count > 0 && (!in_array($move_to, $regions, true) || $move_to === $region))
+    if(count($regions) === 1)
+    {
+        $move_to = '';
+    }
+    elseif($count > 0 && (!in_array($move_to, $regions, true) || $move_to === $region))
     {
         $errors[] = "Choose a region to move " . events_admin_region_event_phrase($count)
             . " filed under \"" . htmlspecialchars_uni($region) . "\" to.";
@@ -547,10 +566,18 @@ function events_admin_region_action()
         elseif($action === 'add')
         {
             $name = trim($mybb->get_input('region_add_name'));
+            $filed = events_admin_add_region($name, $errors, $thread_errors);
 
-            if(events_admin_add_region($name, $errors))
+            if($filed !== false)
             {
-                flash_message("\"" . htmlspecialchars_uni($name) . "\" added.", "success");
+                $message = "\"" . htmlspecialchars_uni($name) . "\" added.";
+                if($filed > 0)
+                {
+                    $message .= " " . $filed . " " . ($filed === 1 ? "event was" : "events were") . " filed under it.";
+                }
+
+                flash_message($thread_errors ? $message . " " . implode(" ", $thread_errors) : $message,
+                    $thread_errors ? "error" : "success");
                 admin_redirect("index.php?module=events&action=settings");
             }
         }
@@ -562,7 +589,11 @@ function events_admin_region_action()
             if($moved !== false)
             {
                 $message = "\"" . htmlspecialchars_uni($region) . "\" deleted.";
-                if($moved > 0)
+                if($moved > 0 && !events_has_regions())
+                {
+                    $message .= " " . $moved . " " . ($moved === 1 ? "event no longer has" : "events no longer have") . " a region.";
+                }
+                elseif($moved > 0)
                 {
                     $message .= " " . $moved . " " . ($moved === 1 ? "event was" : "events were") . " moved to \""
                         . htmlspecialchars_uni($mybb->get_input('region_move_to')) . "\".";
@@ -643,6 +674,8 @@ function events_admin_output_region_delete_page($region)
 
     $counts = events_admin_region_event_counts();
     $count = isset($counts[$region]) ? (int)$counts[$region] : 0;
+    // The last region's events have nowhere to move to, so there is nothing to ask.
+    $last = count($regions) === 1;
 
     $form = new Form("index.php?module=events&amp;action=settings", "post");
     echo $form->generate_hidden_field("region_action", "delete");
@@ -652,10 +685,11 @@ function events_admin_output_region_delete_page($region)
     $container->output_row("Are you sure?",
         $count === 0
             ? "No events are associated with this region, so nothing else changes."
-            : events_admin_region_event_phrase($count) . " associated with this region, and will move to the region chosen below.",
+            : events_admin_region_event_phrase($count) . " associated with this region, and will "
+                . ($last ? "no longer have one." : "move to the region chosen below."),
         "Deleting \"" . htmlspecialchars_uni($region) . "\" cannot be undone.");
 
-    if($count > 0)
+    if($count > 0 && !$last)
     {
         $choices = array();
         foreach($regions as $other)
@@ -676,7 +710,7 @@ function events_admin_output_region_delete_page($region)
     $container->end();
 
     $form->output_submit_wrapper(array(
-        $form->generate_submit_button($count > 0 ? "Move Them and Delete" : "Delete Region"),
+        $form->generate_submit_button($count > 0 && !$last ? "Move Them and Delete" : "Delete Region"),
         '<a href="index.php?module=events&amp;action=settings" class="button">Cancel</a>',
     ));
     $form->end();
@@ -853,7 +887,8 @@ function events_admin_output_region_modals(array $rows, array $counts)
             // Worded exactly as the scriptless confirmation page this modal stands in
             // for: the two describe the same deletion, and the suite asserts both.
             : 'Are you sure you want to delete "' + region + '"? ' + events
-              + (events === 1 ? ' event is' : ' events are') + ' associated with this region.';
+              + (events === 1 ? ' event is' : ' events are') + ' associated with this region.'
+              + (regions.length > 1 ? '' : (events === 1 ? ' It' : ' They') + ' will no longer have one.');
         submit.textContent = 'Yes, delete it';
 
         open('confirm');
@@ -919,8 +954,9 @@ function events_admin_output_region_modals(array $rows, array $counts)
 
     form.addEventListener('submit', function (event) {
         // "Yes, delete it" on a region with events is a step forward, not the deletion:
-        // the events have nowhere to go yet.
-        if (state.step === 'confirm' && state.events > 0) {
+        // the events have nowhere to go yet. The last region's have nowhere to go at all,
+        // and are left with no region.
+        if (state.step === 'confirm' && state.events > 0 && regions.length > 1) {
             event.preventDefault();
             askWhereEventsGo();
             return;

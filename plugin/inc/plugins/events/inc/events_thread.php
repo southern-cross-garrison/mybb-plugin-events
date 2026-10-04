@@ -176,8 +176,11 @@ function events_event_post_content(array $event)
 
     // The region links back to the listing filtered to it: the reader of a Canberra
     // thread is the reader most likely to want the rest of the Canberra schedule.
-    $content .= "[b]Region:[/b] [url=" . $mybb->settings['bburl'] . "/events.php?region="
-              . urlencode($event['region']) . "]" . events_escape_bbcode($event['region']) . "[/url]\n";
+    if($event['region'] !== '')
+    {
+        $content .= "[b]Region:[/b] [url=" . $mybb->settings['bburl'] . "/events.php?region="
+                  . urlencode($event['region']) . "]" . events_escape_bbcode($event['region']) . "[/url]\n";
+    }
 
     // The address is a link to the map rather than a line of text to copy out: the thread
     // is what most members read the event from, and "where is it" is the question they are
@@ -394,7 +397,8 @@ function events_write_event_thread($event_id, &$error = null, array $former_foru
     $forum_id = events_event_forum_id($event['region']);
     if(!$forum_id)
     {
-        $error = "No forum is configured for " . htmlspecialchars_uni($event['region']) . " events, so nothing was posted."
+        $error = ($event['region'] === '' ? "No event forum is configured" : "No forum is configured for " . htmlspecialchars_uni($event['region']) . " events")
+               . ", so nothing was posted."
                . " An administrator can set one in Admin CP -> Event Management -> Settings.";
         return 0;
     }

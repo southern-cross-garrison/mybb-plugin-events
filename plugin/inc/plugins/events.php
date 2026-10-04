@@ -120,7 +120,7 @@ function events_install_settings()
 {
     global $db;
 
-    // For EVENTS_DEFAULT_REGIONS, EVENTS_DEFAULT_TIMEZONE, EVENTS_DEFAULT_WWCC_NAME and
+    // For EVENTS_DEFAULT_TIMEZONE, EVENTS_DEFAULT_WWCC_NAME and
     // EVENTS_DEFAULT_LEGION_API_URL.
     require_once MYBB_ROOT . "inc/plugins/events/inc/events_render.php";
 
@@ -178,7 +178,7 @@ function events_install_settings()
         array("name" => "events_troop_report_forum", "title" => "Troop Report Forum", "description" => "The forum troop reports are posted to", "optionscode" => "forumselectsingle", "disporder" => 9),
         array("name" => "events_event_forum", "title" => "Default Event Forum", "description" => "The forum an event's announcement thread is posted to when its region has no forum of its own", "optionscode" => "forumselectsingle", "disporder" => 10),
         array("name" => "events_event_forums", "title" => "Event Forums by Region", "description" => "Which forum each region's events are announced in, as a comma separated list of Region=forum id pairs. Set it in Admin CP -> Event Management -> Settings rather than here.", "optionscode" => "text", "disporder" => 11),
-        array("name" => "events_regions", "title" => "Regions", "description" => "The regions an event can belong to, as a comma separated list. Set it in Admin CP -> Event Management -> Settings rather than here - removing a region there also rehomes the events that were in it, and removing it here would leave them pointing at a region that no longer exists.", "optionscode" => "text", "disporder" => 13, "value" => EVENTS_DEFAULT_REGIONS),
+        array("name" => "events_regions", "title" => "Regions", "description" => "The regions an event can belong to, as a comma separated list. Set it in Admin CP -> Event Management -> Settings rather than here - removing a region there also rehomes the events that were in it, and removing it here would leave them pointing at a region that no longer exists.", "optionscode" => "text", "disporder" => 13),
         array("name" => "events_print_logo", "title" => "Print Logo", "description" => "Shown in the ribbon at the top of printed pages. A URL, or a path relative to the board root (e.g. images/logo.png). Leave blank to fall back to the theme's own logo.", "optionscode" => "text", "disporder" => 12),
         // Numbered after the settings that shipped before it rather than beside the other
         // profile-field pickers: the install loop leaves an existing setting alone, so
@@ -217,7 +217,56 @@ function events_install_settings()
         $db->insert_query("settings", $row);
     }
 
+    events_restore_legacy_regions();
+
     rebuild_settings();
+}
+
+/**
+ * Give a board that was relying on the old built-in region list that list for real.
+ *
+ * Boards used to start with Sydney, Hunter, Canberra and Other, and an emptied setting
+ * fell back to the same four. Neither happens any more - a board starts with no regions -
+ * so a board whose setting is blank but whose events are filed under regions was reading
+ * them from that fallback, and would otherwise upgrade into events filed under regions it
+ * no longer has. Any other region its events use is kept as well, after the four.
+ * A board that set its own list is left alone, and so is one with no regional events.
+ */
+function events_restore_legacy_regions()
+{
+    global $db;
+
+    $query = $db->simple_select("settings", "sid, value", "name = 'events_regions'");
+    $setting = $db->fetch_array($query);
+    if(!$setting || trim((string)$setting['value']) !== '' || !$db->table_exists("event_plugin_events"))
+    {
+        return;
+    }
+
+    $used = array();
+    $query = $db->simple_select("event_plugin_events", "DISTINCT region", "region != ''", array("order_by" => "region"));
+    while($row = $db->fetch_array($query))
+    {
+        $used[] = $row['region'];
+    }
+
+    if(!$used)
+    {
+        return;
+    }
+
+    $regions = array('Sydney', 'Hunter', 'Canberra', 'Other');
+    foreach($used as $region)
+    {
+        if(!in_array($region, $regions, true))
+        {
+            $regions[] = $region;
+        }
+    }
+
+    $db->update_query("settings",
+        array("value" => $db->escape_string(implode(',', $regions))),
+        "sid = " . (int)$setting['sid']);
 }
 
 /**

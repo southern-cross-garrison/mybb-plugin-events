@@ -663,12 +663,14 @@ function events_event_form_values(array $event = array())
 
     if(empty($event['id']))
     {
+        $regions = events_regions();
+
         return array(
             'title'         => '',
             'event_type'    => 'troop',
             'description'   => '',
             'status'        => 'pending',
-            'region'        => 'Sydney',
+            'region'        => $regions ? $regions[0] : '',
             'address'       => '',
             'start_date'    => '',
             'end_date'      => '',
@@ -890,7 +892,10 @@ function events_validate_event_input(array $input, array $event = array())
     {
         $errors[] = "The event type cannot be changed once members have signed up.";
     }
-    if(!in_array($input['region'], events_regions(), true))
+    // A board with no regions files every event under none, and a board with regions
+    // files every event under one of them.
+    $regions = events_regions();
+    if($regions ? !in_array($input['region'], $regions, true) : $input['region'] !== '')
     {
         $errors[] = "Invalid region.";
     }

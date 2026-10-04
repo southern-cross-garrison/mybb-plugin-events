@@ -246,6 +246,14 @@ baseline picks the change up.
   anybody saves it, so it reads as "the event vanished" rather than as a settings bug.
   That is the whole reason deleting a region asks where its events go first.
 
+- A board starts with no regions, and an empty list is a real state, not a fallback: every
+  event is filed under `''`, and everything that asks for or shows a region checks
+  `events_has_regions()` and leaves it out. The two states never mix - deleting the last
+  region empties its events' region, and adding the first files every event under it.
+  `events_restore_legacy_regions()` exists because an empty setting used to fall back to
+  Sydney/Hunter/Canberra/Other: a board upgraded with a blank setting and regional events
+  gets that list written for real on activation.
+
 - The events table's `region` column is `utf8mb4_bin`, unlike every other text column.
   The region list is exact strings in PHP, and under the table's `general_ci` the database
   treated `Cafe` and `Café` as one value in every GROUP BY, WHERE and CASE the region code

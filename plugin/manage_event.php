@@ -189,13 +189,16 @@ $manage_details .= events_form_field(
     true
 );
 
-$manage_details .= events_form_field(
-    'event_form_region',
-    'Region',
-    events_form_select('region', 'event_form_region', array_combine(events_regions(), events_regions()), $values['region'], true),
-    'Used by the region filter on the events listing.',
-    true
-);
+if(events_has_regions())
+{
+    $manage_details .= events_form_field(
+        'event_form_region',
+        'Region',
+        events_form_select('region', 'event_form_region', array_combine(events_regions(), events_regions()), $values['region'], true),
+        'Used by the region filter on the events listing.',
+        true
+    );
+}
 
 $manage_details .= events_form_field(
     'event_form_address',

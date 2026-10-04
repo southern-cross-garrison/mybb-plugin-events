@@ -129,7 +129,7 @@ while($event = $db->fetch_array($query))
 // page's threads are looked up in one go rather than once per row.
 events_thread_rows($thread_ids);
 
-$region_options = events_region_options($region_filter);
+$events_region_filter = events_region_filter($region_filter);
 $events_view_toggle = events_view_toggle($view, $region_filter, $show_archived);
 $events_archived_filter = events_archived_filter($show_archived);
 $events_filter_disclosure = events_filter_disclosure($region_filter, $show_archived);
@@ -178,6 +178,11 @@ if($view === 'calendar')
     output_page($page);
     exit;
 }
+
+// A board with no regions has no Region column to fill.
+$has_regions = events_has_regions();
+$events_region_head = $has_regions ? '<td class="tcat"><strong>Region</strong></td>' : '';
+$events_columns = $has_regions ? 6 : 5;
 
 $events_rows = '';
 foreach($events as $event)
@@ -237,7 +242,10 @@ foreach($events as $event)
 
     $events_rows .= '<td class="trow1 event_title"><a class="event_link" href="' . events_event_url($event) . '">'
         . htmlspecialchars_uni($event['title']) . '</a>' . $type_pill . $address_line . '</td>';
-    $events_rows .= '<td class="trow1 event_region">' . htmlspecialchars_uni($event['region']) . '</td>';
+    if($has_regions)
+    {
+        $events_rows .= '<td class="trow1 event_region">' . htmlspecialchars_uni($event['region']) . '</td>';
+    }
     $events_rows .= '<td class="trow1 event_start">'
         . events_format_list_date($event['start_date'], isset($event['end_date']) ? $event['end_date'] : null) . '</td>';
     // Abbreviated to T / W here (A for a social event's attendees): the column is narrow
@@ -259,7 +267,7 @@ foreach($events as $event)
 
 if($events_rows === '')
 {
-    $events_rows = '<tr id="events_empty"><td class="trow1" colspan="6">There are no events to show.</td></tr>';
+    $events_rows = '<tr id="events_empty"><td class="trow1" colspan="' . $events_columns . '">There are no events to show.</td></tr>';
 }
 
 $events_print_header = events_print_header('Events', array($region_filter,

@@ -18,7 +18,7 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
 - **Costume Selection**: Select from user's profile costumes during signup, or name a
   preapproved costume when the board allows it
 - **Region Filtering**: Filter events by region. The region list is the board's own -
-  add, rename and delete regions in the Admin CP
+  add, rename and delete regions in the Admin CP, or have none at all
 - **Archived Events Kept Aside**: The index shows what is coming; events that have been
   closed out are one tick of **Show archived** away rather than gone
 - **Calendar & List Views**: View events in calendar or list format, switched with one
@@ -64,7 +64,7 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
      turned back on
    - Turn **Preapproved Costumes** on to let troopers name a costume they are preapproved
      for (see _Preapproved costumes_ below). It starts off. With it on, **Preapproval
-     Requirements** takes a link to the post setting out how a member gets preapproved
+     Requirements** takes a link to the post, or its ID, setting out how a member gets preapproved
    - Set GEC user groups
    - Set Garrison Members and 501st Members group IDs
    - Set troop report forum ID
@@ -243,18 +243,22 @@ again. Unlike the list/calendar choice, it is not remembered between visits.
 
 A region is the label an event is filed under: the events listing filters by it, and an
 event's announcement thread goes to that region's forum. The list lives in Admin CP →
-Event Management → Settings, one row per region, and ships as Sydney, Hunter, Canberra
-and Other for a board that does not change it.
+Event Management → Settings, one row per region, and starts empty. A board with no
+regions never asks for one or shows one: there is no region on the event form, no filter
+on the listing, no Regions report, and every announcement goes to the default event
+forum. A board upgraded from a version that shipped Sydney, Hunter, Canberra and Other
+keeps whatever list it had.
 
 - **Renaming** one is a matter of editing its box and saving the page. Every event filed
   under it comes with it, and so does its announcement forum.
 - **Adding** one is the Add Region button. It can be used on an event the moment it
-  exists; its announcement forum is set on its row afterwards.
+  exists; its announcement forum is set on its row afterwards. A board's first region
+  takes every event the board already has, since those were filed under none.
 - **Deleting** one is the × at the end of its row. If any events are filed under it, the
   confirmation asks which region they should move to and moves them - the plugin will not
   leave an event filed under a region that no longer exists, because such an event is
-  invisible to the region filter and cannot be saved from the event form. The board
-  always keeps at least one region.
+  invisible to the region filter and cannot be saved from the event form. Deleting the
+  last region leaves its events with no region, as on a board that never had any.
 
 A region name cannot contain a comma or an equals sign, and is at most 64 characters.
 
@@ -383,7 +387,10 @@ that post on step 6, rendered as it reads in its thread, and must tick "I have f
 these steps and have received confirmation of preapproval for this costume for this event"
 before they can go on. The tick is not stored, so it is asked for every time they sign up
 or edit a signup that uses a preapproval. The setting accepts a link to the post (or to
-its thread, meaning the first post) or a post ID, and is stored as the post ID. A post
+its thread, meaning the first post) or a post ID, and is stored and shown as the post ID,
+with a link to the post beside it. A pasted link is turned into the ID on the page before
+the form is sent, because hosts running ModSecurity refuse a form that posts a web address
+with "406 Not Acceptable"; with scripts off, enter the ID. A post
 that has since been deleted or unapproved counts as none, and nothing is asked.
 
 ### Costumes from the 501st Legion API

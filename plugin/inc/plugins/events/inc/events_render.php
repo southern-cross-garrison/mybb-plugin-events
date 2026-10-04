@@ -17,15 +17,13 @@ if(!defined("IN_MYBB"))
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
 
 /**
- * The region list a board starts with, and what it falls back to if the setting is
- * ever emptied. A region is only a label the board sorts its events by, so the list is
- * configurable (Admin CP -> Event Management -> Settings) rather than the plugin's to
- * decide - a garrison in one state wants one entry, not four states it does not run.
- */
-define('EVENTS_DEFAULT_REGIONS', 'Sydney,Hunter,Canberra,Other');
-
-/**
  * The board's regions, in the order the Admin CP has them.
+ *
+ * A board starts with none. A region is only a label the board sorts its events by, so
+ * the list is the board's to build (Admin CP -> Event Management -> Settings) rather than
+ * the plugin's to decide - a garrison in one state wants no regions at all, not four
+ * states it does not run. With none, nothing asks for or shows one, and events are filed
+ * under the empty string.
  *
  * @return array of string
  */
@@ -40,10 +38,6 @@ function events_regions()
  * Stored as one comma separated setting rather than a table of its own: it is a handful
  * of labels that only ever get read as a list, and a table would mean an id on every
  * event and a join on every page that shows one.
- *
- * An empty list falls back to the default rather than leaving the board with no regions
- * at all, which would fail validation on every event form and make the plugin unusable
- * until somebody noticed the setting.
  *
  * @param string $stored
  * @return array of string
@@ -62,22 +56,32 @@ function events_parse_regions($stored)
         }
     }
 
-    if(!$regions)
-    {
-        $regions = explode(',', EVENTS_DEFAULT_REGIONS);
-    }
-
     return $regions;
 }
 
 /**
- * <option> markup for the region filter.
+ * Whether the board sorts its events by region at all.
+ *
+ * @return bool
+ */
+function events_has_regions()
+{
+    return events_regions() !== array();
+}
+
+/**
+ * The region filter on the events index, or nothing on a board with no regions.
  *
  * @param string $selected
  * @return string
  */
-function events_region_options($selected)
+function events_region_filter($selected)
 {
+    if(!events_has_regions())
+    {
+        return '';
+    }
+
     $html = '<option value="">All Regions</option>';
     foreach(events_regions() as $region)
     {
@@ -85,7 +89,7 @@ function events_region_options($selected)
         $html .= '<option value="' . htmlspecialchars_uni($region) . '"' . $is_selected . '>' . htmlspecialchars_uni($region) . '</option>';
     }
 
-    return $html;
+    return '<select name="region" id="events_region_filter" class="events_select">' . $html . '</select>';
 }
 
 /**

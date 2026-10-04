@@ -245,7 +245,8 @@ function events_ical_vevents(array $event, $user_id)
 
     // LOCATION is what a calendar app hands to its maps button, so the address is what
     // belongs in it. The region stays as the fallback: it is all an event without an
-    // address has, and an entry with no location at all would be a step back.
+    // address has, and an entry with no location at all would be a step back - unless the
+    // board has no regions either, and then there is nothing to say.
     $address = isset($event['address']) ? trim((string)$event['address']) : '';
     $location = $address !== '' ? $address : $event['region'];
 
@@ -334,7 +335,10 @@ function events_ical_vevents(array $event, $user_id)
         $lines[] = $dtend;
         $lines[] = "SUMMARY:" . events_ical_escape(events_ical_summary($role_days, $event['title'], $day['id']));
         $lines[] = "DESCRIPTION:" . events_ical_escape($description);
-        $lines[] = "LOCATION:" . events_ical_escape($location);
+        if($location !== '')
+        {
+            $lines[] = "LOCATION:" . events_ical_escape($location);
+        }
         $lines[] = "URL:" . $url;
         $lines[] = "END:VEVENT";
     }

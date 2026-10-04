@@ -1,6 +1,7 @@
 import { test, expect, Page } from '../helpers/fixtures';
 import { loginToAdminCp, gotoEventsAdmin, loginAs } from '../helpers/auth';
 import { runPhp } from '../helpers/container';
+import { relativeToTestNow } from '../helpers/clock';
 import {
 	createEvent,
 	getEvent,
@@ -8,6 +9,7 @@ import {
 	getThread,
 	getThreadFirstPost,
 	query,
+	queryOne,
 	T,
 	fixtures,
 } from '../helpers/db';
@@ -133,7 +135,11 @@ async function restoreRegions(page: Page): Promise<void> {
 
 async function restoreRegionList(page: Page): Promise<void> {
 	const wanted = DEFAULT_REGIONS.split(',');
-	let current = (await getSetting('events_regions')).split(',');
+	const list = async () => {
+		const setting = await getSetting('events_regions');
+		return setting === '' ? [] : setting.split(',');
+	};
+	let current = await list();
 
 	if (current.join(',') === DEFAULT_REGIONS) {
 		return;
@@ -151,7 +157,7 @@ async function restoreRegionList(page: Page): Promise<void> {
 
 	if (renamed) {
 		await save(page);
-		current = (await getSetting('events_regions')).split(',');
+		current = await list();
 	}
 
 	for (const extra of current.slice(wanted.length)) {
@@ -482,18 +488,69 @@ test.describe('configurable regions', () => {
 		expect((await getEvent(eventId)).region).toBe('Canberra');
 	});
 
-	test('will not leave the board with no regions at all', async ({ page }) => {
-		await gotoSettings(page);
+	test('deleting the last region leaves its events with none, and the next one added takes them back', async ({
+		page,
+	}) => {
+		const eventId = await createEvent({ title: 'Regionless Troop', region: 'Sydney' });
+		const threadId = await announce(eventId);
 
+		await gotoSettings(page);
 		for (const region of ['Other', 'Canberra', 'Hunter']) {
 			await deleteRegion(page, region);
 		}
-
 		expect(await getSetting('events_regions')).toBe('Sydney');
 
-		await deleteRegion(page, 'Sydney');
-		await expect(page.locator('.error')).toContainText('at least one region');
-		expect(await getSetting('events_regions')).toBe('Sydney');
+		// There is nowhere else for the last region's events to go, so the dialog does not
+		// ask where - one confirmation is the deletion.
+		await page.locator('.events_region_delete[data-region="Sydney"]').click();
+		await expect(page.locator('#events_region_modal_message')).toContainText(
+			'It will no longer have one'
+		);
+		await modalSubmit(page).click();
+
+		await expect(page.locator('#flash_message')).toContainText('1 event no longer has a region');
+		expect(await getSetting('events_regions')).toBe('');
+		expect((await getEvent(eventId)).region).toBe('');
+		expect((await getThreadFirstPost(threadId)).message).not.toContain('Region:');
+
+		// A board with no regions neither asks for one nor shows one.
+		await loginAs(page, 'gec');
+		await page.goto('/manage_event.php?action=add');
+		await expect(page.locator('#event_form_title')).toBeVisible();
+		await expect(page.locator('#event_form_region')).toHaveCount(0);
+
+		await page.locator('#event_form_title').fill('Regionless Draft');
+		const [startDate, startTime] = relativeToTestNow({ days: 21 }).split(' ');
+		const [endDate, endTime] = relativeToTestNow({ days: 21, hours: 6 }).split(' ');
+		await page.locator('#event_form_start_date').fill(startDate);
+		await page.locator('#event_form_start_date_time').fill(startTime.slice(0, 5));
+		await page.locator('#event_form_end_date').fill(endDate);
+		await page.locator('#event_form_end_date_time').fill(endTime.slice(0, 5));
+		await page.locator('#manage_event_submit').click();
+		await expect(page.locator('#event_page')).toContainText('Regionless Draft');
+		const draft = await queryOne(
+			`SELECT id, region FROM ${T('event_plugin_events')} WHERE title = 'Regionless Draft'`
+		);
+		expect(draft?.region).toBe('');
+
+		await page.goto('/events.php');
+		const row = page.locator('tr.event_row', { hasText: 'Regionless Troop' });
+		await expect(row).toHaveCount(1);
+		await expect(row.locator('.event_region')).toHaveCount(0);
+		await expect(page.locator('#events_region_filter')).toHaveCount(0);
+
+		await page.goto(`/event.php?id=${eventId}`);
+		await expect(page.locator('#event_meta')).toBeVisible();
+		await expect(page.locator('#event_region')).toHaveCount(0);
+
+		// The first region added is where every one of those events goes, since a board
+		// with regions files every event under one.
+		await gotoSettings(page);
+		await addRegion(page, 'Illawarra');
+		await expect(page.locator('#flash_message')).toContainText('2 events were filed under it');
+		expect((await getEvent(eventId)).region).toBe('Illawarra');
+		expect((await getEvent(Number(draft?.id))).region).toBe('Illawarra');
+		expect((await getThreadFirstPost(threadId)).message).toContain('Illawarra');
 	});
 
 	test('keeps the rest of the settings form when a region name is rejected', async ({ page }) => {

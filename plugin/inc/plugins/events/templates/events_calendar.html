@@ -19,7 +19,7 @@
 <form method="get" action="events.php" class="events_filter_form" id="events_filter_form">
 <input type="hidden" name="view" value="calendar" />
 <input type="hidden" name="month" value="{$calendar_month}" />
-<select name="region" id="events_region_filter" class="events_select">{$region_options}</select>
+{$events_region_filter}
 {$events_archived_filter}
 <noscript><input type="submit" class="button" value="Filter" /></noscript>
 </form>

@@ -24,12 +24,19 @@ require_once MYBB_ROOT . "inc/plugins/events/admin/events_admin_nudge.php";
  */
 function events_admin_report_views()
 {
-    return array(
+    $views = array(
         'people'   => 'People',
         'events'   => 'Events',
         'regions'  => 'Regions',
         'costumes' => 'Costumes',
     );
+
+    if(!events_has_regions())
+    {
+        unset($views['regions']);
+    }
+
+    return $views;
 }
 
 function events_admin_reports()
@@ -97,7 +104,10 @@ function events_admin_reports()
     $container->output_row("Order", "", $form->generate_select_box("order", array('most' => 'Most first', 'least' => 'Least first'), $ascending ? 'least' : 'most', array("id" => "report_order")), "report_order");
     $container->output_row("From", "Events starting on or after", $form->generate_text_box("from", $filters['from'], array("id" => "report_from", "class" => "events_datepicker")), "report_from");
     $container->output_row("To", "Events starting on or before", $form->generate_text_box("to", $filters['to'], array("id" => "report_to", "class" => "events_datepicker")), "report_to");
-    $container->output_row("Region", "", $form->generate_select_box("region", $regions, htmlspecialchars_uni($filters['region']), array("id" => "report_region")), "report_region");
+    if(count($regions) > 1)
+    {
+        $container->output_row("Region", "", $form->generate_select_box("region", $regions, htmlspecialchars_uni($filters['region']), array("id" => "report_region")), "report_region");
+    }
     $container->output_row("Role", "", $form->generate_select_box("role", array('' => 'Any role', 'trooper' => 'Trooper', 'wrangler' => 'Wrangler'), $filters['role'], array("id" => "report_role")), "report_role");
     $container->end();
 
@@ -203,12 +213,17 @@ function events_admin_report_filter_summary($view_label, $ascending, array $filt
         $dates = 'All dates';
     }
 
-    return implode(' · ', array(
+    $parts = array(
         $view_label . ', ' . ($ascending ? 'least first' : 'most first'),
         $dates,
-        $filters['region'] !== '' ? $filters['region'] : 'All regions',
-        $filters['role'] !== '' ? events_role_label($filters['role']) . 's' : 'Any role',
-    ));
+    );
+    if(events_has_regions())
+    {
+        $parts[] = $filters['region'] !== '' ? $filters['region'] : 'All regions';
+    }
+    $parts[] = $filters['role'] !== '' ? events_role_label($filters['role']) . 's' : 'Any role';
+
+    return implode(' · ', $parts);
 }
 
 /**
@@ -323,10 +338,15 @@ function events_admin_report_table_events(array $rows)
 {
     global $mybb;
 
+    $has_regions = events_has_regions();
+
     $table = new Table;
     $table->construct_header("Event", array("width" => "34%"));
     $table->construct_header("Date", array("width" => "16%"));
-    $table->construct_header("Region", array("width" => "14%"));
+    if($has_regions)
+    {
+        $table->construct_header("Region", array("width" => "14%"));
+    }
     $table->construct_header("Attended", array("width" => "12%", "class" => "align_center"));
     $table->construct_header("Signed Up", array("width" => "12%", "class" => "align_center"));
     $table->construct_header("Turnout", array("width" => "12%", "class" => "align_center"));
@@ -338,7 +358,10 @@ function events_admin_report_table_events(array $rows)
 
         $table->construct_cell("<a href=\"" . $mybb->settings['bburl'] . "/event.php?id=" . (int)$row['id'] . "\">" . htmlspecialchars_uni($row['title']) . "</a>", array("class" => "events_report_member"));
         $table->construct_cell(events_format_date($row['start_date'], $mybb->settings['dateformat']));
-        $table->construct_cell(htmlspecialchars_uni($row['region']));
+        if($has_regions)
+        {
+            $table->construct_cell(htmlspecialchars_uni($row['region']));
+        }
         $table->construct_cell((int)$row['attended'], array("class" => "align_center events_report_count"));
         $table->construct_cell($signups, array("class" => "align_center"));
         $table->construct_cell($turnout, array("class" => "align_center"));

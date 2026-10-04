@@ -189,15 +189,37 @@ test.describe('preapproval requirements setting', () => {
 		await page.locator('#preapproval_enabled_yes').check();
 		await expect(page.locator('#row_preapproval_post')).toBeVisible();
 
+		// A web address in a posted field is refused by the garrison host's ModSecurity
+		// with a 406, so the link has to leave the page as the post's id.
 		await page
 			.locator('#preapproval_post')
 			.fill(`http://localhost/showthread.php?tid=${tid}&pid=${pid}#pid${pid}`);
+		const save = page.waitForRequest(
+			(request) => request.method() === 'POST' && request.url().includes('action=settings')
+		);
 		await page.locator('input[type="submit"][value="Save Settings"]').click();
+		expect(new URLSearchParams((await save).postData() ?? '').get('preapproval_post')).toBe(
+			String(pid)
+		);
 		await expect(page.locator('#flash_message')).toContainText('Settings updated successfully');
 		expect(await getSetting('events_preapproval_post')).toBe(String(pid));
-		await expect(page.locator('#preapproval_post')).toHaveValue(
+		await expect(page.locator('#preapproval_post')).toHaveValue(String(pid));
+		await expect(page.locator('#preapproval_post_link')).toHaveAttribute(
+			'href',
 			new RegExp(`pid=${pid}#pid${pid}$`)
 		);
+
+		// A link to the thread names its first post, which only the server can look up.
+		await page.locator('#preapproval_post').fill(`http://localhost/showthread.php?tid=${tid}`);
+		const threadSave = page.waitForRequest(
+			(request) => request.method() === 'POST' && request.url().includes('action=settings')
+		);
+		await page.locator('input[type="submit"][value="Save Settings"]').click();
+		expect(
+			new URLSearchParams((await threadSave).postData() ?? '').get('preapproval_post')
+		).toBe(`thread-${tid}`);
+		await expect(page.locator('#flash_message')).toContainText('Settings updated successfully');
+		expect(await getSetting('events_preapproval_post')).toBe(String(pid));
 
 		await page.locator('#preapproval_post').fill('');
 		await page.locator('input[type="submit"][value="Save Settings"]').click();

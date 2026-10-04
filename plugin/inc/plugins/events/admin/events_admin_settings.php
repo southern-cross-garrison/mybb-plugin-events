@@ -376,7 +376,11 @@ function events_admin_settings()
             array("id" => "preapproval_enabled_yes"), array("id" => "preapproval_enabled_no")),
         "", array(), array("id" => "row_preapproval_enabled"));
 
-    // Shown back as a link to the post rather than the bare id it is stored as.
+    // Shown back as the bare id it is stored as, with the link to the post beside the box
+    // rather than in it. A web address in a posted field is what a host's ModSecurity
+    // rules refuse with a 406 before the plugin ever sees the request, and a box filled
+    // with one would make every later save of this page fail the same way. The script
+    // below turns a pasted link into its id before the form is sent.
     $preapproval_pid = (int)events_get_setting('preapproval_post');
     if($mybb->request_method == "post")
     {
@@ -384,13 +388,16 @@ function events_admin_settings()
     }
     else
     {
-        $preapproval_post_value = $preapproval_pid > 0
-            ? $mybb->settings['bburl'] . '/' . get_post_link($preapproval_pid) . '#pid' . $preapproval_pid
-            : '';
+        $preapproval_post_value = $preapproval_pid > 0 ? (string)$preapproval_pid : '';
+    }
+    $preapproval_post_link = '';
+    if($preapproval_pid > 0)
+    {
+        $preapproval_post_link = ' <a href="' . htmlspecialchars_uni($mybb->settings['bburl'] . '/' . get_post_link($preapproval_pid) . '#pid' . $preapproval_pid) . '" target="_blank" rel="noopener" id="preapproval_post_link">View post</a>';
     }
     $form_container->output_row("Preapproval Requirements",
-        "A post setting out what a member must do to be preapproved. A member using a preapproved costume is shown it and has to confirm they have followed it each time they sign up. Paste a link to the post, or leave blank to ask for nothing.",
-        $form->generate_text_box("preapproval_post", $preapproval_post_value, array("id" => "preapproval_post")),
+        "A post setting out what a member must do to be preapproved. A member using a preapproved costume is shown it and has to confirm they have followed it each time they sign up. Paste a link to the post or its ID, or leave blank to ask for nothing.",
+        $form->generate_text_box("preapproval_post", $preapproval_post_value, array("id" => "preapproval_post")) . $preapproval_post_link,
         "preapproval_post", array(), array("id" => "row_preapproval_post"));
 
     // Working with children checks. The name and the profile field only mean anything
@@ -503,6 +510,31 @@ function events_admin_settings()
     yes.addEventListener('change', update);
     no.addEventListener('change', update);
     update();
+})();
+
+// A pasted link is turned into the post's id as soon as it is pasted (or thread-N for a
+// thread, whose first post only the server can look up), and again as the form is sent,
+// so it never reaches the server as a web address: ModSecurity refuses a POST carrying
+// one with a 406. Read the same way as events_admin_preapproval_post_id(); an address
+// that names no post is left alone for the server to reject.
+(function () {
+    var box = document.getElementById('preapproval_post');
+    if (!box || !box.form) { return; }
+
+    function toId() {
+        var value = box.value.replace(/^\s+|\s+$/g, '');
+        var match;
+        if ((match = /(?:[?&;]pid=|#pid|\bpost-)(\d+)/i.exec(value))) {
+            box.value = match[1];
+        } else if ((match = /(?:[?&;]tid=|\bthread-)(\d+)/i.exec(value))) {
+            box.value = 'thread-' + match[1];
+        }
+    }
+
+    // Not on every keystroke, which would cut a link typed by hand off at its first digit.
+    box.addEventListener('paste', function () { setTimeout(toId, 0); });
+    box.addEventListener('change', toId);
+    box.form.addEventListener('submit', toId);
 })();
 </script>
 HTML;

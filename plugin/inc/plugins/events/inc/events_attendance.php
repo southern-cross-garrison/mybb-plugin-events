@@ -1076,20 +1076,24 @@ function events_usercp_troops_body($uid)
     }
     $html .= events_chart_bars($bars, 'Costumes worn', 'events_chart_my_costumes');
 
+    $has_regions = events_has_regions();
+
     $rows = '';
     foreach($member['history'] as $index => $troop)
     {
         $rows .= '<tr class="events_troops_row">'
             . '<td class="trow' . ($index % 2 + 1) . '"><a href="' . htmlspecialchars_uni(events_event_url($troop)) . '">' . htmlspecialchars_uni($troop['title']) . '</a></td>'
             . '<td class="trow' . ($index % 2 + 1) . '">' . events_format_date($troop['start_date'], $date_format) . '</td>'
-            . '<td class="trow' . ($index % 2 + 1) . '">' . htmlspecialchars_uni($troop['region']) . '</td>'
+            . ($has_regions ? '<td class="trow' . ($index % 2 + 1) . ' events_troops_region">' . htmlspecialchars_uni($troop['region']) . '</td>' : '')
             . '<td class="trow' . ($index % 2 + 1) . '">' . events_role_label($troop['role']) . '</td>'
             . '<td class="trow' . ($index % 2 + 1) . '">' . htmlspecialchars_uni(implode(', ', $troop['costumes'])) . '</td>'
             . '</tr>';
     }
 
     $html .= '<table class="events_troops_history" id="events_troops_history">'
-        . '<thead><tr><th class="tcat">Event</th><th class="tcat">Date</th><th class="tcat">Region</th><th class="tcat">Role</th><th class="tcat">Costumes</th></tr></thead>'
+        . '<thead><tr><th class="tcat">Event</th><th class="tcat">Date</th>'
+        . ($has_regions ? '<th class="tcat events_troops_region">Region</th>' : '')
+        . '<th class="tcat">Role</th><th class="tcat">Costumes</th></tr></thead>'
         . '<tbody>' . $rows . '</tbody>'
         . '</table>';
 

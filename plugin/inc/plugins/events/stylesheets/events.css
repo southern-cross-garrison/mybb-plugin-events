@@ -2740,7 +2740,7 @@ a.rsvp_remove:focus {
 /* The history is five narrow columns; below a phone's width the region and the costumes
    are what give way, since the event and its date are what the row is. */
 @media (max-width: 480px) {
-	.events_troops_history :is(th, td):nth-child(3) {
+	.events_troops_history .events_troops_region {
 		display: none;
 	}
 }

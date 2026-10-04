@@ -68,7 +68,9 @@ function events_render_event_card(array $event, $thread_id = 0)
     // The one label that is a job outstanding rather than a state, coloured the same way
     // the listing colours it.
     $event_status_class = events_needs_troop_report($event) ? 'event_status_needs_report' : '';
-    $event_region = htmlspecialchars_uni($event['region']);
+    // An event on a board with no regions is filed under none, and has no row to show.
+    $event_region_row = $event['region'] === '' ? ''
+        : '<p><strong>Region:</strong> <span id="event_region">' . htmlspecialchars_uni($event['region']) . '</span></p>';
     $event_start_date = events_format_long_date($event['start_date']);
     $event_end_date = events_format_long_date($event['end_date']);
     $event_description = events_parse_description($event['description']);

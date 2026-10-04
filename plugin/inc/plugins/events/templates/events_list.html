@@ -8,12 +8,12 @@
 <div id="events_page" class="events_page_wrap">
 {$events_print_header}
 <table border="0" cellspacing="{$theme['borderwidth']}" cellpadding="{$theme['tablespace']}" class="tborder" id="events_table">
-<tr class="no-print events_toolbar_row"><td class="trow1" colspan="6">
+<tr class="no-print events_toolbar_row"><td class="trow1" colspan="{$events_columns}">
 <div class="events_toolbar">
 {$events_filter_disclosure}
 <form method="get" action="events.php" class="events_filter_form" id="events_filter_form">
 <input type="hidden" name="view" value="list" />
-<select name="region" id="events_region_filter" class="events_select">{$region_options}</select>
+{$events_region_filter}
 {$events_archived_filter}
 <noscript><input type="submit" class="button" value="Filter" /></noscript>
 </form>
@@ -23,7 +23,7 @@
 </td></tr>
 <tr class="events_list_head">
 <td class="tcat"><strong>Event</strong></td>
-<td class="tcat"><strong>Region</strong></td>
+{$events_region_head}
 <td class="tcat"><strong>When</strong></td>
 <td class="tcat"><strong>Signups</strong></td>
 <td class="tcat"><strong>Status</strong></td>

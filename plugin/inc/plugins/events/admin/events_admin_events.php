@@ -55,11 +55,16 @@ function events_admin_list_events()
         LIMIT {$start}, {$per_page}
     ");
 
+    $has_regions = events_has_regions();
+
     $table = new Table;
     $table->construct_header("Title", array("width" => "24%"));
     $table->construct_header("Status", array("width" => "8%"));
     $table->construct_header("Type", array("width" => "7%"));
-    $table->construct_header("Region", array("width" => "9%"));
+    if($has_regions)
+    {
+        $table->construct_header("Region", array("width" => "9%"));
+    }
     $table->construct_header("Starts", array("width" => "13%"));
     $table->construct_header("Troopers", array("width" => "7%"));
     $table->construct_header("Wranglers", array("width" => "7%"));
@@ -74,7 +79,10 @@ function events_admin_list_events()
         $table->construct_cell("<a href=\"" . $mybb->settings['bburl'] . "/event.php?id=" . (int)$event['id'] . "\">" . htmlspecialchars_uni($event['title']) . "</a>");
         $table->construct_cell("<span class=\"event_status_" . htmlspecialchars_uni($event['status']) . "\">" . ucfirst($event['status']) . "</span>");
         $table->construct_cell($types[events_event_type($event)]);
-        $table->construct_cell(htmlspecialchars_uni($event['region']));
+        if($has_regions)
+        {
+            $table->construct_cell(htmlspecialchars_uni($event['region']));
+        }
         $table->construct_cell(events_format_date($event['start_date']));
 
         // A count for a role the event does not take would read as nobody having signed up
@@ -268,7 +276,10 @@ function events_admin_edit_event()
     {
         $region_choices[htmlspecialchars_uni($region)] = htmlspecialchars_uni($region);
     }
-    $container->output_row("Region", "Used by the region filter", $form->generate_select_box("region", $region_choices, htmlspecialchars_uni((string)$values['region']), array("id" => "region")), "region");
+    if($region_choices)
+    {
+        $container->output_row("Region", "Used by the region filter", $form->generate_select_box("region", $region_choices, htmlspecialchars_uni((string)$values['region']), array("id" => "region")), "region");
+    }
     $container->output_row("Address", "Optional. Where the event happens; shown as a Google Maps link on the event pages and in the announcement thread", $form->generate_text_box("address", $values['address'], array("id" => "address", "maxlength" => 255)), "address");
     // The date boxes are not generate_text_box(): it can set a class, an id and a style and
     // nothing else, so it cannot produce the time input beside each one. events_datetime_field()
