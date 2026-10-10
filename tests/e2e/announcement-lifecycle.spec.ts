@@ -147,6 +147,83 @@ test.describe('announcement threads when something goes wrong', () => {
 		expect(message).not.toContain('taken off the schedule');
 	});
 
+	test('archiving an event moves its thread to the archive forum, and making it live moves it back', async ({
+		page,
+	}) => {
+		const title = announcementTitle('Filed Away Troop');
+		const eventId = await createEvent({ title, status: 'live', region: 'Hunter' });
+		const { threadId } = await announce(eventId);
+		expect(Number((await getThread(threadId)).fid)).toBe(FORUMS.events_hunter);
+
+		await loginToAdminCp(page);
+		await followAdminActionLink(page, `action=status&id=${eventId}&status=archived`);
+
+		expect(Number((await getThread(threadId)).fid)).toBe(FORUMS.events_archive);
+		// Moved, not redirected: a "Moved:" stub names the event's title and nothing marks
+		// it as the event's, so the exclusion hooks could not hide it.
+		const stubs = await query(`SELECT tid FROM ${T('threads')} WHERE closed = ?`, [`moved|${threadId}`]);
+		expect(stubs).toHaveLength(0);
+
+		await followAdminActionLink(page, `action=status&id=${eventId}&status=live`);
+		expect(Number((await getThread(threadId)).fid)).toBe(FORUMS.events_hunter);
+	});
+
+	test('with no archive forum, an archived event keeps its thread where it is', async ({ page }) => {
+		const restore = await withSettings({ events_archive_forum: '' });
+
+		try {
+			const title = announcementTitle('Unfiled Troop');
+			const eventId = await createEvent({ title, status: 'live', region: 'Sydney' });
+			const { threadId } = await announce(eventId);
+
+			await loginToAdminCp(page);
+			await followAdminActionLink(page, `action=status&id=${eventId}&status=archived`);
+
+			expect((await getEvent(eventId)).status).toBe('archived');
+			expect(Number((await getThread(threadId)).fid)).toBe(FORUMS.events);
+		} finally {
+			await restore();
+		}
+	});
+
+	test('setting the archive forum moves the threads of events already archived', async ({ page }) => {
+		const restore = await withSettings({ events_archive_forum: '' });
+
+		try {
+			const title = announcementTitle('Long Gone Troop');
+			const eventId = await createEvent({ title, status: 'live', region: 'Sydney' });
+			const { threadId } = await announce(eventId);
+			await execute(`UPDATE ${T('event_plugin_events')} SET status = 'archived' WHERE id = ?`, [
+				eventId,
+			]);
+			await announce(eventId);
+			expect(Number((await getThread(threadId)).fid)).toBe(FORUMS.events);
+
+			await loginToAdminCp(page);
+			await gotoEventsAdmin(page, '&action=settings');
+			await page.locator('#archive_forum').selectOption(String(FORUMS.events_archive));
+			await page.locator('input[type="submit"][value="Save Settings"]').click();
+			await expect(page.locator('#flash_message')).toContainText('Settings updated successfully');
+
+			expect(Number((await getThread(threadId)).fid)).toBe(FORUMS.events_archive);
+		} finally {
+			await restore();
+		}
+	});
+
+	test('archiving leaves a thread a moderator filed elsewhere where they put it', async ({ page }) => {
+		const title = announcementTitle('Kept Troop');
+		const eventId = await createEvent({ title, status: 'live', region: 'Sydney' });
+		const { threadId } = await announce(eventId);
+		await execute(`UPDATE ${T('threads')} SET fid = ? WHERE tid = ?`, [FORUMS.general, threadId]);
+
+		await loginToAdminCp(page);
+		await followAdminActionLink(page, `action=status&id=${eventId}&status=archived`);
+
+		expect((await getEvent(eventId)).status).toBe('archived');
+		expect(Number((await getThread(threadId)).fid)).toBe(FORUMS.general);
+	});
+
 	test('deleting an event deletes its announcement thread', async ({ page }) => {
 		// The thread is hidden from excluded members only through its event, so a thread
 		// that outlived the event would be readable by exactly the members it was hidden

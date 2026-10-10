@@ -105,7 +105,7 @@ test.describe('troop reports', () => {
 			'[b]Location:[/b] Gosford Japanese Gardens',
 			'[b]Weather:[/b]',
 			'[b]Date/ Time:[/b] 4th of October from 2pm',
-			'[b]Garrison Troopers:[/b]\n[list]\n[*]Ash - trooper1 - TK-20001\n[/list]',
+			'[b]Garrison Troopers:[/b]\n[list]\n[*]Ash - trooper1 - TK-62815\n[/list]',
 			'[b]Mission Report:[/b]',
 			'[b]Mission Status:[/b]',
 			'[b]Photos by:[/b]\nIf permission is not granted, say so... (for use by PR team)',
@@ -135,8 +135,8 @@ test.describe('troop reports', () => {
 		const garrisonIndex = draft.indexOf('[b]Garrison Troopers:[/b]');
 		const legionIndex = draft.indexOf('[b]Other 501st Troopers:[/b]');
 		const otherIndex = draft.indexOf('[b]Other Troopers:[/b]');
-		const trooper1 = draft.indexOf('[*]Ash - trooper1 - TK-20001\n');
-		const trooper2 = draft.indexOf('[*]Bex - trooper2 - TK-20002\n');
+		const trooper1 = draft.indexOf('[*]Ash - trooper1 - TK-62815\n');
+		const trooper2 = draft.indexOf('[*]Bex - trooper2 - TD-23094\n');
 		const newbie = draft.indexOf('[*]newbie\n');
 		expect(garrisonIndex).toBeGreaterThan(-1);
 		expect(trooper1).toBeGreaterThan(garrisonIndex);
@@ -155,7 +155,7 @@ test.describe('troop reports', () => {
 		await page.goto(`/troop_report.php?id=${eventId}`);
 
 		const draft = await page.locator('#troop_report_content').inputValue();
-		expect(draft).toContain('Ash - trooper1 - TK-20001');
+		expect(draft).toContain('Ash - trooper1 - TK-62815');
 		expect(draft).not.toContain('trooper2');
 
 		// Waiting for a place is not having attended, so there is no report to write either.
@@ -191,8 +191,8 @@ test.describe('troop reports', () => {
 		const post = page.locator('.post_body').first();
 		await expect(post.locator('.mycode_b', { hasText: 'Mission Status:' })).toHaveCount(1);
 		await expect(post).not.toContainText('[b]');
-		await expect(post.locator('ul li', { hasText: 'Ash - trooper1 - TK-20001' })).toHaveCount(1);
-		await expect(post.locator('ul li', { hasText: 'Bex - trooper2 - TK-20002' })).toHaveCount(1);
+		await expect(post.locator('ul li', { hasText: 'Ash - trooper1 - TK-62815' })).toHaveCount(1);
+		await expect(post.locator('ul li', { hasText: 'Bex - trooper2 - TD-23094' })).toHaveCount(1);
 		await expect(post).not.toContainText('[*]');
 	});
 
@@ -303,6 +303,26 @@ test.describe('troop reports', () => {
 
 		await page.goto(`/event.php?id=${eventId}`);
 		await expect(page.locator('#event_troop_report_posted')).toBeVisible();
+	});
+
+	test('posting moves the event\'s announcement thread to the archive forum', async ({ page }) => {
+		const eventId = await finishedEvent('Filed Report Troop');
+		await createRsvp(eventId, 'trooper1', { costumes: [TK] });
+		const announced = await runPhp(`
+require_once MYBB_ROOT.'inc/plugins/events/inc/events_thread.php';
+echo events_sync_event_thread(${eventId});
+`);
+		const threadId = Number(announced.trim());
+		expect(threadId).toBeGreaterThan(0);
+
+		await loginAs(page, 'trooper1');
+		await page.goto(`/troop_report.php?id=${eventId}`);
+		await fillDescription(page, 'troop_report_content', 'Filed away afterwards.');
+		await page.locator('#troop_report_submit').click();
+		await expect(page.locator('body')).toContainText('Filed away afterwards.');
+
+		const [thread] = await query(`SELECT fid FROM ${T('threads')} WHERE tid = ?`, [threadId]);
+		expect(Number(thread.fid)).toBe(fixtures().forums.events_archive);
 	});
 
 	test('refuses a second report for the same event', async ({ page }) => {

@@ -8,6 +8,7 @@ sidebar:
 import { Image } from 'astro:assets';
 import forum from '../../../assets/screenshots/coordinators/announcement-forum.png';
 import thread from '../../../assets/screenshots/coordinators/announcement-thread.png';
+import archived from '../../../assets/screenshots/admins/archive-forum.png';
 
 When an event goes **Live**, a thread is posted for it in its region's forum. It's built
 from the event: dates, address, coordinator, cutoff, requirements, the day-by-day
@@ -26,6 +27,17 @@ underneath.
 - Changing the region moves the thread to that region's forum, unless a moderator has
   already moved it somewhere else.
 - If the thread has been deleted, saving the event posts a new one.
+
+## When the event is archived
+
+If the board has an archive forum, the thread moves there when the event is archived,
+replies and all. Posting the troop report archives the event, so this usually happens then.
+
+<Image src={archived} alt="An archived event's thread circled in the Event Archive forum" />
+
+- The first post says the event is over and signups are closed.
+- Making the event live again moves the thread back to its region's forum.
+- A thread a moderator has moved somewhere else stays put.
 
 ## When there's no thread
 

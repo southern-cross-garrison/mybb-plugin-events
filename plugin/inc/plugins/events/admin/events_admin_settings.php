@@ -261,6 +261,7 @@ function events_admin_settings()
                 'events_troop_report_forum' => $mybb->input['troop_report_forum'],
                 'events_timezone' => $timezone,
                 'events_event_forum' => events_admin_forum_input($mybb->get_input('event_forum')),
+                'events_archive_forum' => events_admin_forum_input($mybb->get_input('archive_forum')),
                 'events_regions' => $region_plan['list'],
                 // One dropdown per region, folded back into the single Region=fid setting
                 // under the names the regions now have - without that, renaming a region
@@ -275,6 +276,12 @@ function events_admin_settings()
             // a region the board can still see rather than under one it cannot.
             $former_forum_ids = events_announcement_forum_ids();
             $announced = events_admin_announced_event_ids($region_plan['moves']);
+            // Pointing archived threads at another forum moves the ones already archived
+            // too, not only those archived from now on.
+            if((int)$settings['events_archive_forum'] !== events_archive_forum_id())
+            {
+                $announced = array_values(array_unique(array_merge($announced, events_admin_archived_event_ids())));
+            }
             $moved = events_admin_apply_region_moves($region_plan['moves']);
 
             foreach($settings as $name => $value)
@@ -466,6 +473,10 @@ function events_admin_settings()
     $form_container->output_row("Default Event Forum",
         "Forum where event threads are posted when the region they belong to has None beside it in the list below. Leave this unset too and those events are not announced at all.",
         events_admin_forum_select($form, "event_forum", events_admin_settings_value('event_forum', 'events_event_forum'), "event_forum", true));
+
+    $form_container->output_row("Archive Forum",
+        "Forum an event's thread is moved to when the event is archived. Leave unset to keep it where it is.",
+        events_admin_forum_select($form, "archive_forum", events_admin_settings_value('archive_forum', 'events_archive_forum'), "archive_forum", true));
 
     $form_container->end();
 

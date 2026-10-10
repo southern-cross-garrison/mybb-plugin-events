@@ -96,7 +96,7 @@ test.describe('coordinator controls on the event page', () => {
 
 		await expect(page.locator('li.rsvp_row')).toHaveCount(2);
 		const trooper1Row = page.locator('li.rsvp_row').filter({ hasText: 'trooper1' });
-		await expect(trooper1Row.locator('.rsvp_legion_id')).toHaveText('TK-20001');
+		await expect(trooper1Row.locator('.rsvp_legion_id')).toHaveText('TK-62815');
 		await expect(trooper1Row.locator('.rsvp_costumes')).toContainText(TK);
 		await expect(trooper1Row.locator('.rsvp_costumes')).toContainText(TB);
 	});
@@ -315,7 +315,7 @@ test.describe('attendance sheet', () => {
 		// <tbody> that holds the pair, not either row on its own.
 		const row = page.locator('tbody.attendee_group').filter({ hasText: 'trooper1' });
 		await expect(row.locator('.attendee_preferred_name')).toHaveText('Ash');
-		await expect(row.locator('.attendee_legion_id')).toHaveText('TK-20001');
+		await expect(row.locator('.attendee_legion_id')).toHaveText('TK-62815');
 		await expect(row.locator('.attendee_mobile')).toHaveText('0400 000 002');
 		await expect(row.locator('.attendee_emergency')).toHaveText('Kin Trooper 0400 111 002');
 		await expect(row.locator('.attendee_costumes')).toContainText(TK);
@@ -377,6 +377,6 @@ test.describe('admin RSVP review', () => {
 
 		await expect(page.locator('#content')).toContainText('Admin Review Troop');
 		await expect(page.locator('#content')).toContainText('trooper1');
-		await expect(page.locator('#content')).toContainText('TK-20001');
+		await expect(page.locator('#content')).toContainText('TK-62815');
 	});
 });

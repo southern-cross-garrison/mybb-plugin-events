@@ -56,7 +56,7 @@ export interface Fixtures {
 	profileFields: Record<string, number>;
 	costumeOptions: string[];
 	groups: { gec: number; garrison: number; legion: number };
-	forums: { general: number; troop_reports: number; events: number; events_hunter: number };
+	forums: { general: number; troop_reports: number; events: number; events_hunter: number; events_archive: number };
 	users: Record<string, number>;
 }
 

@@ -248,6 +248,7 @@ update_theme_stylesheet_list(${tid}, false, true);
 		// missing from the map is announced in the default forum, not silently unannounced.
 		expect(await getSetting('events_event_forum')).toBe(String(f.forums.events));
 		expect(await getSetting('events_event_forums')).toBe(`Hunter=${f.forums.events_hunter}`);
+		expect(await getSetting('events_archive_forum')).toBe(String(f.forums.events_archive));
 	});
 
 	test('replaces the board Calendar link with an Events one', async ({ page }) => {
@@ -327,6 +328,7 @@ test.describe('admin module', () => {
 		// the form at all is what could silently drop a region's forum.
 		expect(await getSetting('events_event_forum')).toBe(String(f.forums.events));
 		expect(await getSetting('events_event_forums')).toBe(`Hunter=${f.forums.events_hunter}`);
+		expect(await getSetting('events_archive_forum')).toBe(String(f.forums.events_archive));
 	});
 
 	test('ships the licence and NOTICE, and credits and licenses the plugin on the Support tab', async ({

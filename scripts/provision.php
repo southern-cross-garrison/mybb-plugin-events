@@ -86,7 +86,9 @@ $profile_field_specs = array(
         'description' => 'Costumes you own and can deploy, one per line',
         'type' => 'textarea',
     ),
-    'legion_id' => array('name' => 'Legion ID', 'description' => 'Your 501st legion ID', 'type' => 'text'),
+    // Shown on posts, which is where the garrison theme reads it from for the TK ID badge
+    // under each avatar: it finds the field by name, since its id varies from board to board.
+    'legion_id' => array('name' => 'Legion ID', 'description' => 'Your 501st legion ID', 'type' => 'text', 'postbit' => 1),
     'wwcc' => array('name' => 'WWCC Number', 'description' => 'Working With Children Check number', 'type' => 'text'),
     'mobile' => array('name' => 'Mobile Number', 'description' => 'Contact number for event days', 'type' => 'text'),
     'emergency_contact' => array('name' => 'Emergency Contact', 'description' => 'Who to call in an emergency', 'type' => 'text'),
@@ -105,7 +107,10 @@ foreach ($profile_field_specs as $key => $spec) {
     if ($existing) {
         $field_ids[$key] = (int)$existing['fid'];
         // Keep the option list in sync if it changed since the last provision.
-        $db->update_query('profilefields', array('type' => $db->escape_string($spec['type'])), 'fid = ' . (int)$existing['fid']);
+        $db->update_query('profilefields', array(
+            'type' => $db->escape_string($spec['type']),
+            'postbit' => empty($spec['postbit']) ? 0 : 1,
+        ), 'fid = ' . (int)$existing['fid']);
         $disporder++;
         continue;
     }
@@ -123,7 +128,7 @@ foreach ($profile_field_specs as $key => $spec) {
         'profile' => 1,
         'viewableby' => '-1',
         'editableby' => '-1',
-        'postbit' => 0,
+        'postbit' => empty($spec['postbit']) ? 0 : 1,
         'postnum' => 0,
         'allowhtml' => 0,
         'allowmycode' => 0,
@@ -237,6 +242,9 @@ $forums = array(
     // to tell the two routes apart.
     'events' => provision_forum('Event Announcements', $category_fid),
     'events_hunter' => provision_forum('Hunter Event Announcements', $category_fid),
+    // Where an archived event's thread is moved. Last, so the forums above keep the ids
+    // they had before it existed.
+    'events_archive' => provision_forum('Event Archive', $category_fid),
 );
 out('forums: ' . json_encode($forums));
 
@@ -250,18 +258,18 @@ $users = array(
     'gec' => array(
         'usergroup' => 2,
         'additionalgroups' => array($groups['gec'], $groups['garrison']),
-        'fields' => array('legion_id' => 'TK-10001', 'wwcc' => 'WWCC-1001', 'mobile' => '0400 000 001', 'emergency_contact' => 'Jane Coordinator 0400 111 001', 'preferred_name' => 'Jan', 'costume' => array($costume_options[0])),
+        'fields' => array('legion_id' => 'TK-4127', 'wwcc' => 'WWCC-1001', 'mobile' => '0400 000 001', 'emergency_contact' => 'Jane Coordinator 0400 111 001', 'preferred_name' => 'Jan', 'costume' => array($costume_options[0])),
     ),
     // Fully-provisioned members: can RSVP without touching the prerequisites step.
     'trooper1' => array(
         'usergroup' => 2,
         'additionalgroups' => array($groups['garrison']),
-        'fields' => array('legion_id' => 'TK-20001', 'wwcc' => 'WWCC-2001', 'mobile' => '0400 000 002', 'emergency_contact' => 'Kin Trooper 0400 111 002', 'preferred_name' => 'Ash', 'costume' => array($costume_options[0], $costume_options[2])),
+        'fields' => array('legion_id' => 'TK-62815', 'wwcc' => 'WWCC-2001', 'mobile' => '0400 000 002', 'emergency_contact' => 'Kin Trooper 0400 111 002', 'preferred_name' => 'Ash', 'costume' => array($costume_options[0], $costume_options[2])),
     ),
     'trooper2' => array(
         'usergroup' => 2,
         'additionalgroups' => array($groups['legion']),
-        'fields' => array('legion_id' => 'TK-20002', 'wwcc' => 'WWCC-2002', 'mobile' => '0400 000 003', 'emergency_contact' => 'Kin Trooper 0400 111 003', 'preferred_name' => 'Bex', 'costume' => array($costume_options[1])),
+        'fields' => array('legion_id' => 'TD-23094', 'wwcc' => 'WWCC-2002', 'mobile' => '0400 000 003', 'emergency_contact' => 'Kin Trooper 0400 111 003', 'preferred_name' => 'Bex', 'costume' => array($costume_options[1])),
     ),
     // Deliberately missing every prerequisite - drives the prerequisites form tests.
     'newbie' => array(
@@ -273,7 +281,7 @@ $users = array(
     'nowwcc' => array(
         'usergroup' => 2,
         'additionalgroups' => array($groups['garrison']),
-        'fields' => array('legion_id' => 'TK-20004', 'mobile' => '0400 000 004', 'emergency_contact' => 'Kin Trooper 0400 111 004', 'preferred_name' => 'Cass', 'costume' => array($costume_options[4])),
+        'fields' => array('legion_id' => 'DZ-71360', 'mobile' => '0400 000 004', 'emergency_contact' => 'Kin Trooper 0400 111 004', 'preferred_name' => 'Cass', 'costume' => array($costume_options[4])),
     ),
     // A non-costumed helper: contactable, but no Legion ID, no WWCC and no costumes. Drives
     // the wrangler flow, and proves the costume step is skipped rather than empty.
@@ -286,7 +294,7 @@ $users = array(
     'excluded' => array(
         'usergroup' => 2,
         'additionalgroups' => array($groups['garrison']),
-        'fields' => array('legion_id' => 'TK-20005', 'wwcc' => 'WWCC-2005', 'mobile' => '0400 000 005', 'emergency_contact' => 'Kin Trooper 0400 111 005', 'preferred_name' => 'Eli', 'costume' => array($costume_options[0])),
+        'fields' => array('legion_id' => 'TK-58402', 'wwcc' => 'WWCC-2005', 'mobile' => '0400 000 005', 'emergency_contact' => 'Kin Trooper 0400 111 005', 'preferred_name' => 'Eli', 'costume' => array($costume_options[0])),
     ),
 );
 
@@ -405,6 +413,7 @@ $plugin_settings = array(
     'events_troop_report_forum' => (string)$forums['troop_reports'],
     'events_event_forum' => (string)$forums['events'],
     'events_event_forums' => 'Hunter=' . (int)$forums['events_hunter'],
+    'events_archive_forum' => (string)$forums['events_archive'],
     // The region list is editable, so the suite pins it rather than inheriting whatever
     // a previous run's settings page left behind.
     'events_regions' => 'Sydney,Hunter,Canberra,Other',

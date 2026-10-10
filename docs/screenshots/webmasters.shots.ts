@@ -9,6 +9,7 @@ import { createEvent, createRsvp, fixtures, queryOne, T, uid } from '../../tests
 import { relativeToTestNow } from '../../tests/helpers/clock';
 import type { RowDataPacket } from 'mysql2/promise';
 import { runPhp, runScheduledTask } from '../../tests/helpers/container';
+import { withSettings } from '../../tests/helpers/settings';
 import { ring, shot } from './annotate';
 
 /**
@@ -122,8 +123,31 @@ test.describe('webmasters', () => {
 		);
 		await shot(content, 'webmasters/settings-groups');
 
-		await ring(row('#troop_report_forum'), row('#event_forum'));
+		await ring(row('#troop_report_forum'), row('#event_forum'), row('#archive_forum'));
 		await shot(content, 'webmasters/settings-forums');
+	});
+
+	test('choosing an archive forum', async ({ page }) => {
+		// From a board that has not set one yet, which is where the walkthrough starts.
+		const restore = await withSettings({ events_archive_forum: '' });
+
+		try {
+			await loginToAdminCp(page);
+			await gotoEventsAdmin(page, '&action=settings');
+			const content = page.locator('#content');
+			const row = page.locator('#archive_forum').locator('xpath=ancestor::tr[1]');
+
+			await page.locator('#archive_forum').selectOption(String(fixtures().forums.events_archive));
+			await ring(row);
+			await shot(content, 'webmasters/settings-archive-forum');
+
+			const save = page.locator('input[type="submit"][value="Save Settings"]');
+			await save.scrollIntoViewIfNeeded();
+			await ring(save);
+			await shot(content, 'webmasters/settings-archive-forum-save', { minWidth: 600 });
+		} finally {
+			await restore();
+		}
 	});
 
 	test('print logo setting', async ({ page }) => {

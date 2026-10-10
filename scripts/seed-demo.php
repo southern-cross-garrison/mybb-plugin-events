@@ -520,7 +520,9 @@ $uids = array();
 foreach($TROOPERS as $index => $username)
 {
     $fields = array(
-        'legion_id'             => sprintf('TK-%05d', 31000 + $index),
+        // Prefixed with their first costume's designation, the way the Legion numbers
+        // members, and spread over four and five digits rather than counted up from one.
+        'legion_id'         => strtok($costumes[$index % count($costumes)], ' ') . '-' . (1000 + hexdec(substr(md5($username), 0, 6)) % 89000),
         'preferred_name'    => $PREFERRED_NAMES[$username],
         'mobile'            => sprintf('0400 %03d %03d', 200 + $index, 400 + $index),
         'emergency_contact' => 'Kin ' . $username . sprintf(' 0400 %03d %03d', 900 + $index, 100 + $index),

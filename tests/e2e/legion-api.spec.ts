@@ -10,7 +10,7 @@ import { legionApiMember, legionApiRequests, stubLegionApi } from '../helpers/le
  * whether to ask for them. Anything short of a member record with costumes on it leaves
  * the field alone.
  *
- * trooper1 is TK-20001 with two costumes on file; trooper2 is TK-20002 with one.
+ * trooper1 is TK-62815 with two costumes on file; trooper2 is TD-23094 with one.
  */
 const [TK, TD, TB] = [0, 1, 2].map((index) => fixtures().costumeOptions[index]);
 
@@ -20,8 +20,8 @@ test.describe('costumes from the 501st Legion API', () => {
 	}) => {
 		const eventId = await createEvent({ title: 'Legion Costumes Troop' });
 		stubLegionApi(
-			20001,
-			legionApiMember(20001, [
+			62815,
+			legionApiMember(62815, [
 				{ costumeName: 'Stormtrooper: ANH Stunt', designation: 'TK' },
 				// The real API's names carry trailing spaces, and a comma in one would split it
 				// in two when the field is read back.
@@ -41,7 +41,7 @@ test.describe('costumes from the 501st Legion API', () => {
 		expect(await getUserField('trooper1', 'costume')).toBe(
 			'ID - Officer: Line Officer (Olive Drab)\nTK - Stormtrooper: ANH Stunt\nTS - Snowtrooper'
 		);
-		expect(legionApiRequests()).toEqual(['/legionId/20001/costumes']);
+		expect(legionApiRequests()).toEqual(['/legionId/62815/costumes']);
 
 		const notice = page.locator('#rsvp_costumes_from_api');
 		await expect(notice).toHaveText(
@@ -67,8 +67,8 @@ test.describe('costumes from the 501st Legion API', () => {
 		const eventId = await createEvent({ title: 'Costumeless Legion Troop' });
 		await setUserField('trooper2', 'costume', '');
 		stubLegionApi(
-			20002,
-			legionApiMember(20002, [{ costumeName: 'Sandtrooper', designation: 'TD' }])
+			23094,
+			legionApiMember(23094, [{ costumeName: 'Sandtrooper', designation: 'TD' }])
 		);
 
 		await loginAs(page, 'trooper2');
@@ -86,8 +86,8 @@ test.describe('costumes from the 501st Legion API', () => {
 	test('fetches again every time the member says they will troop', async ({ page }) => {
 		const eventId = await createEvent({ title: 'Repeat Legion Troop' });
 		stubLegionApi(
-			20001,
-			legionApiMember(20001, [{ costumeName: 'Stormtrooper', designation: 'TK' }])
+			62815,
+			legionApiMember(62815, [{ costumeName: 'Stormtrooper', designation: 'TK' }])
 		);
 
 		await loginAs(page, 'trooper1');
@@ -96,8 +96,8 @@ test.describe('costumes from the 501st Legion API', () => {
 
 		// Approved in another costume since.
 		stubLegionApi(
-			20001,
-			legionApiMember(20001, [
+			62815,
+			legionApiMember(62815, [
 				{ costumeName: 'Stormtrooper', designation: 'TK' },
 				{ costumeName: 'Biker Scout', designation: 'TB' },
 			])
@@ -118,7 +118,7 @@ test.describe('costumes from the 501st Legion API', () => {
 		await loginAs(page, 'trooper1');
 		await signUpThroughWizard(page, eventId, { costumes: [TB] });
 
-		expect(legionApiRequests()).toEqual(['/legionId/20001/costumes']);
+		expect(legionApiRequests()).toEqual(['/legionId/62815/costumes']);
 		expect(await getUserField('trooper1', 'costume')).toBe(`${TK}\n${TB}`);
 		expect(await getRsvpCostumes(eventId, 'trooper1')).toEqual([TB]);
 	});
@@ -140,8 +140,8 @@ test.describe('costumes from the 501st Legion API', () => {
 		const eventId = await createEvent({ title: 'Prerequisites Between Troop' });
 		await setUserField('trooper1', 'mobile', '');
 		stubLegionApi(
-			20001,
-			legionApiMember(20001, [
+			62815,
+			legionApiMember(62815, [
 				{ costumeName: 'Stormtrooper', designation: 'TK' },
 				{ costumeName: 'Biker Scout', designation: 'TB' },
 			])
@@ -169,12 +169,12 @@ test.describe('costumes from the 501st Legion API', () => {
 		['a body that is not JSON', { raw: '<html>Bad Gateway</html>' }],
 		// A member who has made their record private on 501st.com, or an ID nobody holds.
 		['a classified record', { body: { memberStatus: 'Classified Record' } }],
-		['a member with no costumes', legionApiMember(20001, [])],
+		['a member with no costumes', legionApiMember(62815, [])],
 	];
 	for (const [answer, response] of unusable) {
 		test(`keeps the costumes on file when the API answers ${answer}`, async ({ page }) => {
 			const eventId = await createEvent({ title: 'Unusable Answer Troop' });
-			stubLegionApi(20001, response);
+			stubLegionApi(62815, response);
 
 			await loginAs(page, 'trooper1');
 			await page.goto(`/rsvp.php?id=${eventId}`);
@@ -199,14 +199,14 @@ test.describe('costumes from the 501st Legion API', () => {
 
 		await expect(page.locator('#rsvp_page')).toHaveAttribute('data-rsvp-step', 'prerequisites');
 		await expect(page.locator('#prereq_costume')).toBeVisible();
-		expect(legionApiRequests()).toEqual(['/legionId/20002/costumes']);
+		expect(legionApiRequests()).toEqual(['/legionId/23094/costumes']);
 	});
 
 	test('does not ask the API about a member wrangling', async ({ page }) => {
 		const eventId = await createEvent({ title: 'Wrangling Troop' });
 		stubLegionApi(
-			20001,
-			legionApiMember(20001, [{ costumeName: 'Stormtrooper', designation: 'TK' }])
+			62815,
+			legionApiMember(62815, [{ costumeName: 'Stormtrooper', designation: 'TK' }])
 		);
 
 		await loginAs(page, 'trooper1');

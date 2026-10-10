@@ -157,13 +157,13 @@ test.describe('troop attendance', () => {
 				// Named, but not numbered.
 				'Ash - trooper1',
 				// Numbered, but not named: a postcode is not a trooper.
-				'We met at the Parramatta 20002 depot.',
+				'We met at the Parramatta 23094 depot.',
 				// The username in the wrong case is somebody else's name, not gec's.
-				'Jan - Gec - TK-10001',
+				'Jan - Gec - TK-4127',
 				// No Legion ID on file, so the name is enough - through BBCode too.
 				'[b]newbie[/b] carried the banner',
 				// Off the waitlist on the day.
-				'Eli - excluded - TK20005',
+				'Eli - excluded - TK58402',
 			].join('\n')
 		);
 
@@ -184,7 +184,7 @@ test.describe('troop attendance', () => {
 
 		// Bex didn't make it after all.
 		await page.goto(`/editpost.php?pid=${pid}`);
-		await fillDescription(page, 'message', 'Ash - trooper1 - TK-20001\nA quiet one.');
+		await fillDescription(page, 'message', 'Ash - trooper1 - TK-62815\nA quiet one.');
 		await page.getByRole('button', { name: 'Update Post' }).click();
 		await page.waitForLoadState('domcontentloaded');
 		await expect.poll(() => attendance(eventId)).toEqual(['trooper1:trooper']);
@@ -194,7 +194,7 @@ test.describe('troop attendance', () => {
 		const status = await page.evaluate(async (postId) => {
 			const body = new URLSearchParams({
 				my_post_key: (window as any).my_post_key,
-				value: 'Ash - trooper1 - TK-20001\nBex - trooper2 - TK-20002',
+				value: 'Ash - trooper1 - TK-62815\nBex - trooper2 - TD-23094',
 			});
 			const response = await fetch(`xmlhttp.php?action=edit_post&do=update_post&pid=${postId}`, {
 				method: 'POST',
@@ -211,13 +211,13 @@ test.describe('troop attendance', () => {
 		await createRsvp(eventId, 'trooper1');
 		await createRsvp(eventId, 'trooper2');
 
-		await postReport(page, eventId, 'Ash - trooper1 - TK-20001');
+		await postReport(page, eventId, 'Ash - trooper1 - TK-62815');
 		expect(await attendance(eventId)).toEqual(['trooper1:trooper']);
 
 		// Change the report underneath the recount, so a recount is visible when it happens.
 		const pid = await reportPostId(eventId);
 		await execute(`UPDATE ${T('posts')} SET message = ? WHERE pid = ?`, [
-			'Ash - trooper1 - TK-20001\nBex - trooper2 - TK-20002',
+			'Ash - trooper1 - TK-62815\nBex - trooper2 - TD-23094',
 			pid,
 		]);
 
@@ -234,11 +234,11 @@ echo 'PID:'.$post['pid'];
 `);
 		const replyPid = Number(output.match(/PID:(\d+)/)![1]);
 
-		await updatePost(replyPid, 'Great photos, Bex - trooper2 - TK-20002!');
+		await updatePost(replyPid, 'Great photos, Bex - trooper2 - TD-23094!');
 		expect(await attendance(eventId)).toEqual(['trooper1:trooper']);
 
 		// And the report's own first post does recount.
-		await updatePost(pid, 'Ash - trooper1 - TK-20001\nBex - trooper2 - TK-20002');
+		await updatePost(pid, 'Ash - trooper1 - TK-62815\nBex - trooper2 - TD-23094');
 		expect(await attendance(eventId)).toEqual(['trooper1:trooper', 'trooper2:trooper']);
 	});
 
@@ -306,7 +306,7 @@ $handler->delete_user(array(${throwaway}));
 
 			// Their signup went with them, so a recount has nothing to rebuild their row from -
 			// and must not throw it away.
-			await updatePost(await reportPostId(eventId), 'Ash - trooper1 - TK-20001');
+			await updatePost(await reportPostId(eventId), 'Ash - trooper1 - TK-62815');
 			expect(await attendance(eventId)).toEqual([`#${throwaway}:wrangler`, 'trooper1:trooper']);
 
 			await loginToAdminCp(page);
@@ -704,7 +704,7 @@ $handler->delete_user(array(${throwaway}));
 		await page.goto(`/troop_report.php?id=${eventId}`);
 		await expectEditorAttached(page, 'troop_report_content');
 		const bodies = await submitFormAtOnce(page, '#troop_report_form', {
-			overrides: { report_content: 'Ash - trooper1 - TK-20001\nBex - trooper2 - TK-20002' },
+			overrides: { report_content: 'Ash - trooper1 - TK-62815\nBex - trooper2 - TD-23094' },
 		});
 		for (const body of bodies) {
 			expect(body).not.toMatch(/SQL Error|Fatal error/);
@@ -725,7 +725,7 @@ $handler->delete_user(array(${throwaway}));
 			TB,
 			rsvpId,
 		]);
-		await updatePost(await reportPostId(eventId), 'Ash - trooper1 - TK-20001');
+		await updatePost(await reportPostId(eventId), 'Ash - trooper1 - TK-62815');
 
 		expect(await attendanceCostumes(eventId, 'trooper1')).toEqual([TB]);
 	});
@@ -733,27 +733,27 @@ $handler->delete_user(array(${throwaway}));
 	test('matching holds at the edges of a username and a number', async () => {
 		const cases: Array<[string, { username: string; role: string; legion_id: string }, boolean]> = [
 			// The number alone, no prefix at all.
-			['trooper1 20001', { username: 'trooper1', role: 'trooper', legion_id: 'TK-20001' }, true],
+			['trooper1 62815', { username: 'trooper1', role: 'trooper', legion_id: 'TK-62815' }, true],
 			// A longer username is not this one, and neither is one run on with an underscore.
 			[
-				'trooper10 - TK-20001',
-				{ username: 'trooper1', role: 'trooper', legion_id: 'TK-20001' },
+				'trooper10 - TK-62815',
+				{ username: 'trooper1', role: 'trooper', legion_id: 'TK-62815' },
 				false,
 			],
 			[
-				'trooper1_old - TK-20001',
-				{ username: 'trooper1', role: 'trooper', legion_id: 'TK-20001' },
+				'trooper1_old - TK-62815',
+				{ username: 'trooper1', role: 'trooper', legion_id: 'TK-62815' },
 				false,
 			],
 			// Part of a number is not the number, either way round.
 			[
-				'trooper1 - TK-200011',
-				{ username: 'trooper1', role: 'trooper', legion_id: 'TK-20001' },
+				'trooper1 - TK-628151',
+				{ username: 'trooper1', role: 'trooper', legion_id: 'TK-62815' },
 				false,
 			],
 			[
-				'trooper1 - TK-2000',
-				{ username: 'trooper1', role: 'trooper', legion_id: 'TK-20001' },
+				'trooper1 - TK-6281',
+				{ username: 'trooper1', role: 'trooper', legion_id: 'TK-62815' },
 				false,
 			],
 			// Leading zeros are the same number.

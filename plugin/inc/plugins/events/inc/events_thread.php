@@ -16,6 +16,8 @@
  * several states runs a forum per region, and a Hunter event posted into the Sydney
  * forum is noise to everyone reading it. events_event_forum_id() resolves a region to a
  * forum, falling back to the board-wide default when a region has no forum of its own.
+ * Once the event is archived its thread moves on to the archive forum, if the board has
+ * one, so the region's forum is left listing what is still to come.
  */
 
 if(!defined("IN_MYBB"))
@@ -107,7 +109,34 @@ function events_event_forum_id($region)
 }
 
 /**
- * Every forum the plugin announces events into.
+ * The forum an archived event's thread is moved to.
+ *
+ * @return int forum id, 0 when archived threads stay where they are
+ */
+function events_archive_forum_id()
+{
+    return (int)events_get_setting('archive_forum');
+}
+
+/**
+ * The forum an event's announcement thread belongs in as the event stands now: the
+ * archive forum once it is archived, if the board has one, and its region's otherwise.
+ *
+ * @param array $event
+ * @return int forum id, 0 when nothing is configured
+ */
+function events_thread_forum_id(array $event)
+{
+    if($event['status'] === 'archived' && events_archive_forum_id())
+    {
+        return events_archive_forum_id();
+    }
+
+    return events_event_forum_id($event['region']);
+}
+
+/**
+ * Every forum the plugin files event threads in, the archive forum included.
  *
  * Used to tell a thread that is still where the plugin put it from one a moderator has
  * since filed somewhere of their own choosing.
@@ -118,10 +147,12 @@ function events_announcement_forum_ids()
 {
     $ids = array_map('intval', array_values(events_region_forums()));
 
-    $default = (int)events_get_setting('event_forum');
-    if($default)
+    foreach(array((int)events_get_setting('event_forum'), events_archive_forum_id()) as $forum_id)
     {
-        $ids[] = $default;
+        if($forum_id)
+        {
+            $ids[] = $forum_id;
+        }
     }
 
     return array_values(array_unique(array_filter($ids)));
@@ -256,6 +287,8 @@ function events_event_post_content(array $event)
  * so a thread would link members to a page they cannot open. The announcement appears
  * when the event goes live. An event that already has a thread keeps it - including when
  * it is archived, where deleting or hiding the thread would take the discussion with it.
+ * Archiving moves it to the archive forum instead, and taking the event back off the
+ * archive moves it back.
  *
  * @param int $event_id
  * @param string|null $error Set to why nothing was posted, for a caller that can say so
@@ -357,13 +390,15 @@ function events_write_event_thread($event_id, &$error = null, array $former_foru
 
         // A region corrected after the fact should take the announcement with it -
         // leaving it where it was is exactly the cross-region noise a forum per region
-        // exists to avoid. But only while the thread is still in a forum the plugin
-        // announces into: a moderator who filed it somewhere else meant it, and dragging
-        // a discussion back out of the forum it has been living in is not a correction.
+        // exists to avoid - and an archived event's goes to the archive forum, so the
+        // region's forum lists what is still to come. But only while the thread is still
+        // in a forum the plugin files threads in: a moderator who filed it somewhere else
+        // meant it, and dragging a discussion back out of the forum it has been living in
+        // is not a correction.
         // "move" rather than MyBB's default "redirect": a redirect leaves a "Moved:" stub
         // behind in the old forum, and nothing about that stub marks it as the event's
         // thread, so the exclusion hooks would show its title to excluded members.
-        $forum_id = events_event_forum_id($event['region']);
+        $forum_id = events_thread_forum_id($event);
         $managed = array_merge(events_announcement_forum_ids(), array_map('intval', $former_forum_ids));
         if($forum_id && (int)$thread['fid'] !== $forum_id && in_array((int)$thread['fid'], $managed, true))
         {

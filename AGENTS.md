@@ -131,6 +131,11 @@ baseline picks the change up.
   `scripts/provision.php` activates it. Without it the board looks fine but every thread
   subject in a forum is an `<a href="">`, so nothing a test posts - an event announcement,
   a troop report - can be reached from the forum it was posted into.
+- The theme's TK ID badge under each avatar is filled by a script in its `headerinclude`,
+  from the profile field named "TKID" or "Legion ID" - on posts, the chip MyBB prints for a
+  field set to show on the postbit. `scripts/provision.php` turns that on for the Legion ID
+  field; it never chooses a field's id, since the script runs on boards that are not ours.
+
 - Plugin settings are created by `events_install_settings()`, which runs from _both_
   `events_install()` and `events_activate()`. MyBB gives plugins no upgrade hook, so a
   setting added to that list only reaches an already-installed board because activation

@@ -70,6 +70,7 @@ A comprehensive event management plugin for MyBB 1.8 that replaces thread-based 
    - Set troop report forum ID
    - Edit the regions, and set the forum each one's events are announced in. A default
      forum covers the regions that have none of their own
+   - Set the archive forum archived events' threads move to (optional - unset, they stay put)
    - Set the print logo (optional - defaults to the theme's own logo)
 
 ## Requirements
@@ -230,7 +231,8 @@ Archiving is how an event is closed out, not how it is deleted. Posting its troo
 archives it automatically, and a coordinator can set the status by hand from either form.
 An archived event keeps everything it had - its page, its announcement thread, its signup
 list and its troop report - and every link to it still works. It just stops crowding the
-index, which is a schedule of what is coming rather than a record of what has been.
+index, which is a schedule of what is coming rather than a record of what has been. Its
+thread moves to the **Archive Forum** for the same reason, when the board has set one.
 
 **Show archived** sits next to the region filter on both the list and the calendar, and
 it works alongside the region filter rather than replacing it. Ticking it applies
@@ -304,8 +306,13 @@ they save.
 Editing an event rewrites the opening post rather than posting a second thread, and
 correcting a region moves the thread to that region's forum - unless a moderator has
 already filed it somewhere else, in which case it is left where they put it. Deleting the
-thread makes the next save write a fresh one. Pending events are not announced, and an
-archived event keeps its thread.
+thread makes the next save write a fresh one. Pending events are not announced.
+
+Archiving an event moves its thread to the **Archive Forum**, if one is set, and setting
+it live again moves the thread back to its region's forum. A thread a moderator has filed
+elsewhere stays put here too, and with no archive forum an archived event's thread stays
+where it was. Setting or changing the archive forum moves the threads of events already
+archived as well. The move leaves no "Moved:" link behind in the old forum.
 
 ### Editing an Event
 
@@ -653,7 +660,7 @@ A member is named when the report has:
   head count, and a name on its own could be a mention of somebody who stayed home.
 
 Wranglers hold no Legion ID, so for them the username is enough, and so it is for a trooper
-with no ID recorded. The generated draft's roll call (`Ash - trooper1 - TK-20001`) meets
+with no ID recorded. The generated draft's roll call (`Ash - trooper1 - TK-62815`) meets
 the rule, so a report posted as drafted counts everyone it lists.
 
 Editing the report's first post - from the edit page or with quick edit - counts it again

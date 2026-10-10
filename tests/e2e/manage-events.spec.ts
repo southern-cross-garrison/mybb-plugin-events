@@ -97,12 +97,16 @@ async function submitEventForm(page: Page) {
 
 // Waits for the POST to come back, so what is asserted next is the page it returned rather
 // than the one it replaced - which has the same warning on it.
-async function pressEnterToSubmit(page: Page, field: string) {
+async function submitAndWait(page: Page, submit: () => Promise<void>) {
 	await Promise.all([
 		page.waitForResponse((response) => response.request().method() === 'POST'),
-		page.locator(field).press('Enter'),
+		submit(),
 	]);
 	await page.waitForLoadState();
+}
+
+async function pressEnterToSubmit(page: Page, field: string) {
+	await submitAndWait(page, () => page.locator(field).press('Enter'));
 }
 
 test.describe('front-end event management', () => {
@@ -462,8 +466,10 @@ test.describe('front-end event management', () => {
 		expect(await getEventDays(eventId)).toHaveLength(3);
 		expect(await getSignupRoles(eventId, 'trooper2')).toEqual(['trooper', 'wrangler']);
 
-		// Saving normally again is not agreeing to it.
-		await submitEventForm(page);
+		// Saving normally again is not agreeing to it. Waited on, since the warning being
+		// visible proves nothing about which page it is on - and pressing Enter below on a
+		// page still loading posted half a form.
+		await submitAndWait(page, () => submitEventForm(page));
 		await expect(page.locator('#event_day_change_warning')).toBeVisible();
 		expect(await getEventDays(eventId)).toHaveLength(3);
 

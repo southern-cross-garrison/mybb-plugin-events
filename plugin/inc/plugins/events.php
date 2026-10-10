@@ -190,6 +190,7 @@ function events_install_settings()
         array("name" => "events_legion_api_url", "title" => "501st Legion API", "description" => "Where members' costumes are fetched from when they sign up to troop, by their Legion ID. Leave blank to use only the costumes on their profiles.", "optionscode" => "text", "disporder" => 18, "value" => EVENTS_DEFAULT_LEGION_API_URL),
         array("name" => "events_preapproval_enabled", "title" => "Preapproved Costumes", "description" => "Lets a member signing up to troop type in a costume they are preapproved for instead of picking one from their profile", "optionscode" => "yesno", "disporder" => 19, "value" => "0"),
         array("name" => "events_preapproval_post", "title" => "Preapproval Requirements", "description" => "The post a member using a preapproved costume must read and agree to, by its post ID. Blank asks for no agreement.", "optionscode" => "text", "disporder" => 20, "value" => ""),
+        array("name" => "events_archive_forum", "title" => "Archive Forum", "description" => "The forum an event's announcement thread is moved to when the event is archived. Blank leaves it where it is.", "optionscode" => "forumselectsingle", "disporder" => 21, "value" => ""),
         array("name" => "events_timezone", "title" => "Event Timezone", "description" => "Where the garrison is, not where the forum is hosted: every event date is entered, stored and shown in this zone, and the server's own timezone is ignored. A PHP timezone identifier such as Australia/Sydney. Pick it from the list in Admin CP -> Event Management -> Settings rather than typing it here - a name PHP does not recognise falls back to UTC.", "optionscode" => "text", "disporder" => 14, "value" => EVENTS_DEFAULT_TIMEZONE),
     );
 
@@ -327,6 +328,7 @@ function events_activate()
         'events_501st_members_group'      => 'groupselectsingle',
         'events_troop_report_forum'       => 'forumselectsingle',
         'events_event_forum'              => 'forumselectsingle',
+        'events_archive_forum'            => 'forumselectsingle',
     );
 
     foreach($group_settings as $setting_name => $optionscode)

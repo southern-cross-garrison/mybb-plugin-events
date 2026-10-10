@@ -5,7 +5,7 @@ sidebar:
   order: 4
 ---
 
-import { Aside } from '@astrojs/starlight/components';
+import { Aside, Steps } from '@astrojs/starlight/components';
 import { Image } from 'astro:assets';
 import timezone from '../../../assets/screenshots/webmasters/settings-timezone.png';
 import fieldsCostumes from '../../../assets/screenshots/webmasters/settings-profile-fields-costumes.png';
@@ -15,6 +15,9 @@ import preapproval from '../../../assets/screenshots/admins/settings-preapproval
 import wwcc from '../../../assets/screenshots/admins/settings-wwcc.png';
 import groups from '../../../assets/screenshots/webmasters/settings-groups.png';
 import forums from '../../../assets/screenshots/webmasters/settings-forums.png';
+import archiveForum from '../../../assets/screenshots/webmasters/settings-archive-forum.png';
+import archiveForumSave from '../../../assets/screenshots/webmasters/settings-archive-forum-save.png';
+import archivedThread from '../../../assets/screenshots/admins/archive-forum.png';
 import regions from '../../../assets/screenshots/admins/regions.png';
 import printLogo from '../../../assets/screenshots/webmasters/settings-print-logo.png';
 
@@ -87,13 +90,48 @@ A detail with no field picked isn't asked for.
 | --- | --- |
 | **Troop Report Forum** | Where troop reports are posted. |
 | **Default Event Forum** | Where announcement threads go for regions without a forum of their own. Leave unset to not announce those events. |
+| **Archive Forum** | Where an event's thread moves when the event is archived. See [Set up an archive forum](#set-up-an-archive-forum). |
 
-<Image src={forums} alt="Troop Report Forum and Default Event Forum circled" />
+<Image src={forums} alt="Troop Report Forum, Default Event Forum and Archive Forum circled" />
+
+## Set up an archive forum
+
+When an event is archived, its announcement thread can move to an archive forum. The
+region forums then only list events that are still to come. Create the forum in
+**Forums & Posts** first.
+
+<Steps>
+
+1. In **Archive Forum**, choose the forum.
+
+   <Image src={archiveForum} alt="Archive Forum circled, with Event Archive chosen" />
+
+2. Click **Save Settings**.
+
+   <Image src={archiveForumSave} alt="The Save Settings button circled" />
+
+</Steps>
+
+Threads of events that are already archived move when you save. From then on, each event's
+thread moves when the event is archived, whether by hand or by
+[posting its troop report](../../coordinators/after-the-event/).
+
+<Image src={archivedThread} alt="An archived event's thread circled in the Event Archive forum" />
+
+- Making an archived event live again moves its thread back to its region's forum.
+- A thread a moderator has moved to another forum stays where they put it.
+- To stop moving threads, set **Archive Forum** to **None**. Threads already in the
+  archive forum go back to their regions' forums when you save.
+
+<Aside type="caution" title="Forum permissions">
+  Members need permission to view the archive forum to read an archived event's thread.
+  Without it, the event's link opens the event page on its own, without the discussion.
+</Aside>
 
 ## Regions
 
 Events are filed under a region, which members can filter by. Each region can have its own
-announcement forum. The list starts as Sydney, Hunter, Canberra and Other.
+announcement forum.
 
 - **Rename** a region by editing its name and saving. Its events and forum go with it.
 - **Add** one with **Add Region**.

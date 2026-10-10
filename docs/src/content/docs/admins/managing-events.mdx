@@ -9,6 +9,8 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 import { Image } from 'astro:assets';
 
 import list from '../../../assets/screenshots/admins/events-list.png';
+import archiveAction from '../../../assets/screenshots/admins/archive-action.png';
+import archiveForum from '../../../assets/screenshots/admins/archive-forum.png';
 
 Go to **Admin CP** > **Event Management** > **Events**.
 
@@ -24,7 +26,7 @@ Click **Actions** on an event for:
 | **Edit** | Opens the [event form](../../coordinators/creating-events/#the-event-form). |
 | **View RSVPs** | Opens the event on the [RSVPs](../rsvps/) tab. |
 | **Make Live** | Opens signups and posts the announcement thread. |
-| **Archive** | Closes the event out and hides it from the events list. |
+| **Archive** | See [Archive an event](#archive-an-event). |
 | **Delete** | See below. |
 
 To add an event, click **Add New Event**. It's the same form coordinators use on the forum.
@@ -33,6 +35,30 @@ To add an event, click **Add New Event**. It's the same form coordinators use on
   Only you, the current point of contact and people with a place at the event can be
   chosen. See [Choosing a point of contact](../../coordinators/creating-events/#choosing-a-point-of-contact).
 </Aside>
+
+## Archive an event
+
+Archiving closes out an event that has happened. Posting its troop report archives it
+automatically. To archive it by hand:
+
+<Steps>
+
+1. Click **Actions** > **Archive** on the event.
+
+   <Image src={archiveAction} alt="Archive circled in the event's Actions menu" />
+
+</Steps>
+
+Signups close, and the event no longer appears on the events list unless members tick
+**Show archived**. Its page, signups and troop report are all kept.
+
+If the board has an [archive forum](../../webmasters/settings/#set-up-an-archive-forum),
+the event's announcement thread moves there, replies and all.
+
+<Image src={archiveForum} alt="The archived event's thread circled in the Event Archive forum" />
+
+To undo it, click **Actions** > **Make Live**. The thread moves back to its region's
+forum.
 
 ## Delete an event
 

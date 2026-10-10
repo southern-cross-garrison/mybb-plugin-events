@@ -194,6 +194,27 @@ function events_admin_announced_event_ids(array $moves)
 }
 
 /**
+ * Every archived event with an announcement thread, for a save that points archived
+ * threads at a different forum.
+ *
+ * @return array of int event id
+ */
+function events_admin_archived_event_ids()
+{
+    global $db;
+
+    $ids = array();
+    $query = $db->simple_select("event_plugin_events", "id", "thread_id > 0 AND status = 'archived'");
+
+    while($row = $db->fetch_array($query))
+    {
+        $ids[] = (int)$row['id'];
+    }
+
+    return $ids;
+}
+
+/**
  * Bring refiled events' announcement threads up to date with their new regions.
  *
  * The post names the region and links to its listing, and the thread belongs in the new

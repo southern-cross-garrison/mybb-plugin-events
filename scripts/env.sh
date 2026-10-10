@@ -21,7 +21,7 @@ BASE_URL="${BASE_URL:-http://localhost:${WEB_PORT}}"
 # The forum's custom theme, imported by scripts/install-theme.sh. Pinned to a commit so
 # the provisioned database snapshot is reproducible; override in .env to track a branch.
 THEME_REPO="${THEME_REPO:-https://github.com/southern-cross-garrison/mybb-custom-theme.git}"
-THEME_REF="${THEME_REF:-947cb69e0beaf074a5d9930f94350099a3520109}"
+THEME_REF="${THEME_REF:-75f1043e82a3083a3ab7ced1c038df46e2094bee}"
 THEME_XML="${THEME_XML:-SCG-Responsive.xml}"
 
 # Smart Thread Link, the companion plugin the custom theme's thread listings need. The

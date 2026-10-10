@@ -182,6 +182,48 @@ test.describe('admins', () => {
 		await shot(page.locator('#events_region_modal'), 'admins/regions-delete');
 	});
 
+	test('archive an event', async ({ page }) => {
+		const finished = await createAnnouncedEvent({
+			title: 'Westfield Parramatta Charity Troop',
+			start: relativeToTestNow({ days: -2 }),
+			end: relativeToTestNow({ days: -2, hours: 6 }),
+			signupCutoff: relativeToTestNow({ days: -3 }),
+		});
+		await createAnnouncedEvent({
+			title: 'Royal North Shore Hospital Visit',
+			start: { days: 5 },
+			end: { days: 5, hours: 4 },
+		});
+
+		await loginToAdminCp(page);
+
+		// Actions > Archive on the events list.
+		await gotoEventsAdmin(page);
+		await page.locator(`#event_${finished}`).click();
+		const popup = page.locator(`#event_${finished}_popup`);
+		await expect(popup).toBeVisible();
+		const archive = popup.getByRole('link', { name: 'Archive' });
+		await ring(archive);
+		// The list is short and the menu hangs below it, out of #content, so the crop is taken
+		// from the whole page.
+		await shot(page.locator('body'), 'admins/archive-action', {
+			include: [page.locator(`#event_${finished}`).locator('xpath=ancestor::tr[1]/td[1]'), popup],
+		});
+
+		await archive.click();
+		await expect(page.locator('#flash_message')).toBeVisible();
+
+		// Where its thread went: the archive forum, as members see it.
+		await loginAs(page, 'trooper1');
+		await page.goto(`/forumdisplay.php?fid=${fixtures().forums.events_archive}`);
+		await ring(page.getByRole('link', { name: 'Westfield Parramatta Charity Troop' }).first());
+		// With the forum's name, since which forum it is in is the point.
+		await shot(page.locator('body'), 'admins/archive-forum', {
+			minWidth: 900,
+			include: [page.locator('h3.text-nav', { hasText: 'Event Archive' })],
+		});
+	});
+
 	test('admin log', async ({ page }) => {
 		const edited = await createAnnouncedEvent({
 			title: 'Royal North Shore Hospital Visit',
