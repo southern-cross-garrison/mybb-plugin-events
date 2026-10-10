@@ -42,7 +42,7 @@ test.describe('plugin installation', () => {
 		);
 		expect(sheet?.tid).toBe(1);
 		expect(sheet?.attachedto).toBe(
-			'events.php|event.php|manage_event.php|rsvp.php|troop_report.php|calendar_feed.php|usercp.php|showthread.php'
+			'events.php|event.php|manage_event.php|rsvp.php|troop_report.php|calendar_feed.php|usercp.php|showthread.php|forumdisplay.php'
 		);
 
 		// A stylesheet missing from a theme's display order is silently never output, so

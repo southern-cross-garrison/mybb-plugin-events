@@ -22,6 +22,9 @@ function events_register_hooks()
 
     $plugins->add_hook("pre_output_page", "events_nav_menu");
 
+    // A forum events are announced in offers a coordinator Create Event before Post Thread.
+    $plugins->add_hook("forumdisplay_threadlist", "events_forum_create_event_button");
+
     // The calendar subscription page, inside the User CP as well as off the events toolbar.
     $plugins->add_hook("usercp_menu_built", "events_usercp_nav");
     $plugins->add_hook("usercp_start", "events_usercp_calendar_feed");
@@ -1113,6 +1116,196 @@ function events_nav_menu(&$page)
     }
 
     return $page;
+}
+
+/**
+ * Turn a forum's Post Thread button into a Create Event split button, for a coordinator in
+ * a forum events are announced in. Post Thread moves onto the button's dropdown.
+ *
+ * Built from the theme's own button, like events_nav_menu() and for the same reason: the
+ * garrison's theme draws it as a Bootstrap .btn with a Font Awesome icon, MyBB's Default as
+ * an a.button with a sprite, and either is only styled as an anchor carrying its classes.
+ * So both halves are copies of the theme's anchor. The dropdown arrow is a real link to
+ * Post Thread, which is where it goes with the script off; the script turns it into a
+ * toggle for the menu. MyBB's Default prints {$newthread} above and below the thread list,
+ * so the markup carries no ids and the script binds once, by class.
+ *
+ * Only where MyBB rendered a Post Thread button at all: a closed forum, or a coordinator
+ * without permission to post in it, keeps the page as MyBB built it.
+ *
+ * @return void
+ */
+function events_forum_create_event_button()
+{
+    global $newthread, $foruminfo, $lang;
+
+    if(empty($newthread) || empty($foruminfo['fid']))
+    {
+        return;
+    }
+
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_thread.php";
+
+    $regions = events_forum_regions($foruminfo['fid']);
+    if(!$regions || !events_is_gec())
+    {
+        return;
+    }
+
+    if(!preg_match('#(<a\b[^>]*\bhref="([^"]*newthread\.php[^"]*)"[^>]*>)(.*?)</a>#is', $newthread, $match, PREG_OFFSET_CAPTURE))
+    {
+        return;
+    }
+
+    list($anchor, $offset) = $match[0];
+    $tag = $match[1][0];
+    $post_thread_url = $match[2][0];
+    $label = $match[3][0];
+
+    // A forum several regions share opens the form on the board's own default.
+    $create_url = 'manage_event.php';
+    if(count($regions) === 1 && $regions[0] !== '')
+    {
+        $create_url .= '?region=' . urlencode($regions[0]);
+    }
+
+    // The theme's icon stays and only the words change. A theme that spells the label some
+    // other way gets the words alone rather than "Create Event" beside "Post Thread".
+    $create_label = str_replace($lang->post_thread, 'Create Event', $label, $replaced);
+    if(!$replaced)
+    {
+        $create_label = 'Create Event';
+    }
+
+    $main = events_rewrite_anchor_tag($tag, array('href' => $create_url), 'events_forum_split_main');
+    $toggle = events_rewrite_anchor_tag($tag, array('title' => $lang->post_thread, 'aria-label' => $lang->post_thread), 'events_forum_split_toggle');
+
+    $button = '<span class="events_forum_split">'
+        . $main . $create_label . '</a>'
+        . $toggle . '<span class="events_forum_split_caret" aria-hidden="true"></span></a>'
+        . '<span class="events_forum_split_menu" hidden>'
+        . '<a href="' . $post_thread_url . '" class="events_forum_split_item">' . $lang->post_thread . '</a>'
+        . '</span>'
+        . '</span>'
+        . events_forum_split_script();
+
+    $newthread = substr_replace($newthread, $button, $offset, strlen($anchor));
+}
+
+/**
+ * Set attributes on an anchor's opening tag and add a class, keeping everything else the
+ * theme put on it. The values are escaped here; the tag is the theme's own markup.
+ *
+ * @param string $tag The opening <a ...> tag
+ * @param array $attributes name => unescaped value
+ * @param string $class
+ * @return string
+ */
+function events_rewrite_anchor_tag($tag, array $attributes, $class)
+{
+    // A duplicated id would be invalid twice over: the button is printed twice on some themes.
+    $tag = preg_replace('#\s+id="[^"]*"#i', '', $tag);
+
+    if(preg_match('#\sclass="([^"]*)"#i', $tag, $class_match))
+    {
+        $attributes['class'] = trim($class_match[1] . ' ' . $class);
+    }
+    else
+    {
+        $attributes['class'] = $class;
+    }
+
+    foreach($attributes as $name => $value)
+    {
+        $attribute = ' ' . $name . '="' . htmlspecialchars_uni($value) . '"';
+        $pattern = '#\s' . preg_quote($name, '#') . '="[^"]*"#i';
+
+        if(preg_match($pattern, $tag))
+        {
+            $tag = preg_replace_callback($pattern, function() use ($attribute) { return $attribute; }, $tag, 1);
+        }
+        else
+        {
+            $tag = preg_replace_callback('#^<a\b#i', function() use ($attribute) { return '<a' . $attribute; }, $tag, 1);
+        }
+    }
+
+    return $tag;
+}
+
+/**
+ * The script that turns each split button's arrow from a link into a menu toggle. Printed
+ * with every copy of the button and run once.
+ *
+ * @return string
+ */
+function events_forum_split_script()
+{
+    return <<<'HTML'
+<script type="text/javascript">
+(function () {
+	if (window.eventsForumSplit) {
+		return;
+	}
+	window.eventsForumSplit = true;
+
+	function setOpen(group, open) {
+		group.classList.toggle('events_forum_split_open', open);
+		group.querySelector('.events_forum_split_menu').hidden = !open;
+		group.querySelector('.events_forum_split_toggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+	}
+
+	function closeAll(except) {
+		var groups = document.querySelectorAll('.events_forum_split_open');
+		for (var i = 0; i < groups.length; i++) {
+			if (groups[i] !== except) {
+				setOpen(groups[i], false);
+			}
+		}
+	}
+
+	function init() {
+		var toggles = document.querySelectorAll('.events_forum_split_toggle');
+		for (var i = 0; i < toggles.length; i++) {
+			toggles[i].setAttribute('role', 'button');
+			toggles[i].setAttribute('aria-expanded', 'false');
+		}
+	}
+
+	document.addEventListener('click', function (event) {
+		var toggle = event.target.closest('.events_forum_split_toggle');
+		if (toggle) {
+			event.preventDefault();
+			var group = toggle.parentNode;
+			closeAll(group);
+			setOpen(group, !group.classList.contains('events_forum_split_open'));
+			return;
+		}
+		if (!event.target.closest('.events_forum_split_menu')) {
+			closeAll(null);
+		}
+	});
+
+	document.addEventListener('keydown', function (event) {
+		if (event.key !== 'Escape') {
+			return;
+		}
+		var group = document.querySelector('.events_forum_split_open');
+		if (group) {
+			setOpen(group, false);
+			group.querySelector('.events_forum_split_toggle').focus();
+		}
+	});
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', init);
+	} else {
+		init();
+	}
+})();
+</script>
+HTML;
 }
 
 /**

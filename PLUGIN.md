@@ -168,6 +168,10 @@ render it.
 2. Fill in the event details (below)
 3. Click "Create Event" - it lands on the new event's page
 
+In a forum events are announced in, a coordinator's Post Thread button is a Create Event
+split button instead, with Post Thread on its dropdown. In a forum only one region
+announces into, the form opens on that region (`manage_event.php?region=...`).
+
 **From the Admin CP** (admins):
 
 1. Go to Admin CP → Event Management → Events

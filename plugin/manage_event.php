@@ -57,6 +57,12 @@ elseif(!events_is_gec())
 $errors = array();
 $values = events_event_form_values($event);
 $manage_preview = '';
+
+// A region's forum opens the form on that region (its Create Event button).
+if(!$is_edit && in_array($mybb->get_input('region'), events_regions(), true))
+{
+    $values['region'] = $mybb->get_input('region');
+}
 $day_change = null;
 
 if($mybb->request_method === 'post')

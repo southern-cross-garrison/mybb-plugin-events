@@ -25,8 +25,9 @@ define('EVENTS_STYLESHEET', 'events.css');
 // read in its announcement thread - which means the sheet reaches every thread on the
 // board, so nothing in it may apply outside the plugin's own markup. usercp.php is there
 // for the calendar subscription page the plugin adds to the User CP, and the same rule
-// holds: the sheet reaches every User CP page.
-define('EVENTS_STYLESHEET_ATTACHEDTO', 'events.php|event.php|manage_event.php|rsvp.php|troop_report.php|calendar_feed.php|usercp.php|showthread.php');
+// holds: the sheet reaches every User CP page. forumdisplay.php is there for the Create Event
+// button that replaces Post Thread in an event forum, and reaches every forum the same way.
+define('EVENTS_STYLESHEET_ATTACHEDTO', 'events.php|event.php|manage_event.php|rsvp.php|troop_report.php|calendar_feed.php|usercp.php|showthread.php|forumdisplay.php');
 
 /** The theme every other theme inherits from. */
 define('EVENTS_MASTER_THEME', 1);

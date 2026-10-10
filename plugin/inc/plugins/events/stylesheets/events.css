@@ -2744,3 +2744,96 @@ a.rsvp_remove:focus {
 		display: none;
 	}
 }
+
+/* ---------------------------------------------------------------------------
+ * Create Event split button (forumdisplay.php)
+ *
+ * Replaces Post Thread in a forum events are announced in (events_forum_create_event_button()).
+ * Both halves are copies of the theme's own Post Thread anchor, so the theme draws them;
+ * these rules only join the two into one control and hang the menu off it. This sheet is
+ * attached to forumdisplay.php for the button, so it reaches every forum - nothing here may
+ * apply outside .events_forum_split.
+ * ------------------------------------------------------------------------ */
+
+.events_forum_split {
+	position: relative;
+	display: inline-flex;
+	align-items: stretch;
+	vertical-align: middle;
+}
+
+/* :link and :visited because MyBB's Default styles a.button through them, and its margins
+   would otherwise open a gap between the halves. The corners where the halves meet need
+   !important: the garrison's theme rounds every .btn with "border-radius: 3px !important",
+   which nothing short of another !important overrides. */
+.events_forum_split > a.events_forum_split_main,
+.events_forum_split > a.events_forum_split_main:link,
+.events_forum_split > a.events_forum_split_main:visited {
+	margin-right: 0;
+	border-top-right-radius: 0 !important;
+	border-bottom-right-radius: 0 !important;
+}
+
+.events_forum_split > a.events_forum_split_toggle,
+.events_forum_split > a.events_forum_split_toggle:link,
+.events_forum_split > a.events_forum_split_toggle:visited {
+	display: inline-flex;
+	align-items: center;
+	margin-left: 0;
+	padding-left: 0.6em;
+	padding-right: 0.6em;
+	border-left: 1px solid rgba(0, 0, 0, 0.25);
+	border-top-left-radius: 0 !important;
+	border-bottom-left-radius: 0 !important;
+}
+
+/* Drawn with borders, in the text colour, so it needs no icon set. The padding and
+   background reset MyBB Default's "a.button span", which hangs a sprite off every span in
+   a button. */
+.events_forum_split .events_forum_split_caret {
+	display: inline-block;
+	width: 0;
+	height: 0;
+	padding: 0;
+	background: none;
+	border-top: 0.35em solid currentColor;
+	border-left: 0.3em solid transparent;
+	border-right: 0.3em solid transparent;
+}
+
+.events_forum_split .events_forum_split_menu {
+	position: absolute;
+	top: 100%;
+	right: 0;
+	/* Above the board's header and sticky furniture, like the plugin's other popups. */
+	z-index: 9999;
+	min-width: 100%;
+	box-sizing: border-box;
+	margin-top: 4px;
+	padding: 4px 0;
+	text-align: left;
+	white-space: nowrap;
+	color: #333;
+	background: #fff;
+	border: 1px solid rgba(0, 0, 0, 0.15);
+	border-radius: 4px;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+/* Closed with the hidden attribute, which the display of a positioned box would override. */
+.events_forum_split .events_forum_split_menu[hidden] {
+	display: none;
+}
+
+/* The menu matches the event page's own split buttons (.events_split_list). */
+.events_forum_split a.events_forum_split_item,
+.events_forum_split a.events_forum_split_item:link,
+.events_forum_split a.events_forum_split_item:visited {
+	display: block;
+	padding: 8px 14px;
+	color: inherit;
+	text-decoration: none;
+}
+.events_forum_split a.events_forum_split_item:hover,
+.events_forum_split a.events_forum_split_item:focus {
+	background: rgba(0, 0, 0, 0.05);
+}

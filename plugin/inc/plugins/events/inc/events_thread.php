@@ -109,6 +109,32 @@ function events_event_forum_id($region)
 }
 
 /**
+ * The regions whose events are announced in this forum.
+ *
+ * A board with no regions files every event under '', which goes to the default forum, so
+ * that forum answers array('') there. An empty answer means no new event is announced in
+ * the forum - the archive forum included, since an event only reaches it by being closed.
+ *
+ * @param int $forum_id
+ * @return array of region names
+ */
+function events_forum_regions($forum_id)
+{
+    $forum_id = (int)$forum_id;
+    $regions = array();
+
+    foreach(events_has_regions() ? events_regions() : array('') as $region)
+    {
+        if($forum_id > 0 && events_event_forum_id($region) === $forum_id)
+        {
+            $regions[] = $region;
+        }
+    }
+
+    return $regions;
+}
+
+/**
  * The forum an archived event's thread is moved to.
  *
  * @return int forum id, 0 when archived threads stay where they are
