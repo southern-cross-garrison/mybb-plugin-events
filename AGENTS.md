@@ -261,6 +261,11 @@ baseline picks the change up.
   refused if they carry a script, an event handler or an outside link, because they are
   served from the board's own origin. Tests seed the map with `setRegionUnits()`
   (`tests/helpers/units.ts`) and clear it, files and all, with `clearRegionUnits()`.
+  Both touch `uploads/events/` only from inside the container as `www-data`
+  (`runPhp(..., { user: 'www-data' })`), never with `fs` from the host: on CI's Linux
+  runner the bind mount keeps ownership, so a folder the runner creates is one Apache can
+  neither upload into nor delete from. macOS ignores ownership on the mount, so a helper
+  that gets this wrong passes locally and fails only in CI.
 
 - Nothing may leave an event filed under a region that is not on the list. Such an event
   is invisible to the region filter and is rejected by the event form the next time

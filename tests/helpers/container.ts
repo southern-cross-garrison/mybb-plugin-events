@@ -6,8 +6,12 @@ import { REPO_ROOT } from './config';
  *
  * Used to exercise code paths that have no UI - chiefly MyBB's scheduled task runner,
  * which the suite needs in order to test the troop-report reminders under a moved clock.
+ *
+ * Runs as root unless `user` says otherwise. Anything that writes files the web server has
+ * to modify later should run as `www-data`: on a Linux host the forum is a bind mount
+ * that keeps ownership, so a folder root creates is one Apache cannot write into.
  */
-export async function runPhp(snippet: string): Promise<string> {
+export async function runPhp(snippet: string, options: { user?: string } = {}): Promise<string> {
 	const script = `<?php
 define('IN_MYBB', 1);
 define('MYBB_ROOT', '/var/www/html/');
@@ -19,7 +23,8 @@ ${snippet}
 `;
 
 	const output = await new Promise<string>((resolve, reject) => {
-		const child = spawn('docker', ['compose', 'exec', '-T', 'web', 'php', '/dev/stdin'], {
+		const user = options.user ? ['-u', options.user] : [];
+		const child = spawn('docker', ['compose', 'exec', '-T', ...user, 'web', 'php', '/dev/stdin'], {
 			cwd: REPO_ROOT,
 		});
 

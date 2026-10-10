@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { FORUM_DIR } from './config';
+import { runPhp } from './container';
 import { getSetting } from './db';
 import { setSettings } from './settings';
 
@@ -44,9 +45,15 @@ export function storedLogos(): string[] {
  * Hand regions to other units without going through the settings page, for tests where
  * that is a precondition rather than the subject. A logo is written where the page would
  * have stored it.
+ *
+ * Written from inside the container as the web server's user, never from the host. On a
+ * Linux host the forum is a bind mount that keeps ownership, so a folder the test runner
+ * created would be one Apache could neither upload into nor delete from - which passes on
+ * macOS, where the mount ignores ownership, and fails in CI.
  */
 export async function setRegionUnits(units: RegionUnits): Promise<void> {
 	const stored: Record<string, { unit: string; logo: string }> = {};
+	const writes: string[] = [];
 
 	for (const [region, entry] of Object.entries(units)) {
 		let logo = '';
@@ -56,24 +63,43 @@ export async function setRegionUnits(units: RegionUnits): Promise<void> {
 				typeof source === 'string'
 					? [source === 'svg' ? SVG : PNG, source]
 					: [source.buffer, source.extension];
-			fs.mkdirSync(LOGO_DIR, { recursive: true });
-			const name = `unit_${'e2e0'.repeat(4)}${Object.keys(stored).length}.${extension}`;
-			fs.writeFileSync(path.join(LOGO_DIR, name), buffer);
-			logo = `uploads/events/${name}`;
+			logo = `uploads/events/unit_${'e2e0'.repeat(4)}${Object.keys(stored).length}.${extension}`;
+			writes.push(
+				`file_put_contents(MYBB_ROOT.'${logo}', base64_decode('${buffer.toString('base64')}'));`
+			);
 		}
 		stored[region] = { unit: entry.unit, logo };
+	}
+
+	if (writes.length > 0) {
+		await runPhp(
+			`
+if(!is_dir(MYBB_ROOT.'uploads/events')) { mkdir(MYBB_ROOT.'uploads/events', 0755, true); }
+${writes.join('\n')}
+`,
+			{ user: 'www-data' }
+		);
 	}
 
 	await setSettings({ events_region_units: JSON.stringify(stored) });
 }
 
-/** Every region back to the garrison's own, and no logos left behind. */
+/**
+ * Every region back to the garrison's own, and no logos left behind. Deleted by the
+ * plugin's own uninstall helper, as the web server's user, for the reason above.
+ */
 export async function clearRegionUnits(): Promise<void> {
 	if ((await getSetting('events_region_units')) !== '') {
 		await setSettings({ events_region_units: '' });
 	}
 
-	for (const name of storedLogos()) {
-		fs.rmSync(path.join(LOGO_DIR, name), { force: true });
+	if (storedLogos().length > 0) {
+		await runPhp(
+			`
+require_once MYBB_ROOT.'inc/plugins/events/inc/events_units.php';
+events_delete_all_unit_logos();
+`,
+			{ user: 'www-data' }
+		);
 	}
 }
