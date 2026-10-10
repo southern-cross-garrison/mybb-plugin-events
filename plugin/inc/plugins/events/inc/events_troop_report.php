@@ -163,7 +163,8 @@ function events_post_troop_report(array $event, array $author, $content, &$error
 
 /**
  * The report a member is handed to fill in: the event's details and a roll call of
- * everyone attending it, grouped the way the garrison files its reports.
+ * everyone attending it, grouped the way the garrison files its reports, with each
+ * group of troopers as a bulleted list.
  *
  * Every line names the member by username, and a trooper by Legion ID as well, which is
  * what events_attendance_matches() looks for - so a report posted as drafted counts
@@ -223,12 +224,12 @@ function events_troop_report_draft(array $event)
             continue;
         }
 
-        $draft .= "[b]" . $bucket['title'] . ":[/b]\n";
+        $draft .= "[b]" . $bucket['title'] . ":[/b]\n[list]\n";
         foreach($bucket['attendees'] as $attendee)
         {
-            $draft .= events_troop_report_roster_line($attendee) . "\n";
+            $draft .= "[*]" . events_troop_report_roster_line($attendee) . "\n";
         }
-        $draft .= "\n";
+        $draft .= "[/list]\n\n";
     }
 
     // Wranglers are not costumed and hold no Legion ID, so they get their own section

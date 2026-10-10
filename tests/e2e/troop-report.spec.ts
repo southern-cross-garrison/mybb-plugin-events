@@ -105,7 +105,7 @@ test.describe('troop reports', () => {
 			'[b]Location:[/b] Gosford Japanese Gardens',
 			'[b]Weather:[/b]',
 			'[b]Date/ Time:[/b] 4th of October from 2pm',
-			'[b]Garrison Troopers:[/b]\nAsh - trooper1 - TK-20001',
+			'[b]Garrison Troopers:[/b]\n[list]\n[*]Ash - trooper1 - TK-20001\n[/list]',
 			'[b]Mission Report:[/b]',
 			'[b]Mission Status:[/b]',
 			'[b]Photos by:[/b]\nIf permission is not granted, say so... (for use by PR team)',
@@ -130,14 +130,14 @@ test.describe('troop reports', () => {
 
 		const draft = await page.locator('#troop_report_content').inputValue();
 
-		// Each attendee must appear under their own heading. newbie has no preferred name or
-		// Legion ID, so the line is the username alone.
+		// Each attendee must appear under their own heading, as an item of its list. newbie has
+		// no preferred name or Legion ID, so the item is the username alone.
 		const garrisonIndex = draft.indexOf('[b]Garrison Troopers:[/b]');
 		const legionIndex = draft.indexOf('[b]Other 501st Troopers:[/b]');
 		const otherIndex = draft.indexOf('[b]Other Troopers:[/b]');
-		const trooper1 = draft.indexOf('Ash - trooper1 - TK-20001\n');
-		const trooper2 = draft.indexOf('Bex - trooper2 - TK-20002\n');
-		const newbie = draft.indexOf('\nnewbie\n');
+		const trooper1 = draft.indexOf('[*]Ash - trooper1 - TK-20001\n');
+		const trooper2 = draft.indexOf('[*]Bex - trooper2 - TK-20002\n');
+		const newbie = draft.indexOf('[*]newbie\n');
 		expect(garrisonIndex).toBeGreaterThan(-1);
 		expect(trooper1).toBeGreaterThan(garrisonIndex);
 		expect(legionIndex).toBeGreaterThan(trooper1);
@@ -176,7 +176,7 @@ test.describe('troop reports', () => {
 		await expectEditorAttached(page, 'troop_report_content');
 	});
 
-	test('rosters the attendees one per line, all the way to the thread', async ({ page }) => {
+	test('rosters the troopers as a bulleted list, all the way to the thread', async ({ page }) => {
 		const eventId = await finishedEvent('Listed Troop');
 		await createRsvp(eventId, 'trooper1', { costumes: [TK] });
 		await createRsvp(eventId, 'trooper2', { costumes: [TD] });
@@ -185,13 +185,15 @@ test.describe('troop reports', () => {
 		await page.goto(`/troop_report.php?id=${eventId}`);
 
 		// Posted unchanged - which also takes the draft back out through the editor - the
-		// headings have to arrive bold and each attendee on a line of their own.
+		// headings have to arrive bold and each trooper as an item of a list.
 		await page.locator('#troop_report_submit').click();
 
 		const post = page.locator('.post_body').first();
 		await expect(post.locator('.mycode_b', { hasText: 'Mission Status:' })).toHaveCount(1);
 		await expect(post).not.toContainText('[b]');
-		expect(await post.innerText()).toMatch(/Ash - trooper1 - TK-20001\s*\n/);
+		await expect(post.locator('ul li', { hasText: 'Ash - trooper1 - TK-20001' })).toHaveCount(1);
+		await expect(post.locator('ul li', { hasText: 'Bex - trooper2 - TK-20002' })).toHaveCount(1);
+		await expect(post).not.toContainText('[*]');
 	});
 
 	test('lists wranglers in their own section, apart from the membership buckets', async ({
