@@ -176,7 +176,7 @@ test.describe('troop reports', () => {
 		await expectEditorAttached(page, 'troop_report_content');
 	});
 
-	test('rosters the troopers as a bulleted list, all the way to the thread', async ({ page }) => {
+	test('rosters the attendees as bulleted lists, all the way to the thread', async ({ page }) => {
 		const eventId = await finishedEvent('Listed Troop');
 		await createRsvp(eventId, 'trooper1', { costumes: [TK] });
 		await createRsvp(eventId, 'trooper2', { costumes: [TD] });
@@ -185,7 +185,7 @@ test.describe('troop reports', () => {
 		await page.goto(`/troop_report.php?id=${eventId}`);
 
 		// Posted unchanged - which also takes the draft back out through the editor - the
-		// headings have to arrive bold and each trooper as an item of a list.
+		// headings have to arrive bold and each attendee as an item of a list.
 		await page.locator('#troop_report_submit').click();
 
 		const post = page.locator('.post_body').first();
@@ -210,7 +210,7 @@ test.describe('troop reports', () => {
 		const draft = await page.locator('#troop_report_content').inputValue();
 
 		expect(draft).toContain('[b]Wranglers:[/b]');
-		expect(draft).toContain('[b]Wranglers:[/b]\nDev - wrangler\n');
+		expect(draft).toContain('[b]Wranglers:[/b]\n[list]\n[*]Dev - wrangler\n[/list]');
 
 		// Wranglers sit after the membership buckets, not inside them.
 		expect(draft.indexOf('[b]Wranglers:[/b]')).toBeGreaterThan(

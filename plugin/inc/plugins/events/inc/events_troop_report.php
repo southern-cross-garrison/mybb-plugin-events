@@ -163,8 +163,8 @@ function events_post_troop_report(array $event, array $author, $content, &$error
 
 /**
  * The report a member is handed to fill in: the event's details and a roll call of
- * everyone attending it, grouped the way the garrison files its reports, with each
- * group of troopers as a bulleted list.
+ * everyone attending it, grouped the way the garrison files its reports, each group a
+ * bulleted list.
  *
  * Every line names the member by username, and a trooper by Legion ID as well, which is
  * what events_attendance_matches() looks for - so a report posted as drafted counts
@@ -236,12 +236,12 @@ function events_troop_report_draft(array $event)
     // rather than being folded into the membership buckets above.
     if(!empty($wranglers))
     {
-        $draft .= "[b]Wranglers:[/b]\n";
+        $draft .= "[b]Wranglers:[/b]\n[list]\n";
         foreach($wranglers as $wrangler)
         {
-            $draft .= events_troop_report_roster_line($wrangler, false) . "\n";
+            $draft .= "[*]" . events_troop_report_roster_line($wrangler, false) . "\n";
         }
-        $draft .= "\n";
+        $draft .= "[/list]\n\n";
     }
 
     $draft .= "[b]Mission Report:[/b]\n\n\n\n";
