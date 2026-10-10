@@ -1277,6 +1277,71 @@ test.describe('front-end event management', () => {
 		await expect(entry('2026-10-25')).toHaveCount(0);
 	});
 
+	test("each day starts out with the event's own hours, and follows them until it is set", async ({
+		page,
+	}) => {
+		await loginAs(page, 'gec');
+		await page.goto('/manage_event.php');
+
+		// The end date goes in before its time, so the grid is drawn while the end time is
+		// still blank and has to pick it up afterwards.
+		await fillEventForm(page, {
+			title: 'Weekend Hours Troop',
+			status: 'live',
+			start: '2026-10-23 09:00:00',
+			end: '2026-10-25 18:00:00',
+		});
+
+		const dates = ['2026-10-23', '2026-10-24', '2026-10-25'];
+		const times = (date: string) =>
+			page.locator(`[data-events-day-date="${date}"] input[type="time"]`);
+		await expect(page.locator('[data-events-day-date]')).toHaveCount(3);
+		for (const date of dates) {
+			await expect(times(date).nth(0)).toHaveValue('09:00');
+			await expect(times(date).nth(1)).toHaveValue('18:00');
+		}
+
+		// A day given hours of its own keeps them when the event's change; the rest follow.
+		await times('2026-10-24').nth(1).fill('16:00');
+		await page.locator('#event_form_end_date_time').fill('17:00');
+		await expect(times('2026-10-23').nth(1)).toHaveValue('17:00');
+		await expect(times('2026-10-24').nth(1)).toHaveValue('16:00');
+		await expect(times('2026-10-25').nth(1)).toHaveValue('17:00');
+
+		await submitEventForm(page);
+		await expect(page.locator('#manage_event_errors')).toHaveCount(0);
+
+		const saved = await query(
+			`SELECT id FROM ${T('event_plugin_events')} WHERE title = 'Weekend Hours Troop'`
+		);
+		expect(saved).toHaveLength(1);
+		const days = await getEventDays(Number(saved[0].id));
+		expect(days.map((day) => [day.date, day.start_time, day.end_time])).toEqual([
+			['2026-10-23', '09:00:00', '17:00:00'],
+			['2026-10-24', '09:00:00', '16:00:00'],
+			['2026-10-25', '09:00:00', '17:00:00'],
+		]);
+	});
+
+	test("the server draws a day it has no hours for with the event's own", async ({ page }) => {
+		// An event spanning days with no day rows yet - saved with the script off - comes back
+		// to be edited with the same defaults the script would have filled in.
+		const eventId = await createEvent({
+			title: 'Unrowed Weekend Troop',
+			start: '2026-10-23 09:00:00',
+			end: '2026-10-24 18:00:00',
+		});
+
+		await loginAs(page, 'gec');
+		await page.goto(`/manage_event.php?id=${eventId}`);
+
+		for (const date of ['2026-10-23', '2026-10-24']) {
+			const times = page.locator(`[data-events-day-date="${date}"] input[type="time"]`);
+			await expect(times.nth(0)).toHaveValue('09:00');
+			await expect(times.nth(1)).toHaveValue('18:00');
+		}
+	});
+
 	test('an apostrophe in the title and description survives the round trip', async ({ page }) => {
 		await loginAs(page, 'gec');
 		await page.goto('/manage_event.php');

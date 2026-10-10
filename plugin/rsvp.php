@@ -1132,6 +1132,10 @@ elseif($rsvp_step === 'confirm')
         $rsvp_body .= '<p><strong>Costumes:</strong> <span id="confirm_costumes">' . htmlspecialchars_uni(implode(', ', $signup_costumes)) . '</span></p>'
             . $costumes_from_api_notice;
     }
+
+    // Said again where it matters most, right above the button: confirming here does not
+    // sign anybody up with the unit that runs the event.
+    $rsvp_body .= events_unit_notice_html($event, 'rsvp_unit_notice');
 }
 
 $events_print_header = events_print_header($rsvp_page_title, array($event['title']));

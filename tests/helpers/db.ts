@@ -56,7 +56,13 @@ export interface Fixtures {
 	profileFields: Record<string, number>;
 	costumeOptions: string[];
 	groups: { gec: number; garrison: number; legion: number };
-	forums: { general: number; troop_reports: number; events: number; events_hunter: number; events_archive: number };
+	forums: {
+		general: number;
+		troop_reports: number;
+		events: number;
+		events_hunter: number;
+		events_archive: number;
+	};
 	users: Record<string, number>;
 }
 
@@ -236,6 +242,8 @@ export interface EventInput {
 	region?: string;
 	/** Where the event happens; rendered as a Google Maps link wherever it is shown. */
 	address?: string;
+	/** The real signup sheet, for an event in a region another unit runs. */
+	externalSignupUrl?: string;
 	/** MySQL datetime, or an offset from TEST_NOW. */
 	start?: string | { days?: number; hours?: number };
 	end?: string | { days?: number; hours?: number };
@@ -281,9 +289,9 @@ export async function createEvent(input: EventInput): Promise<number> {
 
 	const result = await execute(
 		`INSERT INTO ${T('event_plugin_events')}
-       (title, event_type, description, status, region, address, start_date, end_date, signup_cutoff,
+       (title, event_type, description, status, region, address, external_signup_url, start_date, end_date, signup_cutoff,
         requires_wwcc, gec_user_id, poc_user_id, max_troopers, max_wranglers, max_attendees, created_by, thread_id, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		[
 			input.title,
 			input.eventType ?? 'troop',
@@ -291,6 +299,7 @@ export async function createEvent(input: EventInput): Promise<number> {
 			input.status ?? 'live',
 			input.region ?? 'Sydney',
 			input.address ?? '',
+			input.externalSignupUrl ?? '',
 			start,
 			end,
 			cutoff,

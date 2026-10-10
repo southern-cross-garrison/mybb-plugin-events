@@ -251,19 +251,22 @@ function events_admin_sync_region_threads(array $event_ids, array $former_forum_
 /**
  * Write the region list and the per-region forum map, and refresh MyBB's settings cache.
  *
- * The two always move together: the forum map is keyed by region name, so a list written
- * without it is a board whose announcements quietly stop being routed.
+ * They always move together: the forum map and the unit map are keyed by region name, so
+ * a list written without them is a board whose announcements quietly stop being routed,
+ * or whose cross-posted events quietly stop saying they are.
  *
  * @param array $regions Ordered region names
  * @param array $forums  region => forum id
+ * @param array $units   region => array('unit' => string, 'logo' => string)
  */
-function events_admin_save_region_settings(array $regions, array $forums)
+function events_admin_save_region_settings(array $regions, array $forums, array $units)
 {
     global $db;
 
     $values = array(
         'events_regions'      => implode(',', $regions),
         'events_event_forums' => events_build_region_forums_setting($forums),
+        'events_region_units' => events_build_region_units_setting($units),
     );
 
     foreach($values as $name => $value)
@@ -306,7 +309,7 @@ function events_admin_add_region($name, array &$errors, &$thread_errors = null)
     $announced = events_admin_announced_event_ids($moves);
 
     $regions[] = $name;
-    events_admin_save_region_settings($regions, events_region_forums());
+    events_admin_save_region_settings($regions, events_region_forums(), events_region_units());
 
     // The list first, the reverse of a deletion, for the same reason: interrupted between
     // the two, the events are left with no region - still listed - rather than filed under
@@ -369,6 +372,12 @@ function events_admin_delete_region($region, $move_to, array &$errors, &$thread_
     // another region and are announced wherever that region is.
     unset($forums[$region]);
 
+    // So does the unit that ran it, and its logo: the events now belong to whoever runs
+    // the region they moved to.
+    $units = events_region_units();
+    $logo = isset($units[$region]) ? $units[$region]['logo'] : '';
+    unset($units[$region]);
+
     $remaining = array();
     foreach($regions as $other)
     {
@@ -378,7 +387,10 @@ function events_admin_delete_region($region, $move_to, array &$errors, &$thread_
         }
     }
 
-    events_admin_save_region_settings($remaining, $forums);
+    events_admin_save_region_settings($remaining, $forums, $units);
+
+    // Only once nothing points at it any more.
+    events_delete_unit_logo($logo);
 
     // A thread failing to update does not undo the deletion: the events are already
     // refiled, and the next save of each event retries its thread.
@@ -402,13 +414,19 @@ function events_admin_delete_region($region, $move_to, array &$errors, &$thread_
  * event_forums[North]Coast] arrives as event_forums[North] and the region loses its
  * forum to a name the board does not have.
  *
- * @return array of array('original' => string, 'name' => string, 'forum' => string)
+ * The logo is never read back from the form: it is the stored one, looked up under the
+ * row's original name, so a forged post cannot point the setting at any file it likes.
+ * 'upload' is the row's index into $_FILES['region_logo'].
+ *
+ * @return array of array('original' => string, 'name' => string, 'forum' => string,
+ *         'unit' => string, 'logo' => string, 'logo_remove' => bool, 'upload' => int|null)
  */
 function events_admin_region_rows()
 {
     global $mybb;
 
     $rows = array();
+    $units = events_region_units();
 
     if($mybb->request_method != "post")
     {
@@ -417,9 +435,13 @@ function events_admin_region_rows()
         foreach(events_regions() as $region)
         {
             $rows[] = array(
-                'original' => $region,
-                'name'     => $region,
-                'forum'    => isset($forums[$region]) ? (string)$forums[$region] : '',
+                'original'    => $region,
+                'name'        => $region,
+                'forum'       => isset($forums[$region]) ? (string)$forums[$region] : '',
+                'unit'        => isset($units[$region]) ? $units[$region]['unit'] : '',
+                'logo'        => isset($units[$region]) ? $units[$region]['logo'] : '',
+                'logo_remove' => false,
+                'upload'      => null,
             );
         }
 
@@ -429,17 +451,158 @@ function events_admin_region_rows()
     $originals = (array)$mybb->get_input('region_original', MyBB::INPUT_ARRAY);
     $names     = (array)$mybb->get_input('region_name', MyBB::INPUT_ARRAY);
     $forums    = (array)$mybb->get_input('event_forums', MyBB::INPUT_ARRAY);
+    $unit_names = (array)$mybb->get_input('region_unit', MyBB::INPUT_ARRAY);
+    $removes   = (array)$mybb->get_input('region_logo_remove', MyBB::INPUT_ARRAY);
 
     foreach($originals as $index => $original)
     {
+        $original = trim((string)$original);
+
         $rows[] = array(
-            'original' => trim((string)$original),
-            'name'     => isset($names[$index]) ? trim((string)$names[$index]) : '',
-            'forum'    => isset($forums[$index]) ? trim((string)$forums[$index]) : '',
+            'original'    => $original,
+            'name'        => isset($names[$index]) ? trim((string)$names[$index]) : '',
+            'forum'       => isset($forums[$index]) ? trim((string)$forums[$index]) : '',
+            'unit'        => isset($unit_names[$index]) && is_string($unit_names[$index]) ? trim($unit_names[$index]) : '',
+            'logo'        => isset($units[$original]) ? $units[$original]['logo'] : '',
+            'logo_remove' => !empty($removes[$index]),
+            'upload'      => is_int($index) || ctype_digit((string)$index) ? (int)$index : null,
         );
     }
 
     return $rows;
+}
+
+/**
+ * One row's uploaded logo, out of PHP's sideways $_FILES layout for an array of file
+ * boxes ($_FILES['region_logo']['name'][3] rather than [3]['name']).
+ *
+ * @param int|null $index
+ * @return array|null in the shape of a single $_FILES entry
+ */
+function events_admin_region_logo_upload($index)
+{
+    if($index === null || !isset($_FILES['region_logo']) || !is_array($_FILES['region_logo']))
+    {
+        return null;
+    }
+
+    $file = array();
+    foreach(array('name', 'type', 'tmp_name', 'error', 'size') as $key)
+    {
+        if(!isset($_FILES['region_logo'][$key]) || !is_array($_FILES['region_logo'][$key])
+            || !array_key_exists($index, $_FILES['region_logo'][$key]))
+        {
+            return null;
+        }
+
+        $file[$key] = $_FILES['region_logo'][$key][$index];
+    }
+
+    // A nested array here would be a forged post; a real one is one file per box.
+    foreach($file as $value)
+    {
+        if(is_array($value))
+        {
+            return null;
+        }
+    }
+
+    return $file;
+}
+
+/**
+ * The units the submitted rows ask for, under the names the regions now have, with any
+ * uploaded logos checked and stored.
+ *
+ * Run only once everything else on the form has validated, because storing an upload is
+ * the one thing this page does before the settings are written - and a save refused for
+ * some other reason would otherwise leave files behind that nothing points at. When this
+ * refuses the save itself, it deletes what it stored.
+ *
+ * @param array $rows    From events_admin_region_rows()
+ * @param array $renames original => final name
+ * @param array $errors  Appended to
+ * @param array|null $stale Set to the logo files the new map no longer uses, which the
+ *        caller deletes once the settings are written
+ * @param array|null $changed Set to the original names of the regions whose unit changed
+ * @return array|false region => array('unit' => string, 'logo' => string)
+ */
+function events_admin_region_units_from_rows(array $rows, array $renames, array &$errors, &$stale = null, &$changed = null)
+{
+    $stale = array();
+    $changed = array();
+    $stored = array();
+    $units = array();
+    $current = events_region_units();
+    $before = count($errors);
+
+    foreach($rows as $row)
+    {
+        $region = isset($renames[$row['original']]) ? $renames[$row['original']] : $row['original'];
+        $label = "The logo for " . htmlspecialchars_uni($region);
+        $unit = $row['unit'];
+        $logo = $row['logo'];
+
+        if(my_strlen($unit) > EVENTS_UNIT_NAME_MAX_LENGTH)
+        {
+            $errors[] = "The unit that runs " . htmlspecialchars_uni($region) . " is too long a name ("
+                . EVENTS_UNIT_NAME_MAX_LENGTH . " characters at most).";
+            continue;
+        }
+
+        $upload = events_admin_region_logo_upload($row['upload']);
+        $new_logo = '';
+        if($upload !== null)
+        {
+            if($unit === '' && (int)$upload['error'] !== UPLOAD_ERR_NO_FILE)
+            {
+                $errors[] = "Name the unit that runs " . htmlspecialchars_uni($region) . " to give it a logo.";
+                continue;
+            }
+
+            $new_logo = events_store_unit_logo($upload, $label, $errors);
+        }
+
+        if($new_logo !== '')
+        {
+            $stored[] = $new_logo;
+            if($logo !== '')
+            {
+                $stale[] = $logo;
+            }
+            $logo = $new_logo;
+        }
+        // A logo only ever means "this is somebody else's event", so a region the
+        // garrison runs again has no use for the one it had.
+        elseif($logo !== '' && ($row['logo_remove'] || $unit === ''))
+        {
+            $stale[] = $logo;
+            $logo = '';
+        }
+
+        $was = isset($current[$row['original']]) ? $current[$row['original']]['unit'] : '';
+        if($was !== $unit)
+        {
+            $changed[] = $row['original'];
+        }
+
+        $units[$region] = array('unit' => $unit, 'logo' => $logo);
+    }
+
+    if(count($errors) > $before)
+    {
+        foreach($stored as $path)
+        {
+            events_delete_unit_logo($path);
+        }
+
+        $stale = array();
+        $changed = array();
+
+        return false;
+    }
+
+    return $units;
 }
 
 /**
@@ -782,7 +945,8 @@ function events_admin_output_region_rows($form, array $rows, array $counts)
             . $form->generate_text_box("region_name[" . $index . "]", $row['name'], array("id" => "region_name_" . $index))
             . '<span class="events_region_forum">' . $forum . '</span>'
             . $delete
-            . '</span>';
+            . '</span>'
+            . events_admin_region_unit_controls($row, $index);
 
         // Only the count goes on the row. What the forum beside it does is explained
         // once, on the default it falls back to - repeating it under every region turns
@@ -797,6 +961,48 @@ function events_admin_output_region_rows($form, array $rows, array $counts)
         '<a href="' . events_admin_region_action_url('add') . '" class="button events_region_add" id="events_region_add">Add Region</a>');
 
     $container->end();
+}
+
+/**
+ * The second line of a region's row: who runs it, when that is another unit, and the
+ * unit's logo.
+ *
+ * Written out by hand rather than with the Form helpers, which can give an input an id
+ * and a class and nothing else - no placeholder, and no accept list for the file box.
+ *
+ * @param array $row From events_admin_region_rows()
+ * @param int $index
+ * @return string
+ */
+function events_admin_region_unit_controls(array $row, $index)
+{
+    $index = (int)$index;
+
+    $html = '<span class="events_region_unit">'
+        . '<label for="region_unit_' . $index . '">Run by</label> '
+        . '<input type="text" class="text_input" name="region_unit[' . $index . ']" id="region_unit_' . $index . '"'
+        . ' value="' . htmlspecialchars_uni($row['unit']) . '" placeholder="This garrison"'
+        . ' maxlength="' . EVENTS_UNIT_NAME_MAX_LENGTH . '" />'
+        . '<span class="events_region_logo">';
+
+    if($row['logo'] !== '')
+    {
+        $html .= '<img src="' . htmlspecialchars_uni(events_unit_logo_url($row['logo'])) . '"'
+            . ' class="events_region_logo_preview" id="region_logo_preview_' . $index . '" alt="Logo" />';
+    }
+
+    $html .= '<label for="region_logo_' . $index . '">' . ($row['logo'] !== '' ? 'Replace logo' : 'Logo') . '</label> '
+        . '<input type="file" name="region_logo[' . $index . ']" id="region_logo_' . $index . '"'
+        . ' accept=".png,.jpg,.jpeg,.gif,.webp,.svg,image/png,image/jpeg,image/gif,image/webp,image/svg+xml" />';
+
+    if($row['logo'] !== '')
+    {
+        $html .= '<label class="events_region_logo_remove" for="region_logo_remove_' . $index . '">'
+            . '<input type="checkbox" name="region_logo_remove[' . $index . ']" id="region_logo_remove_' . $index . '" value="1"'
+            . ($row['logo_remove'] ? ' checked="checked"' : '') . ' /> Remove</label>';
+    }
+
+    return $html . '</span></span>';
 }
 
 /**

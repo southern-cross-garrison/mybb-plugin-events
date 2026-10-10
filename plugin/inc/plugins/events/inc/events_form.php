@@ -672,6 +672,7 @@ function events_event_form_values(array $event = array())
             'status'        => 'pending',
             'region'        => $regions ? $regions[0] : '',
             'address'       => '',
+            'external_signup_url' => '',
             'start_date'    => '',
             'end_date'      => '',
             'signup_cutoff' => '',
@@ -715,6 +716,8 @@ function events_event_form_values(array $event = array())
         // Events written before the column existed have no key at all on a board that has
         // not been re-activated yet, so this is read defensively rather than as a string.
         'address'       => isset($event['address']) ? (string)$event['address'] : '',
+        // Likewise, for a board that has not run the upgrade adding it.
+        'external_signup_url' => isset($event['external_signup_url']) ? (string)$event['external_signup_url'] : '',
         'start_date'    => $event['start_date'],
         'end_date'      => $event['end_date'],
         'signup_cutoff' => $cutoff,
@@ -772,6 +775,7 @@ function events_event_form_input()
         'status'        => $mybb->get_input('status'),
         'region'        => $mybb->get_input('region'),
         'address'       => trim($mybb->get_input('address')),
+        'external_signup_url' => trim($mybb->get_input('external_signup_url')),
         'start_date'    => events_posted_datetime('start_date'),
         'end_date'      => events_posted_datetime('end_date'),
         'signup_cutoff' => events_posted_datetime('signup_cutoff'),
@@ -905,6 +909,23 @@ function events_validate_event_input(array $input, array $event = array())
     if(my_strlen($input['address']) > 255)
     {
         $errors[] = "The address cannot be longer than 255 characters.";
+    }
+
+    // Signing up to an event another unit runs does not sign anybody up with them, so the
+    // event has to say where that happens. Ignored for the garrison's own regions, where
+    // the box is not shown, so whatever it held is not worth refusing a save over.
+    $unit = events_region_unit($input['region']);
+    if($unit !== null)
+    {
+        if($input['external_signup_url'] === '')
+        {
+            $errors[] = "Add the link to " . $unit['unit'] . "'s signup sheet for this event.";
+        }
+        elseif(!events_valid_signup_url($input['external_signup_url']))
+        {
+            $errors[] = "The signup sheet must be a web address starting with http:// or https://, at most "
+                . EVENTS_SIGNUP_URL_MAX_LENGTH . " characters.";
+        }
     }
 
     // The coordinator arrives as a select box on both forms, so anything not on the list
@@ -1663,6 +1684,11 @@ function events_save_event($event_id, array $input, $user_id, &$thread_error = n
         'status'        => $db->escape_string($input['status']),
         'region'        => $db->escape_string($input['region']),
         'address'       => $db->escape_string($input['address']),
+        // Only kept for a region another unit runs: anywhere else nothing shows it, and a
+        // link left over from before the region changed would come back to life the day
+        // the region was handed to another unit.
+        'external_signup_url' => $db->escape_string(isset($input['external_signup_url']) && events_region_unit($input['region']) !== null
+            ? $input['external_signup_url'] : ''),
         'start_date'    => $db->escape_string(events_date('Y-m-d H:i:s', events_strtotime($input['start_date']))),
         'end_date'      => $db->escape_string(events_date('Y-m-d H:i:s', events_strtotime($input['end_date']))),
         'requires_wwcc' => $input['requires_wwcc'] ? 1 : 0,
@@ -1813,6 +1839,7 @@ function events_event_log_state($event_id)
         'status'        => 'Status',
         'region'        => 'Region',
         'address'       => 'Address',
+        'external_signup_url' => 'Signup Sheet',
         'start_date'    => 'Start Date',
         'end_date'      => 'End Date',
         'signup_cutoff' => 'Signup Cutoff',
@@ -1826,7 +1853,7 @@ function events_event_log_state($event_id)
 
     // Read defensively: a board that has not run the upgrade adding the type has neither
     // column, and every one of its events is a troop with no attendee maximum.
-    $event += array('event_type' => 'troop', 'max_attendees' => 0);
+    $event += array('event_type' => 'troop', 'max_attendees' => 0, 'external_signup_url' => '');
 
     $state = array();
     foreach($columns as $column => $label)
@@ -2050,6 +2077,7 @@ function events_event_days_grid(array $values, array $options)
     }
 
     $dates = events_event_day_span($values['start_date'], $values['end_date']);
+    $default = events_event_day_default_times($values['start_date'], $values['end_date']);
 
     $html = '<div id="' . $container_id . '" class="events_day_grid" data-events-day-grid="1"'
           . ' data-events-day-start="' . htmlspecialchars_uni($options['start_input']) . '"'
@@ -2064,7 +2092,7 @@ function events_event_days_grid(array $values, array $options)
 
     foreach($dates as $index => $date)
     {
-        $time = isset($times[$date]) ? $times[$date] : array('', '');
+        $time = isset($times[$date]) ? $times[$date] : $default;
         $html .= events_event_day_row(
             $index,
             $date,
@@ -2077,6 +2105,31 @@ function events_event_days_grid(array $values, array $options)
     }
 
     return array('html' => $html . '</div>', 'rows' => count($dates));
+}
+
+/**
+ * The hours a day the grid has no times for starts out with: the event's own start and end
+ * times, so a Friday 09:00 to Sunday 18:00 event offers 09:00 to 18:00 on each day.
+ *
+ * Blank when the two are the same time, since a day that starts and ends at the same time
+ * is refused (events_validate_event_input()) and a grid that came pre-filled with an error
+ * would be no help. events_event_days_script() applies the same rule to the rows it draws.
+ *
+ * @param string $start_date From the form values: 'Y-m-d H:i:s', a bare 'Y-m-d' or ''
+ * @param string $end_date
+ * @return array (start, end) as 'H:i', or two blanks
+ */
+function events_event_day_default_times($start_date, $end_date)
+{
+    $start = events_datetime_parts($start_date);
+    $end = events_datetime_parts($end_date);
+
+    if($start['time'] === $end['time'])
+    {
+        return array('', '');
+    }
+
+    return array($start['time'], $end['time']);
 }
 
 /**
@@ -2193,6 +2246,32 @@ function events_event_days_script()
 		return row.querySelectorAll('input[type="time"]');
 	}
 
+	// The hours a new row starts with, by events_event_day_default_times()'s rule: the
+	// event's own start and end times, or nothing when the two are the same.
+	function defaults() {
+		var start = startTimeInput ? startTimeInput.value : '';
+		var end = endTimeInput ? endTimeInput.value : '';
+		return start === end ? ['', ''] : [start, end];
+	}
+
+	// The defaults the rows were last given. A cell still holding its row's default has not
+	// been set by anybody, so it follows the event's times when they change; one that has
+	// been set keeps what was typed. This is what lets the grid appear before the end time
+	// is filled in - the usual order, since the end date comes first - and still pick it up.
+	var given = defaults();
+
+	function follow() {
+		var next = defaults();
+		var existing = rows();
+		for(var i = 0; i < existing.length; i++) {
+			var cells = times(existing[i]);
+			for(var c = 0; c < 2; c++) {
+				if(cells[c] && cells[c].value === given[c]) { cells[c].value = next[c]; }
+			}
+		}
+		given = next;
+	}
+
 	// settled is false while a field is still being typed in, where an unreadable date means
 	// "not finished" rather than "no days" - clearing the grid under someone mid-keystroke
 	// would take the hours they had already entered with it.
@@ -2254,11 +2333,10 @@ function events_event_days_script()
 				.split('__LABEL__').join(labelDate(dates[i]));
 
 			var row = holder.firstElementChild;
-			if(kept[date]) {
-				var cells = times(row);
-				if(cells[0]) { cells[0].value = kept[date][0]; }
-				if(cells[1]) { cells[1].value = kept[date][1]; }
-			}
+			var hours = kept[date] || given;
+			var cells = times(row);
+			if(cells[0]) { cells[0].value = hours[0]; }
+			if(cells[1]) { cells[1].value = hours[1]; }
 
 			grid.appendChild(row);
 		}
@@ -2280,12 +2358,14 @@ function events_event_days_script()
 	startInput.addEventListener('change', onChange);
 	endInput.addEventListener('change', onChange);
 	// A time can take an event over or under a day. Unsettled, so a change to one while a
-	// date box is still half typed leaves the grid alone rather than clearing it.
+	// date box is still half typed leaves the grid alone rather than clearing it. The rows
+	// still on the event's hours are moved first, so any row the change adds agrees with them.
+	function onTime() { follow(); render(false); }
 	var timeInputs = [startTimeInput, endTimeInput];
 	for(var t = 0; t < timeInputs.length; t++) {
 		if(timeInputs[t]) {
-			timeInputs[t].addEventListener('input', onInput);
-			timeInputs[t].addEventListener('change', onInput);
+			timeInputs[t].addEventListener('input', onTime);
+			timeInputs[t].addEventListener('change', onTime);
 		}
 	}
 })();
@@ -2749,6 +2829,52 @@ function events_tag_field_script()
 		}
 	}
 })();
+</script>
+SCRIPT;
+}
+
+/**
+ * The script that shows the Signup Sheet field only while a region another unit runs is
+ * chosen.
+ *
+ * Both forms render the field whenever the board has such a region at all, so with the
+ * script off it is simply always there - and the server ignores it for the garrison's own
+ * regions (events_save_event()), so filling it in by mistake does no harm.
+ *
+ * @param string $select_id The region select
+ * @param string $row_id    The element wrapping the field, label and all
+ * @return string '' when no region is run by another unit
+ */
+function events_signup_url_script($select_id, $row_id)
+{
+    $regions = events_unit_regions();
+    if(!$regions)
+    {
+        return '';
+    }
+
+    // JSON_HEX_* so a region name cannot close the script element it sits in.
+    $config = json_encode(array(
+        'select'  => $select_id,
+        'row'     => $row_id,
+        'regions' => $regions,
+    ), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
+
+    return <<<SCRIPT
+<script type="text/javascript">
+(function(config) {
+	var select = document.getElementById(config.select);
+	var row = document.getElementById(config.row);
+	if(!select || !row) { return; }
+
+	function update() {
+		// Not the hidden attribute, which loses to any stylesheet setting the row's display.
+		row.style.display = config.regions.indexOf(select.value) === -1 ? 'none' : '';
+	}
+
+	select.addEventListener('change', update);
+	update();
+})({$config});
 </script>
 SCRIPT;
 }

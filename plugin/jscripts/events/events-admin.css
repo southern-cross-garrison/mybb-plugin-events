@@ -24,6 +24,37 @@
 	gap: 6px;
 }
 
+/* Who runs the region, on a line of its own under the name: it is a second thing about
+   the region rather than more of the first, and the row would not fit a phone with it
+   alongside. */
+.events_region_unit {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 10px;
+	margin-top: 6px;
+}
+
+.events_region_logo {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+}
+
+/* Small enough to keep the row to a line or two; the event card shows it larger. */
+.events_region_logo_preview {
+	max-width: 64px;
+	max-height: 40px;
+	object-fit: contain;
+}
+
+.events_region_logo_remove {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+}
+
 /* Borderless by design: it sits beside a text box on every row, and a bordered button
    on each of them would read as the row's primary control rather than as the small
    destructive one. The colour only arrives on hover, so a page of regions is not a

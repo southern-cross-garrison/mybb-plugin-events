@@ -20,7 +20,7 @@ import {
 import { withSettings } from '../../tests/helpers/settings';
 import { relativeToTestNow } from '../../tests/helpers/clock';
 import { ring, shot } from './annotate';
-import { createAnnouncedEvent } from './events';
+import { BORDER_REGION, createAnnouncedEvent, withBorderRegion } from './events';
 
 const [TK, TD] = [0, 1].map((index) => fixtures().costumeOptions[index]);
 
@@ -180,6 +180,27 @@ test.describe('admins', () => {
 		await canberra.click();
 		await expect(page.locator('#events_region_modal')).toBeVisible();
 		await shot(page.locator('#events_region_modal'), 'admins/regions-delete');
+	});
+
+	test('regions run by another unit', async ({ page }) => {
+		const restore = await withBorderRegion();
+		try {
+			await loginToAdminCp(page);
+			await gotoEventsAdmin(page, '&action=settings');
+			const index = (
+				await page
+					.locator(`input[name^="region_original"][value="${BORDER_REGION}"]`)
+					.getAttribute('name')
+			)?.match(/\[(\d+)\]/)?.[1];
+			await ring(
+				page
+					.locator(`#region_unit_${index}`)
+					.locator('xpath=ancestor::span[contains(@class, "events_region_unit")]')
+			);
+			await shot(page.locator('#content'), 'admins/regions-unit');
+		} finally {
+			await restore();
+		}
 	});
 
 	test('archive an event', async ({ page }) => {

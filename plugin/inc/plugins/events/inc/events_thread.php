@@ -220,6 +220,19 @@ function events_event_post_content(array $event)
         $content .= "[b]This event has been taken off the schedule and is not open for signups.[/b]\n\n";
     }
 
+    // Guests and Tapatalk read the event from this post rather than the card, so it carries
+    // the card's warning too, and as prominently. The address was checked on the way in
+    // (events_valid_signup_url()) to hold no bracket that could end the url tag early, and
+    // any that got past that some other way are encoded, which a browser reads the same.
+    $unit = events_event_unit($event);
+    if($unit !== null)
+    {
+        $content .= "[b]This event is run by " . events_escape_bbcode($unit['unit']) . ". Signing up here doesn't sign you up with them";
+        $content .= $unit['signup_url'] !== ''
+            ? ": [url=" . str_replace(array('[', ']'), array('%5B', '%5D'), $unit['signup_url']) . "]sign up on their signup sheet[/url] too.[/b]\n\n"
+            : ".[/b]\n\n";
+    }
+
     $content .= "[b]When:[/b] " . events_format_date($event['start_date']);
     $end = events_format_date($event['end_date']);
     if($end !== '')
@@ -237,6 +250,11 @@ function events_event_post_content(array $event)
     {
         $content .= "[b]Region:[/b] [url=" . $mybb->settings['bburl'] . "/events.php?region="
                   . urlencode($event['region']) . "]" . events_escape_bbcode($event['region']) . "[/url]\n";
+    }
+
+    if($unit !== null)
+    {
+        $content .= "[b]Run by:[/b] " . events_escape_bbcode($unit['unit']) . "\n";
     }
 
     // The address is a link to the map rather than a line of text to copy out: the thread

@@ -17,7 +17,7 @@ import {
 	getUserField,
 	setUserField,
 } from '../../tests/helpers/db';
-import { createAnnouncedEvent } from './events';
+import { BORDER_REGION, createAnnouncedEvent, withBorderRegion } from './events';
 import { relativeToTestNow } from '../../tests/helpers/clock';
 import { withSettings } from '../../tests/helpers/settings';
 import { signUpThroughWizard } from '../../tests/helpers/rsvp';
@@ -180,6 +180,26 @@ test.describe('members: finding events', () => {
 		await loginAs(page, 'trooper1');
 		await page.goto(`/event.php?id=${eventId}`);
 		await shot(page.locator('#rsvp_list'), 'members/who-is-attending');
+	});
+
+	test('an event run by another garrison', async ({ page }) => {
+		const restore = await withBorderRegion();
+		try {
+			const eventId = await createAnnouncedEvent({
+				title: 'Coolangatta Charity Troop',
+				region: BORDER_REGION,
+				externalSignupUrl: 'https://redback-garrison.example/forum/showthread.php?tid=12',
+				start: { days: 8 },
+				end: { days: 8, hours: 5 },
+			});
+
+			await loginAs(page, 'trooper1');
+			await page.goto(`/event.php?id=${eventId}`);
+			await ring(page.locator('#event_unit_notice'), page.locator('#event_unit_logo'));
+			await shot(page.locator('#event_card'), 'members/other-unit-event');
+		} finally {
+			await restore();
+		}
 	});
 });
 

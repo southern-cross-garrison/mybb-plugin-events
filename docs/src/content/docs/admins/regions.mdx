@@ -1,6 +1,6 @@
 ---
 title: Regions
-description: Add, rename or delete regions, and set where each region's events are announced.
+description: Add, rename or delete regions, set where each region's events are announced, and cross-post another garrison's events.
 sidebar:
   order: 5
 ---
@@ -9,6 +9,7 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 import { Image } from 'astro:assets';
 import regions from '../../../assets/screenshots/admins/regions.png';
 import regionsDelete from '../../../assets/screenshots/admins/regions-delete.png';
+import regionsUnit from '../../../assets/screenshots/admins/regions-unit.png';
 
 Every event is filed under a region. Members filter the events list by region, and each
 region can have its own forum for announcement threads.
@@ -46,3 +47,19 @@ Each region's events are announced in the forum on its row. Regions set to **Non
 <Aside>
   Names can be up to 64 characters, with no commas or equals signs.
 </Aside>
+
+## Regions run by another unit
+
+If members troop at a neighbouring garrison's events, you can cross-post those events
+under a region of their own. Enter the other garrison's name in **Run by** on that
+region's row, choose its logo (PNG, JPEG, GIF, WebP or SVG, up to 1 MB), and click
+**Save Settings**.
+
+<Image src={regionsUnit} alt="A region's Run by box and logo circled" />
+
+Members sign up to these events as usual. Each event shows the other garrison's logo and a
+warning that signing up here doesn't sign them up with that garrison, with a link to the
+real signup sheet. Coordinators must add that link when they create the event.
+
+To replace the logo, choose another file. To remove it, tick **Remove**. If you clear
+**Run by**, the region is yours again and its logo is removed.

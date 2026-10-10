@@ -15,6 +15,8 @@ if(!defined("IN_MYBB"))
 // events_regions() reads a setting, and this file is included on pages that have not
 // necessarily pulled the core helpers in themselves.
 require_once MYBB_ROOT . "inc/plugins/events/inc/events_functions.php";
+// Every page that shows an event can be showing one another unit runs.
+require_once MYBB_ROOT . "inc/plugins/events/inc/events_units.php";
 
 /**
  * The board's regions, in the order the Admin CP has them.

@@ -280,6 +280,16 @@ function events_admin_edit_event()
     {
         $container->output_row("Region", "Used by the region filter", $form->generate_select_box("region", $region_choices, htmlspecialchars_uni((string)$values['region']), array("id" => "region")), "region");
     }
+    // See manage_event.php.
+    if(events_unit_regions())
+    {
+        // Written by hand: generate_text_box() can set an id and a class and nothing else.
+        $container->output_row("Signup Sheet", "The running unit's own signup thread for this event",
+            '<input type="text" class="text_input" name="external_signup_url" id="external_signup_url"'
+                . ' value="' . htmlspecialchars_uni($values['external_signup_url']) . '"'
+                . ' maxlength="' . EVENTS_SIGNUP_URL_MAX_LENGTH . '" inputmode="url" placeholder="https://" />',
+            "external_signup_url", array(), array("id" => "row_external_signup_url"));
+    }
     $container->output_row("Address", "Optional. Where the event happens; shown as a Google Maps link on the event pages and in the announcement thread", $form->generate_text_box("address", $values['address'], array("id" => "address", "maxlength" => 255)), "address");
     // The date boxes are not generate_text_box(): it can set a class, an id and a style and
     // nothing else, so it cannot produce the time input beside each one. events_datetime_field()
@@ -366,6 +376,7 @@ function events_admin_edit_event()
     echo events_datepicker_script();
     echo events_event_days_script();
     echo events_tag_field_script();
+    echo events_signup_url_script('region', 'row_external_signup_url');
 }
 
 /**

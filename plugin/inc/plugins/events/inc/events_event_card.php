@@ -118,6 +118,11 @@ function events_render_event_card(array $event, $thread_id = 0)
         . events_signup_counts(events_signup_role_counts($event), true, true)
         . '</div>';
 
+    // An event another unit runs carries their logo under the tab, and says up front that
+    // this is not where signing up counts.
+    $event_unit_logo = events_unit_logo_html($event);
+    $event_unit_notice = events_unit_notice_html($event, 'event_unit_notice');
+
     $event_capacity_row = '';
     $event_capacity = events_capacity_text($event, !empty($event_days));
     if($event_capacity !== '')

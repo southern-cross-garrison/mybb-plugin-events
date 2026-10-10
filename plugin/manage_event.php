@@ -206,6 +206,19 @@ if(events_has_regions())
     );
 }
 
+// Only on a board where another unit runs one of the regions; the script shows it while
+// one of those is chosen.
+if(events_unit_regions())
+{
+    $manage_details .= events_form_field(
+        'event_form_signup_url',
+        'Signup Sheet',
+        events_form_text('external_signup_url', 'event_form_signup_url', $values['external_signup_url'],
+            array('maxlength' => EVENTS_SIGNUP_URL_MAX_LENGTH, 'inputmode' => 'url', 'placeholder' => 'https://'), true),
+        'The running unit\'s own signup thread for this event.'
+    );
+}
+
 $manage_details .= events_form_field(
     'event_form_address',
     'Address',
@@ -340,7 +353,8 @@ $manage_assets = events_datepicker_assets('jscripts/events/')
                . events_tag_field_assets('jscripts/events/')
                . events_preview_assets('jscripts/events/');
 
-$manage_days_script = events_datepicker_script() . events_event_days_script() . events_tag_field_script();
+$manage_days_script = events_datepicker_script() . events_event_days_script() . events_tag_field_script()
+    . events_signup_url_script('event_form_region', 'field_event_form_signup_url');
 
 $events_print_header = events_print_header($is_edit ? $event['title'] : 'Create Event', array(), $is_edit ? 'Event Settings' : '');
 

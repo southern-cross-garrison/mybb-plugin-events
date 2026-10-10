@@ -206,7 +206,9 @@ Either way the details are:
 - WWCC requirement
 - GEC assignment - see below
 - Event days - the hours the event runs on each of its days. The rows follow the start
-  and end dates rather than being typed, and a single-day event has none at all. A night
+  and end dates rather than being typed, and a single-day event has none at all. Each
+  row starts with the event's start and end times, and keeps following them until its own
+  are changed. A night
   that runs past midnight is not a second day: an event shorter than a day is on the
   date it starts, and one that ends before 06:00 finished the night before, so a
   22:00 to 01:00 troop is one night and two such nights are two rows. A day whose end
@@ -267,6 +269,32 @@ keeps whatever list it had.
   last region leaves its events with no region, as on a board that never had any.
 
 A region name cannot contain a comma or an equals sign, and is at most 64 characters.
+
+#### Regions Run by Another Unit
+
+Members living near the garrison's borders often troop at a neighbouring garrison's
+events, and those can be cross-posted here so members sign up as usual. A region's row has
+a **Run by** box for the unit that runs it - blank is the garrison itself - and a logo for
+that unit (PNG, JPEG, GIF, WebP or SVG, 1 MB at most).
+
+Every event filed under such a region:
+
+- needs a **Signup Sheet** on the event form: the link to the event's own signup thread on
+  the other unit's forum. Both forms show the box only while one of those regions is
+  chosen, and refuse to save without it.
+- says on its card, between the details and the description, that it is run by that unit
+  and that signing up here doesn't sign anybody up with them, linking the real signup
+  sheet. The unit's logo sits in the card's top right corner under the turnout tab.
+- says it again on the signup's confirm step, above the Confirm button.
+- carries the same warning, and a **Run by** line, in its announcement thread's first post,
+  which is what guests and Tapatalk read.
+
+Nothing else changes: the event is signed up to, reminded about, reported on and counted
+like any of the garrison's own. Renaming the region keeps its unit and logo; deleting it,
+or clearing its Run by box, drops them. Logos are stored in the board's uploads folder
+(`uploads/events/`), and a replaced or removed one is deleted. An SVG that carries a
+script, an event handler, or a link to another file is refused, since it is served from
+the board's own domain.
 
 ### Who Can Be Assigned as Coordinator
 
@@ -785,6 +813,7 @@ accordingly.
       events_ical.php             # iCal rendering shared by the export and the feed
       events_feed.php             # Calendar subscription tokens
       events_thread.php           # Generating and maintaining event announcement threads
+      events_units.php            # Regions run by another unit, and their logos
       events_troop_report.php     # The troop report draft, and posting a report
       events_attendance.php       # Troop attendance: counting it, and the statistics
       events_charts.php           # The Reports tab's and My Troops' charts
@@ -882,7 +911,8 @@ to `[` as the textarea's value and quietly undo the escaping on submit.
 
 All tables use the `mybb_event_plugin_` prefix:
 
-- `event_plugin_events` - Main events table
+- `event_plugin_events` - Main events table. `external_signup_url` is the real signup
+  sheet of an event in a region another unit runs, and is blank for every other event
 - `event_plugin_event_days` - Multi-day event support
 - `event_plugin_event_exclusions` - Users excluded from RSVPing
 - `event_plugin_rsvps` - Signup records; `role` is `trooper` or `wrangler` on a troop and

@@ -775,6 +775,45 @@ textarea.events_input {
 	}
 }
 
+/* The logo of the unit running an event cross-posted from another garrison. Wide, it hangs
+   under the turnout tab in the gutter kept clear for it above, placed by the tab's own
+   height (its padding plus one line) so it follows whatever font size the theme sets.
+   Narrow, the tab sits over the meta list instead, so the logo floats at the list's
+   right, below it. */
+#event_meta {
+	display: flow-root;
+}
+.event_unit_logo {
+	float: right;
+	/* Capped by the card as well on a phone, where 192px would take half of it and leave
+	   the details beside it a word to a line. */
+	max-width: min(192px, 40%);
+	max-height: 128px;
+	margin: 0 0 8px 12px;
+	object-fit: contain;
+}
+@media (min-width: 620px) {
+	.event_unit_logo {
+		position: absolute;
+		top: calc(1.3em + 13px + 10px);
+		right: 14px;
+		float: none;
+		margin: 0;
+	}
+	/* Out of the flow, so nothing else keeps the warning under the details from running
+	   into it on an event with few of them. Measured from the card's top, the same as the
+	   logo, less the cell's own padding above the details. */
+	#event_meta:has(.event_unit_logo) {
+		min-height: calc(1.3em + 13px + 10px + 128px - 8px);
+	}
+}
+
+/* That this is not where signing up for it counts, between the details and the
+   description on the card, and above the button on the signup's confirm step. */
+.events_unit_notice {
+	margin: 10px 0;
+}
+
 /* The address under an event's title, rather than a column of its own: a venue runs as
    long as the rest of the row put together, and a column for it would squeeze the five
    beside it. Small and quiet, because it is the answer to a second question - the title
@@ -2528,6 +2567,12 @@ a.rsvp_remove:focus {
 	}
 	#event_meta {
 		padding: 0 !important;
+	}
+	/* Back into the flow beside the details, the way the tab above it goes back in. */
+	.event_unit_logo {
+		position: static;
+		float: right;
+		margin: 0 0 6pt 12pt;
 	}
 
 	/* Controls that can only do something in a browser. The status pills are not

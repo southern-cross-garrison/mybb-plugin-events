@@ -242,9 +242,25 @@ baseline picks the change up.
   it, the `region` column is a `varchar` rather than the enum it shipped as, and the
   Admin CP settings page owns all three ways it changes - renaming (a box saved with the
   form), adding and deleting (each its own action, confirmed in a dialog). Every one of
-  them has to keep three things in step: the list, the events filed under each name, and
-  the `Region=fid` announcement-forum map, which is keyed by name too. Miss the last one
-  and a rename silently stops routing that region's announcements.
+  them has to keep four things in step: the list, the events filed under each name, the
+  `Region=fid` announcement-forum map, and the `events_region_units` map of regions run by
+  another unit - both maps keyed by name too. Miss the forum map and a rename silently
+  stops routing that region's announcements; miss the unit map and its cross-posted
+  events silently stop saying they are not the real signup sheet.
+  `events_admin_save_region_settings()` writes all three settings together for that reason.
+
+- A region run by another unit (`events_units.php`) is a neighbouring garrison's, and its
+  events are cross-posted here: each one needs an `external_signup_url`, and the card, the
+  RSVP confirm step and the announcement post all say signing up here is not signing up
+  with them. The unit map is JSON, not `Region=value` pairs, because a unit's name is free
+  text. Its logos are files in `uploads/events/`, the only files the plugin writes: one per
+  upload under a random name, stored only once the rest of the settings form has
+  validated, and deleted once the setting stops naming them - on replace, Remove, clearing
+  Run by, deleting the region and uninstall. `events_delete_unit_logo()` refuses any path
+  it did not generate, since the setting can be edited by hand. SVGs are accepted but
+  refused if they carry a script, an event handler or an outside link, because they are
+  served from the board's own origin. Tests seed the map with `setRegionUnits()`
+  (`tests/helpers/units.ts`) and clear it, files and all, with `clearRegionUnits()`.
 
 - Nothing may leave an event filed under a region that is not on the list. Such an event
   is invisible to the region filter and is rejected by the event form the next time

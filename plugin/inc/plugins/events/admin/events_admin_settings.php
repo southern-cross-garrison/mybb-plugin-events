@@ -241,7 +241,15 @@ function events_admin_settings()
             $errors[] = "Preapproval Requirements must be a link to a post on this board, its post ID, or blank.";
         }
 
+        // Last, because it stores any uploaded logos: see
+        // events_admin_region_units_from_rows().
+        $region_units = false;
         if($region_plan !== false && empty($errors))
+        {
+            $region_units = events_admin_region_units_from_rows($region_rows, $region_plan['renames'], $errors, $stale_logos, $unit_changes);
+        }
+
+        if($region_units !== false && empty($errors))
         {
             $settings = array(
                 'events_costume_field' => $mybb->input['costume_field'],
@@ -268,7 +276,9 @@ function events_admin_settings()
                 // silently unroutes its announcements.
                 'events_event_forums' => events_build_region_forums_setting(
                     events_admin_region_forums_from_rows($region_rows, $region_plan['renames'])
-                )
+                ),
+                // Keyed by region name the same way, for the same reason.
+                'events_region_units' => events_build_region_units_setting($region_units),
             );
 
             // A rename takes the region's events with it, and they move before the list
@@ -276,6 +286,13 @@ function events_admin_settings()
             // a region the board can still see rather than under one it cannot.
             $former_forum_ids = events_announcement_forum_ids();
             $announced = events_admin_announced_event_ids($region_plan['moves']);
+            // An announcement says who runs the event and links to their signup sheet, so a
+            // region changing hands rewrites its threads as well.
+            if($unit_changes)
+            {
+                $announced = array_values(array_unique(array_merge($announced,
+                    events_admin_announced_event_ids(array_combine($unit_changes, $unit_changes)))));
+            }
             // Pointing archived threads at another forum moves the ones already archived
             // too, not only those archived from now on.
             if((int)$settings['events_archive_forum'] !== events_archive_forum_id())
@@ -290,6 +307,12 @@ function events_admin_settings()
             }
 
             rebuild_settings();
+
+            // Replaced and removed logos go only once the setting no longer names them.
+            foreach($stale_logos as $logo)
+            {
+                events_delete_unit_logo($logo);
+            }
 
             // The announcements name the region and link to its listing, and the same
             // save may have pointed the region at another forum. Synced against the new
@@ -332,7 +355,8 @@ function events_admin_settings()
         $user_groups[$group['gid']] = $group['title'];
     }
     
-    $form = new Form("index.php?module=events&action=settings", "post");
+    // Uploads, for the logos of regions another unit runs.
+    $form = new Form("index.php?module=events&action=settings", "post", "", true);
 
     // A form coming back with a validation error still shows what was submitted, so it
     // keeps the token that was submitted with it: it is still based on that state, and a

@@ -1,4 +1,4 @@
-import { Page } from '@playwright/test';
+import { Page, Request } from '@playwright/test';
 import { test, expect } from '../helpers/fixtures';
 import { loginAs, loginToAdminCp, gotoEventsAdmin } from '../helpers/auth';
 import {
@@ -164,6 +164,16 @@ test.describe('preapproval requirements', () => {
 	});
 });
 
+/**
+ * One field of a posted form, read from the body as it went over the wire. The settings
+ * form is multipart, since it takes the logos of regions another unit runs.
+ */
+function postedField(request: Request, name: string): string | null {
+	const body = request.postData() ?? '';
+	const multipart = body.match(new RegExp(`name="${name}"\\r\\n\\r\\n([^\\r]*)\\r\\n`));
+	return multipart ? multipart[1] : new URLSearchParams(body).get(name);
+}
+
 test.describe('preapproval requirements setting', () => {
 	let restore: (() => Promise<void>) | undefined;
 
@@ -198,9 +208,7 @@ test.describe('preapproval requirements setting', () => {
 			(request) => request.method() === 'POST' && request.url().includes('action=settings')
 		);
 		await page.locator('input[type="submit"][value="Save Settings"]').click();
-		expect(new URLSearchParams((await save).postData() ?? '').get('preapproval_post')).toBe(
-			String(pid)
-		);
+		expect(postedField(await save, 'preapproval_post')).toBe(String(pid));
 		await expect(page.locator('#flash_message')).toContainText('Settings updated successfully');
 		expect(await getSetting('events_preapproval_post')).toBe(String(pid));
 		await expect(page.locator('#preapproval_post')).toHaveValue(String(pid));
@@ -215,9 +223,7 @@ test.describe('preapproval requirements setting', () => {
 			(request) => request.method() === 'POST' && request.url().includes('action=settings')
 		);
 		await page.locator('input[type="submit"][value="Save Settings"]').click();
-		expect(
-			new URLSearchParams((await threadSave).postData() ?? '').get('preapproval_post')
-		).toBe(`thread-${tid}`);
+		expect(postedField(await threadSave, 'preapproval_post')).toBe(`thread-${tid}`);
 		await expect(page.locator('#flash_message')).toContainText('Settings updated successfully');
 		expect(await getSetting('events_preapproval_post')).toBe(String(pid));
 

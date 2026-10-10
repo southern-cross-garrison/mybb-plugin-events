@@ -29,6 +29,8 @@ export interface SignupOptions {
 	dayRoles?: Record<number, SignupRole | 'none'>;
 	/** The leading answer, covering every day not overridden above; defaults to trooping. */
 	role?: SignupRole;
+	/** Called on the confirm step, before it is confirmed, for a test asserting on it. */
+	beforeConfirm?: (page: Page) => Promise<void>;
 }
 
 /**
@@ -81,6 +83,9 @@ export async function signUpThroughWizard(
 		await page.locator('#rsvp_submit').click();
 		await settleOnStep(page, 'confirm');
 	}
+
+	await settleOnStep(page, 'confirm');
+	await options.beforeConfirm?.(page);
 
 	await page.locator('#rsvp_submit').click();
 	await expect(page.locator('#rsvp_success_message')).toBeVisible();

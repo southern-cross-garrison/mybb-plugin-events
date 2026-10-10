@@ -13,6 +13,14 @@ import {
 	T,
 	fixtures,
 } from '../helpers/db';
+import {
+	PNG,
+	SVG,
+	clearRegionUnits,
+	getRegionUnits,
+	setRegionUnits,
+	storedLogos,
+} from '../helpers/units';
 
 /**
  * The region list is the board's, not the plugin's: it is edited in Admin CP -> Event
@@ -114,6 +122,9 @@ async function addRegion(page: Page, name: string): Promise<void> {
  * tests themselves are there to catch.
  */
 async function restoreRegions(page: Page): Promise<void> {
+	// First, so the renames and deletions below have no units to carry along.
+	await clearRegionUnits();
+
 	await restoreRegionList(page);
 
 	// Deleting a region takes its announcement forum with it, and nothing above puts that
@@ -736,5 +747,139 @@ test.describe('configurable regions without JavaScript', () => {
 
 		await expect(page.locator('#flash_message')).toContainText('"Illawarra" added');
 		expect(await getSetting('events_regions')).toBe(`${DEFAULT_REGIONS},Illawarra`);
+	});
+});
+
+/**
+ * A region can be handed to another unit - a neighbouring garrison whose events are
+ * cross-posted here - with that unit's logo. The unit map is keyed by region name like
+ * the forum map, so it has to follow every rename and deletion the same way.
+ */
+test.describe('regions run by another unit', () => {
+	test.afterEach(async ({ page }) => {
+		await restoreRegions(page);
+	});
+
+	async function upload(page: Page, region: string, name: string, buffer: Buffer): Promise<void> {
+		const index = await rowIndex(page, region);
+		await page.locator(`#region_logo_${index}`).setInputFiles({
+			name,
+			mimeType: name.endsWith('.svg') ? 'image/svg+xml' : 'image/png',
+			buffer,
+		});
+	}
+
+	test('hands a region to another unit with its logo, which follows a rename and can be replaced or removed', async ({
+		page,
+	}) => {
+		await gotoSettings(page);
+		await page.locator(`#region_unit_${await rowIndex(page, 'Hunter')}`).fill('Star Garrison');
+		await upload(page, 'Hunter', 'star.png', PNG);
+		await save(page);
+
+		await expect(page.locator('#flash_message')).toContainText('Settings updated successfully');
+		const units = await getRegionUnits();
+		expect(units.Hunter.unit).toBe('Star Garrison');
+		expect(units.Hunter.logo).toMatch(/^uploads\/events\/unit_[0-9a-f]{16}\.png$/);
+		expect(storedLogos()).toEqual([units.Hunter.logo.split('/').pop()]);
+
+		// The row shows what members will see.
+		const preview = page.locator(`#region_logo_preview_${await rowIndex(page, 'Hunter')}`);
+		await expect
+			.poll(() => preview.evaluate((img: HTMLImageElement) => img.naturalWidth))
+			.toBeGreaterThan(0);
+
+		// Renamed, the region keeps its unit and its logo.
+		await renameRegion(page, 'Hunter', 'Hunter Valley');
+		await save(page);
+		const renamed = await getRegionUnits();
+		expect(Object.keys(renamed)).toEqual(['Hunter Valley']);
+		expect(renamed['Hunter Valley']).toEqual(units.Hunter);
+
+		// A new logo replaces the old one, file and all.
+		await upload(page, 'Hunter Valley', 'star.svg', SVG);
+		await save(page);
+		const replaced = (await getRegionUnits())['Hunter Valley'].logo;
+		expect(replaced).toMatch(/\.svg$/);
+		expect(storedLogos()).toEqual([replaced.split('/').pop()]);
+
+		// And Remove takes it away while leaving the unit.
+		await page.locator(`#region_logo_remove_${await rowIndex(page, 'Hunter Valley')}`).check();
+		await save(page);
+		expect((await getRegionUnits())['Hunter Valley']).toEqual({ unit: 'Star Garrison', logo: '' });
+		expect(storedLogos()).toEqual([]);
+	});
+
+	test('handing a region back to the garrison drops its logo', async ({ page }) => {
+		await setRegionUnits({ Hunter: { unit: 'Star Garrison', logo: 'png' } });
+
+		await gotoSettings(page);
+		await page.locator(`#region_unit_${await rowIndex(page, 'Hunter')}`).fill('');
+		await save(page);
+
+		expect(await getRegionUnits()).toEqual({});
+		expect(storedLogos()).toEqual([]);
+	});
+
+	test('deleting a region takes its unit and logo with it', async ({ page }) => {
+		await setRegionUnits({ Canberra: { unit: 'Star Garrison', logo: 'png' } });
+
+		await gotoSettings(page);
+		await deleteRegion(page, 'Canberra');
+
+		await expect(page.locator('#flash_message')).toContainText('"Canberra" deleted');
+		expect(await getRegionUnits()).toEqual({});
+		expect(storedLogos()).toEqual([]);
+	});
+
+	test('refuses a logo that is no image, carries a script, or has no unit, and saves nothing', async ({
+		page,
+	}) => {
+		await gotoSettings(page);
+		const index = await rowIndex(page, 'Hunter');
+
+		await page.locator(`#region_unit_${index}`).fill('Star Garrison');
+		await upload(page, 'Hunter', 'star.png', Buffer.from('not an image'));
+		await save(page);
+		await expect(page.locator('.error')).toContainText('The logo for Hunter is not a PNG image.');
+
+		await upload(
+			page,
+			'Hunter',
+			'star.svg',
+			Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"></svg>')
+		);
+		await save(page);
+		await expect(page.locator('.error')).toContainText('The logo for Hunter contains a script');
+
+		await page.locator(`#region_unit_${index}`).fill('');
+		await upload(page, 'Hunter', 'star.png', PNG);
+		await save(page);
+		await expect(page.locator('.error')).toContainText(
+			'Name the unit that runs Hunter to give it a logo.'
+		);
+
+		expect(await getRegionUnits()).toEqual({});
+		expect(storedLogos()).toEqual([]);
+	});
+
+	test("handing a region over rewrites its events' announcements", async ({ page }) => {
+		const eventId = await createEvent({
+			title: 'Handed Over Troop',
+			region: 'Hunter',
+			externalSignupUrl: 'https://star.example/sheet',
+		});
+		const threadId = await announce(eventId);
+		expect((await getThreadFirstPost(threadId)).message).not.toContain('Run by');
+
+		await gotoSettings(page);
+		await page.locator(`#region_unit_${await rowIndex(page, 'Hunter')}`).fill('Star Garrison');
+		await save(page);
+
+		const message = (await getThreadFirstPost(threadId)).message;
+		expect(message).toContain('[b]Run by:[/b] Star Garrison');
+		expect(message).toContain(
+			'[url=https://star.example/sheet]sign up on their signup sheet[/url]'
+		);
 	});
 });

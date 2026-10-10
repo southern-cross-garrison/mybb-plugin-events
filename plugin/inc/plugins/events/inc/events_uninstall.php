@@ -22,6 +22,10 @@ function events_uninstall_database()
         $db->write_query("DROP TABLE IF EXISTS `" . TABLE_PREFIX . $table . "`");
     }
     
+    // The logos uploaded for regions another unit runs.
+    require_once MYBB_ROOT . "inc/plugins/events/inc/events_units.php";
+    events_delete_all_unit_logos();
+
     // Remove plugin settings
     $db->delete_query("settings", "name LIKE 'events_%'");
     $db->delete_query("settinggroups", "name = 'events'");
